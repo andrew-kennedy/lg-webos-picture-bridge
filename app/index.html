@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LG Picture Bridge</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <img class="logo" src="assets/icon160.png" alt="">
+        <div>
+          <p class="eyebrow">ROOTED WEBOS UTILITY</p>
+          <h1>LG Picture Bridge</h1>
+          <p class="subtitle">Reports SDR, HDR10, HLG, and Dolby Vision transitions to Home Assistant.</p>
+        </div>
+      </header>
+
+      <section class="status-card" aria-live="polite">
+        <div class="status-row">
+          <span id="status-dot" class="status-dot pending"></span>
+          <div>
+            <p class="label">Bridge status</p>
+            <p id="status-title" class="status-title">Checking configuration…</p>
+          </div>
+        </div>
+        <dl>
+          <div><dt>Home Assistant</dt><dd id="callback-display">Not paired</dd></div>
+          <div><dt>Background monitor</dt><dd id="process-display">Unknown</dd></div>
+          <div><dt>Last operation</dt><dd id="operation-display">Waiting</dd></div>
+        </dl>
+      </section>
+
+      <section class="instructions">
+        <h2>Pair from Home Assistant</h2>
+        <p>
+          Run the pairing script supplied with this project. Home Assistant will relaunch this app
+          with a local webhook URL; no TV keyboard entry is required.
+        </p>
+      </section>
+
+      <nav class="actions" aria-label="Bridge actions">
+        <button id="refresh-button" type="button" autofocus>Refresh status</button>
+        <button id="test-button" type="button">Send test event</button>
+        <button id="clear-button" class="danger" type="button">Clear pairing</button>
+      </nav>
+
+      <pre id="details" class="details"></pre>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+<h2>LG Picture Bridge</h2>
+<p>
+  LG Picture Bridge monitors a rooted LG webOS TV's internal video-output and picture-dimension
+  services. It reports SDR, HDR10, HLG, and Dolby Vision transitions to a local Home Assistant
+  webhook so picture-setting automations can be reapplied whenever content changes format.
+</p>
+<h3>Requirements</h3>
+<ul>
+  <li>A rooted LG webOS TV with an elevated Homebrew Channel installation</li>
+  <li>Home Assistant reachable from the TV over the local network</li>
+  <li>The pairing script from the project documentation</li>
+</ul>
+<p>No ambient-light capture server is required. Pairing is sent from Home Assistant as application launch parameters, so no webhook URL needs to be typed with the TV remote.</p>

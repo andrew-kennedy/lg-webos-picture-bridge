@@ -1,0 +1,39 @@
+lg_picture_bridge_pair:
+  alias: Pair LG Picture Bridge
+  description: Provision the TV bridge without typing a webhook URL on the TV.
+  mode: single
+  fields:
+    home_assistant_base_url:
+      name: Home Assistant base URL
+      description: A URL reachable from the TV, such as http://10.0.0.5:8123.
+      required: true
+      selector:
+        text: {}
+    webhook_id:
+      name: Webhook ID
+      description: The same random ID used by the receiving automation.
+      required: true
+      selector:
+        text: {}
+    lg_tv_media_player_entity:
+      name: LG TV
+      required: true
+      default: media_player.lg_webos_smart_tv
+      selector:
+        entity:
+          domain: media_player
+  sequence:
+    - action: webostv.command
+      data:
+        entity_id: "{{ lg_tv_media_player_entity }}"
+        command: system.launcher/launch
+        payload:
+          id: io.github.andrewkennedy.lgpicturebridge
+          params:
+            setup:
+              callback_url: >-
+                {{ home_assistant_base_url | trim | trim('/')
+                   }}/api/webhook/{{ webhook_id | trim }}
+              device_id: living-room-lg-c9
+              device_name: Living Room LG C9
+              debounce_ms: 1200

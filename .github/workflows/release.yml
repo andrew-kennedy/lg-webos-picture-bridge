@@ -1,0 +1,54 @@
+name: Release and Pages
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run validate
+      - run: npm run build
+      - run: npm run manifest
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+      - run: npm run site
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${{ github.ref_name }}"
+          dist/*.ipk dist/*.manifest.json
+          --verify-tag
+          --generate-notes
+          --title "LG Picture Bridge ${{ github.ref_name }}"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

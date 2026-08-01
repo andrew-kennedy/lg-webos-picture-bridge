@@ -1,0 +1,34 @@
+alias: LG Picture Bridge - Receive Dynamic Range
+description: Receive SDR, HDR10, HLG, and Dolby Vision transitions from the TV.
+triggers:
+  - trigger: webhook
+    webhook_id: REPLACE_WITH_THE_SAME_RANDOM_WEBHOOK_ID
+    allowed_methods:
+      - POST
+    local_only: true
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.json.event == 'pairing_test' }}"
+        sequence:
+          - action: persistent_notification.create
+            data:
+              notification_id: lg_picture_bridge_paired
+              title: LG Picture Bridge paired
+              message: >-
+                Received a pairing test from
+                {{ trigger.json.device_name | default('LG webOS TV') }}.
+    default:
+      - event: lg_picture_bridge_dynamic_range_changed
+        event_data:
+          dynamic_range: "{{ trigger.json.dynamic_range }}"
+          previous_dynamic_range: "{{ trigger.json.previous_dynamic_range }}"
+          source: "{{ trigger.json.source }}"
+          raw_value: "{{ trigger.json.raw_value }}"
+          device_id: "{{ trigger.json.device_id }}"
+          device_name: "{{ trigger.json.device_name }}"
+      # Add your source-policy dispatcher after this event. The bridge avoids
+      # referencing a script that may not exist in your Home Assistant setup.
+mode: queued
+max: 10
