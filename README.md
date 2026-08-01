@@ -19,14 +19,15 @@ not capture video, drive LEDs, or require HyperHDR.
 Open **Homebrew Channel → Settings → Add repository** and enter this exact URL:
 
 ```text
-https://raw.githubusercontent.com/andrew-kennedy/lg-webos-picture-bridge/main/site/apps.json
+https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/latest/download/apps.json
 ```
 
 Return to the app browser, install **LG Picture Bridge**, and launch it once. Homebrew Channel must
 show **Root status: ok** because the monitor needs private Luna access and a startup hook.
 
-The release workflow also deploys a browsable GitHub Pages site. The raw GitHub URL above is used
-for Homebrew Channel so it remains independent of account-level Pages custom-domain redirects.
+The release workflow also deploys a browsable GitHub Pages site. The release URL above always
+selects the latest tagged feed and remains independent of account-level Pages custom-domain
+redirects and branch-content cache delays.
 
 ## Configure Home Assistant
 
