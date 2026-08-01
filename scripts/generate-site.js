@@ -9,7 +9,7 @@ var app = project.appInfo();
 var tag = process.env.RELEASE_TAG || 'v' + app.version;
 var manifestPath = path.join(project.ROOT, 'dist', app.id + '.manifest.json');
 var manifest = project.readJson(manifestPath);
-var pagesBase = 'https://andrew-kennedy.github.io/lg-webos-picture-bridge';
+var contentBase = 'https://raw.githubusercontent.com/andrew-kennedy/lg-webos-picture-bridge/main/site';
 var repository = 'https://github.com/andrew-kennedy/lg-webos-picture-bridge';
 var site = path.join(project.ROOT, 'site');
 
@@ -18,13 +18,13 @@ var feed = {
   packages: [{
     id: app.id,
     title: app.title,
-    iconUri: pagesBase + '/icon160.png',
+    iconUri: contentBase + '/icon160.png',
     manifestUrl: repository + '/releases/download/' + tag + '/' + app.id + '.manifest.json',
     manifest: manifest,
     pool: 'main',
     requirements: {webosRelease: '>=4.0'},
     shortDescription: app.appDescription,
-    fullDescriptionUrl: pagesBase + '/full_description.html'
+    fullDescriptionUrl: contentBase + '/full_description.html'
   }]
 };
 

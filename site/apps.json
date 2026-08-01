@@ -9,7 +9,7 @@
     {
       "id": "io.github.andrewkennedy.lgpicturebridge",
       "title": "LG Picture Bridge",
-      "iconUri": "https://andrew-kennedy.github.io/lg-webos-picture-bridge/icon160.png",
+      "iconUri": "https://raw.githubusercontent.com/andrew-kennedy/lg-webos-picture-bridge/main/site/icon160.png",
       "manifestUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/download/v0.1.0/io.github.andrewkennedy.lgpicturebridge.manifest.json",
       "manifest": {
         "id": "io.github.andrewkennedy.lgpicturebridge",
@@ -31,7 +31,7 @@
         "webosRelease": ">=4.0"
       },
       "shortDescription": "Reports TV dynamic-range changes to Home Assistant",
-      "fullDescriptionUrl": "https://andrew-kennedy.github.io/lg-webos-picture-bridge/full_description.html"
+      "fullDescriptionUrl": "https://raw.githubusercontent.com/andrew-kennedy/lg-webos-picture-bridge/main/site/full_description.html"
     }
   ]
 }
