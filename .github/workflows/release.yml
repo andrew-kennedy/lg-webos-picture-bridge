@@ -36,15 +36,20 @@ jobs:
       - run: npm run site
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-      - name: Create GitHub release
+      - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "${{ github.ref_name }}"
-          dist/*.ipk dist/*.manifest.json
-          --verify-tag
-          --generate-notes
-          --title "LG Picture Bridge ${{ github.ref_name }}"
+        run: |
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            gh release upload "${{ github.ref_name }}" \
+              dist/*.ipk dist/*.manifest.json site/apps.json --clobber
+          else
+            gh release create "${{ github.ref_name }}" \
+              dist/*.ipk dist/*.manifest.json site/apps.json \
+              --verify-tag \
+              --generate-notes \
+              --title "LG Picture Bridge ${{ github.ref_name }}"
+          fi
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
@@ -52,3 +57,20 @@ jobs:
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+      - name: Publish install feed to main
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          feed_copy="${RUNNER_TEMP}/lg-picture-bridge-apps.json"
+          cp site/apps.json "$feed_copy"
+          git fetch origin main
+          git checkout -B main FETCH_HEAD
+          cp "$feed_copy" site/apps.json
+          if git diff --quiet -- site/apps.json; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/apps.json
+          git commit -m "Update Homebrew feed for ${RELEASE_TAG} [skip ci]"
+          git push origin main
