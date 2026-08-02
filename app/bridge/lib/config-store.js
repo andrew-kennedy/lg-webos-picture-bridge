@@ -22,6 +22,8 @@ function ensureDirectory(directory) {
 function validate(input) {
   var parsed;
   var debounce;
+  var commandPort;
+  var commandToken;
   var config = input || {};
   if (typeof config.callback_url !== 'string' || config.callback_url.length > 2048) {
     throw new Error('callback_url is required and must be shorter than 2048 characters');
@@ -40,11 +42,25 @@ function validate(input) {
   if (!isFinite(debounce) || debounce < 250 || debounce > 10000) {
     throw new Error('debounce_ms must be between 250 and 10000');
   }
+  commandToken = config.command_token === undefined || config.command_token === null ?
+    null : String(config.command_token);
+  if (commandToken === '') commandToken = null;
+  if (commandToken && (commandToken.length < 24 || commandToken.length > 256 ||
+      /\s/.test(commandToken))) {
+    throw new Error('command_token must contain 24 to 256 characters without whitespace');
+  }
+  commandPort = Number(config.command_port || 49191);
+  if (!isFinite(commandPort) || Math.round(commandPort) !== commandPort ||
+      commandPort < 1024 || commandPort > 65535) {
+    throw new Error('command_port must be an integer between 1024 and 65535');
+  }
   return {
     callback_url: config.callback_url,
     device_id: String(config.device_id || 'lg-webos-tv').slice(0, 128),
     device_name: String(config.device_name || 'LG webOS TV').slice(0, 128),
-    debounce_ms: Math.round(debounce)
+    debounce_ms: Math.round(debounce),
+    command_token: commandToken,
+    command_port: commandPort
   };
 }
 

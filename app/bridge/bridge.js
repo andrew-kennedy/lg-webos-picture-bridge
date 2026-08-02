@@ -4,6 +4,9 @@ var range = require('./lib/range');
 var store = require('./lib/config-store');
 var healthStore = require('./lib/health-store');
 var webhook = require('./lib/webhook');
+var commandServer = require('./lib/command-server');
+var lunaExecutor = require('./lib/luna-executor');
+var picturePolicy = require('./lib/picture-policy');
 var appInfo = require('../appinfo.json');
 
 function now() {
@@ -29,6 +32,10 @@ function start(service, dependencies) {
   var retryTimer = null;
   var sending = false;
   var stopping = false;
+  var currentPictureContext = null;
+  var policyServer = null;
+  var commandQueue = [];
+  var commandRunning = false;
   var health = {
     bridge_version: appInfo.version,
     service_registered: true,
@@ -51,9 +58,17 @@ function start(service, dependencies) {
     last_dynamic_range: null,
     last_source: null,
     last_raw_value: null,
+    current_picture_context: null,
     last_observed_at: null,
     last_delivery_at: null,
     last_delivery_status: null,
+    command_api: {
+      enabled: Boolean(config.command_token),
+      port: config.command_token ? config.command_port : null,
+      state: config.command_token ? 'starting' : 'disabled',
+      last_error: null
+    },
+    last_command: null,
     last_error: null
   };
 
@@ -78,6 +93,11 @@ function start(service, dependencies) {
     return selected;
   }
 
+  function candidateIdentity(candidate) {
+    if (!candidate) return null;
+    return candidate.dynamic_range + '|' + String(candidate.input || '');
+  }
+
   function retryDelivery() {
     if (retryTimer || stopping) return;
     retryTimer = setTimeout(function () {
@@ -95,6 +115,9 @@ function start(service, dependencies) {
       event: 'dynamic_range_changed',
       dynamic_range: candidate.dynamic_range,
       previous_dynamic_range: lastDelivered ? lastDelivered.dynamic_range : null,
+      input: candidate.input,
+      previous_input: lastDelivered ? lastDelivered.input : null,
+      picture_mode: candidate.picture_mode,
       source: candidate.source,
       raw_value: candidate.raw_value,
       observed_at: candidate.observed_at,
@@ -123,7 +146,7 @@ function start(service, dependencies) {
       log('Delivered ' + candidate.dynamic_range + ' from ' + candidate.source +
         ' (HTTP ' + response.statusCode + ')');
       newest = selectNewestCandidate();
-      if (!pending && newest && newest.dynamic_range !== lastDelivered.dynamic_range) {
+      if (!pending && newest && candidateIdentity(newest) !== candidateIdentity(lastDelivered)) {
         pending = newest;
       }
       if (pending) deliverPending();
@@ -135,7 +158,7 @@ function start(service, dependencies) {
     debounceTimer = setTimeout(function () {
       var selected = selectNewestCandidate();
       if (!selected) return;
-      if (lastDelivered && lastDelivered.dynamic_range === selected.dynamic_range) {
+      if (lastDelivered && candidateIdentity(lastDelivered) === candidateIdentity(selected)) {
         pending = null;
         if (retryTimer) {
           clearTimeout(retryTimer);
@@ -150,6 +173,8 @@ function start(service, dependencies) {
 
   function handlePayload(source, payload) {
     var extracted = range.extract(source, payload);
+    var pictureContext = source === 'picture' ?
+      range.extractPictureContext(payload, currentPictureContext) : null;
     var sourceHealth = health.subscriptions[source];
     var payloadSummary = summarizePayload(payload);
     sourceHealth.last_response_at = now();
@@ -180,7 +205,15 @@ function start(service, dependencies) {
     }
 
     sourceHealth.state = payload && payload.subscribed === true ? 'subscribed' : 'responding';
+    if (pictureContext) {
+      currentPictureContext = pictureContext;
+      health.current_picture_context = pictureContext;
+    }
     if (!extracted) {
+      if (pictureContext) {
+        saveHealth();
+        return;
+      }
       if (sourceHealth.last_unrecognized_payload !== payloadSummary) {
         sourceHealth.last_unrecognized_payload = payloadSummary;
         log('Unrecognized ' + source + ' payload: ' + payloadSummary);
@@ -189,6 +222,10 @@ function start(service, dependencies) {
       return;
     }
 
+    if (!extracted.input && currentPictureContext) extracted.input = currentPictureContext.input;
+    if (!extracted.picture_mode && currentPictureContext) {
+      extracted.picture_mode = currentPictureContext.picture_mode;
+    }
     extracted.observed_at = now();
     extracted.updated_at_ms = Date.now();
     sources[source] = extracted;
@@ -201,6 +238,105 @@ function start(service, dependencies) {
     log('Observed ' + extracted.dynamic_range + ' from ' + source +
       ' (' + extracted.raw_value + ')');
     scheduleDelivery();
+  }
+
+  function commandSummary(policy, state, operationCount, error) {
+    return {
+      request_id: policy.request_id,
+      input: policy.input,
+      scope: policy.scope,
+      state: state,
+      operation_count: operationCount,
+      updated_at: now(),
+      error: error ? error.message : null
+    };
+  }
+
+  function runNextCommand() {
+    var queued;
+    var normalized;
+    var operations;
+    if (commandRunning || commandQueue.length === 0 || stopping) return;
+    queued = commandQueue.shift();
+    commandRunning = true;
+    try {
+      normalized = picturePolicy.normalize(queued.payload);
+      operations = picturePolicy.buildOperations(normalized, currentPictureContext);
+    } catch (error) {
+      commandRunning = false;
+      queued.callback(error);
+      runNextCommand();
+      return;
+    }
+    health.last_command = commandSummary(normalized, normalized.dry_run ? 'dry_run' : 'running', operations.length);
+    saveHealth();
+    if (normalized.dry_run) {
+      commandRunning = false;
+      queued.callback(null, {
+        ok: true,
+        dry_run: true,
+        request_id: normalized.request_id,
+        input: normalized.input,
+        scope: normalized.scope,
+        operation_count: operations.length,
+        operations: operations.map(function (operation) {
+          return {
+            kind: operation.kind,
+            category: operation.params.category,
+            setting_keys: Object.keys(operation.params.settings)
+          };
+        })
+      });
+      runNextCommand();
+      return;
+    }
+    lunaExecutor.execute(service, operations, function (operation, index, count) {
+      health.last_command = commandSummary(normalized, 'running', count);
+      health.last_command.completed_operations = index + 1;
+      saveHealth();
+      log('Applied ' + operation.kind + ' to ' + operation.params.category);
+    }, function (error) {
+      commandRunning = false;
+      if (error) {
+        health.last_command = commandSummary(normalized, 'failed', operations.length, error);
+        health.last_command.failed_operation = error.operation_index;
+        health.last_error = 'Picture policy failed: ' + error.message;
+        saveHealth();
+        log(health.last_error);
+        queued.callback(error);
+        runNextCommand();
+        return;
+      }
+      health.last_command = commandSummary(normalized, 'completed', operations.length);
+      health.last_command.completed_operations = operations.length;
+      health.last_error = null;
+      saveHealth();
+      log('Completed ' + normalized.scope + ' picture policy for ' + normalized.input +
+        ' (' + operations.length + ' Luna writes)');
+      queued.callback(null, {
+        ok: true,
+        dry_run: false,
+        request_id: normalized.request_id,
+        input: normalized.input,
+        scope: normalized.scope,
+        operation_count: operations.length,
+        active_context: currentPictureContext
+      });
+      runNextCommand();
+    });
+  }
+
+  function applyPolicy(payload, callback) {
+    var error;
+    if (commandQueue.length >= 10) {
+      error = new Error('Picture command queue is full');
+      error.code = 'command_queue_full';
+      error.statusCode = 429;
+      callback(error);
+      return;
+    }
+    commandQueue.push({payload: payload, callback: callback});
+    runNextCommand();
   }
 
   function markSubscriptionError(source, error) {
@@ -239,6 +375,9 @@ function start(service, dependencies) {
     log('Stopping after ' + signal);
     if (debounceTimer) clearTimeout(debounceTimer);
     if (retryTimer) clearTimeout(retryTimer);
+    if (policyServer) {
+      try { policyServer.close(); } catch (serverError) { /* Already closed. */ }
+    }
     subscriptions.forEach(function (subscription) {
       try {
         if (subscription && typeof subscription.cancel === 'function') subscription.cancel();
@@ -266,8 +405,27 @@ function start(service, dependencies) {
     category: 'picture',
     subscribe: true
   });
+  policyServer = commandServer.start({
+    token: config.command_token,
+    port: config.command_port,
+    applyPolicy: applyPolicy,
+    status: function () { return health; },
+    onListening: function () {
+      health.command_api.state = 'listening';
+      health.command_api.last_error = null;
+      saveHealth();
+      log('Authenticated picture command API is listening on port ' + config.command_port);
+    },
+    onError: function (error) {
+      health.command_api.state = 'error';
+      health.command_api.last_error = error.message;
+      health.last_error = 'Picture command API failed: ' + error.message;
+      saveHealth();
+      log(health.last_error);
+    }
+  });
   setInterval(saveHealth, 30000);
-  return {health: health, handlePayload: handlePayload, stop: stop};
+  return {applyPolicy: applyPolicy, health: health, handlePayload: handlePayload, stop: stop};
 }
 
 module.exports = {start: start, summarizePayload: summarizePayload};

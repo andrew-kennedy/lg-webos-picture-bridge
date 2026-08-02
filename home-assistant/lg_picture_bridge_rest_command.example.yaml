@@ -1,0 +1,14 @@
+# Merge this under the existing top-level rest_command key in configuration.yaml.
+# The token must be the same value used when pairing the TV.
+rest_command:
+  lg_picture_bridge_apply_policy:
+    url: "http://10.0.0.5:49191/v1/picture/policy"
+    method: POST
+    headers:
+      Authorization: !secret lg_picture_bridge_command_authorization
+      Content-Type: application/json
+    payload: "{{ policy_json }}"
+    timeout: 15
+
+# Add this separately to secrets.yaml:
+# lg_picture_bridge_command_authorization: "Bearer YOUR_RANDOM_24_PLUS_CHARACTER_TOKEN"
