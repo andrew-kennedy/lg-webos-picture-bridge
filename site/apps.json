@@ -22,9 +22,9 @@
         "rootRequired": true,
         "ipkUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/download/v0.3.1/io.github.andrewkennedy.lgpicturebridge_0.3.1_all.ipk",
         "ipkHash": {
-          "sha256": "5c838b3d9d59c6bc03b07571449e500322b1d3c40385adbbab7b70137178d27a"
+          "sha256": "92380b659729713bfe068a1e734f05cee1e023fe2296e3fd4e02a05da35097e5"
         },
-        "ipkSize": 63330
+        "ipkSize": 63354
       },
       "pool": "main",
       "requirements": {
