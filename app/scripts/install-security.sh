@@ -6,7 +6,9 @@ APP_ID="io.github.andrewkennedy.lgpicturebridge"
 APP_ROOT="/media/developer/apps/usr/palm/applications/$APP_ID"
 POLICY_ROOT="$APP_ROOT/security"
 MANIFEST_TARGET="/var/luna-service2/manifests.d/$APP_ID.json"
+APP_ROLE_TARGET="/var/luna-service2/roles.d/$APP_ID.app.role.json"
 ROLE_TARGET="/var/luna-service2/roles.d/$APP_ID.service.role.json"
+APP_PERMISSION_TARGET="/var/luna-service2/client-permissions.d/$APP_ID.app.perm.json"
 PERMISSION_TARGET="/var/luna-service2/client-permissions.d/$APP_ID.service.perm.json"
 SERVICE_TARGET="/var/luna-service2/services.d/$APP_ID.service.service"
 changed=0
@@ -35,7 +37,9 @@ case "${1:-install}" in
             /var/luna-service2/client-permissions.d \
             /var/luna-service2/services.d
         copy_policy "$POLICY_ROOT/$APP_ID.manifest.json" "$MANIFEST_TARGET"
+        copy_policy "$POLICY_ROOT/$APP_ID.app.role.json" "$APP_ROLE_TARGET"
         copy_policy "$POLICY_ROOT/$APP_ID.service.role.json" "$ROLE_TARGET"
+        copy_policy "$POLICY_ROOT/$APP_ID.app.perm.json" "$APP_PERMISSION_TARGET"
         copy_policy "$POLICY_ROOT/$APP_ID.service.perm.json" "$PERMISSION_TARGET"
         copy_policy "$POLICY_ROOT/$APP_ID.service.service" "$SERVICE_TARGET"
         scan_if_changed
@@ -43,7 +47,9 @@ case "${1:-install}" in
     remove)
         for target_file in \
             "$MANIFEST_TARGET" \
+            "$APP_ROLE_TARGET" \
             "$ROLE_TARGET" \
+            "$APP_PERMISSION_TARGET" \
             "$PERMISSION_TARGET" \
             "$SERVICE_TARGET"
         do

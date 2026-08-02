@@ -1,0 +1,16 @@
+{
+  "appId": "io.github.andrewkennedy.lgpicturebridge",
+  "type": "regular",
+  "allowedNames": [
+    "io.github.andrewkennedy.lgpicturebridge-*"
+  ],
+  "permissions": [
+    {
+      "service": "io.github.andrewkennedy.lgpicturebridge-*",
+      "outbound": [
+        "io.github.andrewkennedy.lgpicturebridge.service",
+        "org.webosbrew.hbchannel.service"
+      ]
+    }
+  ]
+}
