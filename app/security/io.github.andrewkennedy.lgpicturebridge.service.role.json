@@ -1,0 +1,19 @@
+{
+  "exeName": "js",
+  "allowedNames": [
+    "io.github.andrewkennedy.lgpicturebridge.service"
+  ],
+  "type": "regular",
+  "permissions": [
+    {
+      "service": "io.github.andrewkennedy.lgpicturebridge.service",
+      "inbound": [
+        "*"
+      ],
+      "outbound": [
+        "com.webos.service.videooutput",
+        "com.webos.settingsservice"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "io.github.andrewkennedy.lgpicturebridge.service": [
+    "all",
+    "private",
+    "public",
+    "settings"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "io.github.andrewkennedy.lgpicturebridge.service",
+  "description": "LG Picture Bridge Luna monitor",
+  "services": [
+    {
+      "name": "io.github.andrewkennedy.lgpicturebridge.service",
+      "description": "LG Picture Bridge Luna monitor"
+    }
+  ]
+}

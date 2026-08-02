@@ -1,9 +1,10 @@
 #!/bin/sh
 
 APP_ID="io.github.andrewkennedy.lgpicturebridge"
-APP_ROOT="/media/developer/apps/usr/palm/applications/$APP_ID"
 STATE_DIR="/var/lib/$APP_ID"
-NODE_BIN="/usr/bin/node"
+SERVICE_ID="$APP_ID.service"
+SERVICE_ROOT="/media/developer/apps/usr/palm/services/$SERVICE_ID"
+HOMEBREW_RUNNER="/media/developer/apps/usr/palm/services/org.webosbrew.hbchannel.service/run-js-service"
 bridge_pid=""
 stopping=0
 
@@ -19,7 +20,17 @@ stop_child() {
 trap stop_child TERM INT HUP
 
 while [ "$stopping" -eq 0 ] && [ -f "$STATE_DIR/config.json" ]; do
-    "$NODE_BIN" "$APP_ROOT/bridge/bridge.js" &
+    if [ ! -x "$HOMEBREW_RUNNER" ]; then
+        echo "Homebrew JS-service runner was not found: $HOMEBREW_RUNNER"
+        sleep 30
+        continue
+    fi
+    if [ ! -f "$SERVICE_ROOT/services.json" ]; then
+        echo "Registered Luna service was not installed: $SERVICE_ROOT"
+        sleep 30
+        continue
+    fi
+    "$HOMEBREW_RUNNER" -k -n "$SERVICE_ROOT" &
     bridge_pid=$!
     wait "$bridge_pid" 2>/dev/null || true
     bridge_pid=""

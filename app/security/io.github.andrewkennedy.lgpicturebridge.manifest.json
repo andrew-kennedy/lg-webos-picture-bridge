@@ -1,0 +1,13 @@
+{
+  "id": "io.github.andrewkennedy.lgpicturebridge",
+  "version": "0.2.0",
+  "roleFiles": [
+    "/var/luna-service2/roles.d/io.github.andrewkennedy.lgpicturebridge.service.role.json"
+  ],
+  "clientPermissionFiles": [
+    "/var/luna-service2/client-permissions.d/io.github.andrewkennedy.lgpicturebridge.service.perm.json"
+  ],
+  "serviceFiles": [
+    "/var/luna-service2/services.d/io.github.andrewkennedy.lgpicturebridge.service.service"
+  ]
+}

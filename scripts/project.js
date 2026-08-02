@@ -20,11 +20,13 @@ function packageInfo() {
 
 function findIpk() {
   var directory = path.join(ROOT, 'dist');
+  var app = appInfo();
+  var expectedName = app.id + '_' + app.version + '_all.ipk';
   var matches = fs.existsSync(directory) ? fs.readdirSync(directory).filter(function (name) {
-    return /\.ipk$/.test(name);
+    return name === expectedName;
   }) : [];
   if (matches.length !== 1) {
-    throw new Error('Expected exactly one IPK in dist/, found ' + matches.length);
+    throw new Error('Expected dist/' + expectedName + ', found ' + matches.length);
   }
   return path.join(directory, matches[0]);
 }

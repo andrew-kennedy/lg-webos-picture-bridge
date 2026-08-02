@@ -9,6 +9,9 @@
   var statusDot = document.getElementById('status-dot');
   var callbackDisplay = document.getElementById('callback-display');
   var processDisplay = document.getElementById('process-display');
+  var lunaDisplay = document.getElementById('luna-display');
+  var signalDisplay = document.getElementById('signal-display');
+  var deliveryDisplay = document.getElementById('delivery-display');
   var operationDisplay = document.getElementById('operation-display');
   var details = document.getElementById('details');
   var bridges = [];
@@ -85,19 +88,38 @@
   }
 
   function renderStatus(status) {
+    var subscriptionStates = status.subscription_states || {};
+    var subscriptionSummary = Object.keys(subscriptionStates).map(function (name) {
+      return name + ': ' + subscriptionStates[name].state;
+    }).join(' · ');
     clearError();
     callbackDisplay.textContent = status.callback_display || 'Not paired';
     processDisplay.textContent = status.running ? 'Running' : (status.paired ? 'Stopped' : 'Not configured');
+    lunaDisplay.textContent = subscriptionSummary || status.monitor_state || 'Not started';
+    signalDisplay.textContent = status.last_dynamic_range ?
+      status.last_dynamic_range + ' via ' + (status.last_source || 'unknown') : 'None yet';
+    deliveryDisplay.textContent = status.last_delivery_at ?
+      (status.last_delivery_status || 'delivered') + ' at ' + status.last_delivery_at : 'None yet';
 
-    if (status.paired && status.running) {
+    if (status.paired && status.running && status.monitor_healthy) {
       statusDot.className = 'status-dot ok';
       statusTitle.textContent = 'Paired and monitoring';
+    } else if (status.paired && status.running && status.monitor_state === 'starting') {
+      statusDot.className = 'status-dot pending';
+      statusTitle.textContent = 'Starting registered Luna service…';
+    } else if (status.paired && status.running) {
+      statusDot.className = 'status-dot error';
+      statusTitle.textContent = 'Running, but Luna needs attention';
     } else if (status.paired) {
       statusDot.className = 'status-dot error';
       statusTitle.textContent = 'Paired, but monitor is stopped';
     } else {
       statusDot.className = 'status-dot pending';
       statusTitle.textContent = 'Not paired';
+    }
+    if (status.last_error) {
+      details.textContent = status.last_error;
+      details.className = 'details visible';
     }
   }
 
@@ -162,6 +184,13 @@
   }
 
   document.getElementById('refresh-button').addEventListener('click', refreshStatus);
+  document.getElementById('restart-button').addEventListener('click', function () {
+    setOperation('Restarting monitor…');
+    exec(SETUP_SCRIPT + ' restart', function (error) {
+      if (error) showError(error.message);
+      else refreshStatus();
+    });
+  });
   document.getElementById('test-button').addEventListener('click', function () {
     setOperation('Sending test…');
     exec(SETUP_SCRIPT + ' test', function (error) {
