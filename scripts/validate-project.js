@@ -18,6 +18,7 @@ var required = [
   'app/bridge/lib/command-server.js',
   'app/bridge/lib/luna-executor.js',
   'app/bridge/lib/picture-policy.js',
+  'app/bridge/lib/ui-status.js',
   'app/scripts/runner.sh',
   'app/scripts/install-security.sh',
   'app/scripts/setup.sh',

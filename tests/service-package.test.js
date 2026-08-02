@@ -26,4 +26,5 @@ module.exports = function () {
     'com.webos.service.videooutput',
     'com.webos.settingsservice'
   ]);
+  assert.deepStrictEqual(role.permissions[0].inbound, ['*']);
 };

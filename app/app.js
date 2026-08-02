@@ -5,6 +5,7 @@
   var APP_ROOT = '/media/developer/apps/usr/palm/applications/' + APP_ID;
   var SETUP_SCRIPT = APP_ROOT + '/scripts/setup.sh';
   var EXEC_URI = 'luna://org.webosbrew.hbchannel.service/exec';
+  var SERVICE_URI = 'luna://' + APP_ID + '.service/';
   var statusTitle = document.getElementById('status-title');
   var statusDot = document.getElementById('status-dot');
   var callbackDisplay = document.getElementById('callback-display');
@@ -34,7 +35,7 @@
     details.className = 'details';
   }
 
-  function exec(command, callback) {
+  function lunaCall(uri, payload, callback) {
     if (typeof PalmServiceBridge === 'undefined') {
       callback(new Error('PalmServiceBridge is unavailable. Run this app on an LG webOS TV.'));
       return;
@@ -58,11 +59,11 @@
       }
       callback(null, response);
     };
-    bridge.call(EXEC_URI, JSON.stringify({command: command}));
+    bridge.call(uri, JSON.stringify(payload || {}));
   }
 
-  function utf8Base64(value) {
-    return btoa(unescape(encodeURIComponent(value)));
+  function exec(command, callback) {
+    lunaCall(EXEC_URI, {command: command}, callback);
   }
 
   function normalizeLaunchParams(detail) {
@@ -132,45 +133,31 @@
 
   function refreshStatus() {
     setOperation('Refreshing…');
-    exec(SETUP_SCRIPT + ' status', function (error, response) {
-      var status;
+    lunaCall(SERVICE_URI + 'uiStatus', {}, function (error, response) {
       if (error) {
         showError(error.message);
         return;
       }
-      try {
-        status = JSON.parse((response.stdoutString || '').trim());
-      } catch (parseError) {
-        showError('Could not read bridge status: ' + (response.stdoutString || response.stderrString || 'empty response'));
+      if (!response.status) {
+        showError('The bridge service returned no status.');
         return;
       }
-      renderStatus(status);
+      renderStatus(response.status);
       setOperation('Status refreshed');
     });
   }
 
   function pair(params) {
-    var encoded = utf8Base64(JSON.stringify(params));
-    if (!/^[A-Za-z0-9+/=]+$/.test(encoded)) {
-      showError('Could not encode pairing parameters safely.');
-      return;
-    }
-
     setOperation('Saving pairing…');
     statusTitle.textContent = 'Pairing with Home Assistant…';
-    exec(SETUP_SCRIPT + ' pair ' + encoded, function (error) {
+    lunaCall(SERVICE_URI + 'configure', params, function (error, response) {
       if (error) {
         showError(error.message);
         return;
       }
-      exec(SETUP_SCRIPT + ' test', function (testError) {
-        if (testError) {
-          showError('Pairing was saved, but the test event failed: ' + testError.message);
-          return;
-        }
-        refreshStatus();
-        setOperation('Pairing test sent');
-      });
+      if (response.status) renderStatus(response.status);
+      else refreshStatus();
+      setOperation('Pairing saved and test event sent');
     });
   }
 
@@ -200,9 +187,12 @@
   });
   document.getElementById('test-button').addEventListener('click', function () {
     setOperation('Sending test…');
-    exec(SETUP_SCRIPT + ' test', function (error) {
+    lunaCall(SERVICE_URI + 'testWebhook', {}, function (error, response) {
       if (error) showError(error.message);
-      else setOperation('Test event sent');
+      else {
+        if (response.status) renderStatus(response.status);
+        setOperation('Test event sent');
+      }
     });
   });
   document.getElementById('clear-button').addEventListener('click', function () {

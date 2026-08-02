@@ -339,6 +339,60 @@ function start(service, dependencies) {
     runNextCommand();
   }
 
+  function startPolicyServer() {
+    health.command_api.enabled = Boolean(config.command_token);
+    health.command_api.port = config.command_token ? config.command_port : null;
+    health.command_api.state = config.command_token ? 'starting' : 'disabled';
+    health.command_api.last_error = null;
+    if (!config.command_token) {
+      policyServer = null;
+      saveHealth();
+      return;
+    }
+    policyServer = commandServer.start({
+      token: config.command_token,
+      port: config.command_port,
+      applyPolicy: applyPolicy,
+      status: function () { return health; },
+      onListening: function () {
+        health.command_api.state = 'listening';
+        health.command_api.last_error = null;
+        saveHealth();
+        log('Authenticated picture command API is listening on port ' + config.command_port);
+      },
+      onError: function (error) {
+        health.command_api.state = 'error';
+        health.command_api.last_error = error.message;
+        health.last_error = 'Picture command API failed: ' + error.message;
+        saveHealth();
+        log(health.last_error);
+      }
+    });
+  }
+
+  function reconfigure(nextConfig, callback) {
+    var commandServerChanged = config.command_token !== nextConfig.command_token ||
+      config.command_port !== nextConfig.command_port;
+    config = nextConfig;
+    if (!commandServerChanged) {
+      saveHealth();
+      callback(null);
+      return;
+    }
+    health.command_api.state = 'restarting';
+    saveHealth();
+    if (!policyServer) {
+      startPolicyServer();
+      callback(null);
+      return;
+    }
+    policyServer.close(function () {
+      policyServer = null;
+      startPolicyServer();
+      callback(null);
+    });
+  }
+
   function markSubscriptionError(source, error) {
     var message = error && error.message ? error.message : String(error || 'unknown error');
     health.subscriptions[source].state = 'error';
@@ -405,27 +459,15 @@ function start(service, dependencies) {
     category: 'picture',
     subscribe: true
   });
-  policyServer = commandServer.start({
-    token: config.command_token,
-    port: config.command_port,
-    applyPolicy: applyPolicy,
-    status: function () { return health; },
-    onListening: function () {
-      health.command_api.state = 'listening';
-      health.command_api.last_error = null;
-      saveHealth();
-      log('Authenticated picture command API is listening on port ' + config.command_port);
-    },
-    onError: function (error) {
-      health.command_api.state = 'error';
-      health.command_api.last_error = error.message;
-      health.last_error = 'Picture command API failed: ' + error.message;
-      saveHealth();
-      log(health.last_error);
-    }
-  });
+  startPolicyServer();
   setInterval(saveHealth, 30000);
-  return {applyPolicy: applyPolicy, health: health, handlePayload: handlePayload, stop: stop};
+  return {
+    applyPolicy: applyPolicy,
+    health: health,
+    handlePayload: handlePayload,
+    reconfigure: reconfigure,
+    stop: stop
+  };
 }
 
 module.exports = {start: start, summarizePayload: summarizePayload};
