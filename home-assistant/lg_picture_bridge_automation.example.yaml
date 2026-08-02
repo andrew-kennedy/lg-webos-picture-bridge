@@ -26,6 +26,9 @@ actions:
           previous_dynamic_range: "{{ trigger.json.previous_dynamic_range }}"
           source: "{{ trigger.json.source }}"
           raw_value: "{{ trigger.json.raw_value }}"
+          input: "{{ trigger.json.input | default(none) }}"
+          previous_input: "{{ trigger.json.previous_input | default(none) }}"
+          picture_mode: "{{ trigger.json.picture_mode | default(none) }}"
           device_id: "{{ trigger.json.device_id }}"
           device_name: "{{ trigger.json.device_name }}"
       # Add your source-policy dispatcher after this event. The bridge avoids

@@ -56,11 +56,16 @@ process.stdout.write(JSON.stringify({
   callback_display: config ? store.redactCallback(config.callback_url) : null,
   device_id: config ? config.device_id : null,
   device_name: config ? config.device_name : null,
+  command_api_enabled: config ? Boolean(config.command_token) : false,
+  command_api_port: config && config.command_token ? config.command_port : null,
+  command_api: health ? health.command_api : null,
   subscription_states: subscriptions,
+  current_picture_context: health ? health.current_picture_context : null,
   last_dynamic_range: health ? health.last_dynamic_range : null,
   last_source: health ? health.last_source : null,
   last_observed_at: health ? health.last_observed_at : null,
   last_delivery_at: health ? health.last_delivery_at : null,
   last_delivery_status: health ? health.last_delivery_status : null,
+  last_command: health ? health.last_command : null,
   last_error: health ? health.last_error : null
 }) + '\n');

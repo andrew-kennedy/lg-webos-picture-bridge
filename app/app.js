@@ -10,6 +10,7 @@
   var callbackDisplay = document.getElementById('callback-display');
   var processDisplay = document.getElementById('process-display');
   var lunaDisplay = document.getElementById('luna-display');
+  var commandDisplay = document.getElementById('command-display');
   var signalDisplay = document.getElementById('signal-display');
   var deliveryDisplay = document.getElementById('delivery-display');
   var operationDisplay = document.getElementById('operation-display');
@@ -83,7 +84,9 @@
       callback_url: callbackUrl,
       device_id: candidate.device_id || 'lg-webos-tv',
       device_name: candidate.device_name || 'LG webOS TV',
-      debounce_ms: candidate.debounce_ms || 1200
+      debounce_ms: candidate.debounce_ms || 500,
+      command_token: candidate.command_token || null,
+      command_port: candidate.command_port || 49191
     };
   }
 
@@ -96,6 +99,10 @@
     callbackDisplay.textContent = status.callback_display || 'Not paired';
     processDisplay.textContent = status.running ? 'Running' : (status.paired ? 'Stopped' : 'Not configured');
     lunaDisplay.textContent = subscriptionSummary || status.monitor_state || 'Not started';
+    commandDisplay.textContent = status.command_api_enabled ?
+      ((status.command_api && status.command_api.state) || 'starting') +
+        ' on port ' + status.command_api_port :
+      'Disabled — re-pair with a command token';
     signalDisplay.textContent = status.last_dynamic_range ?
       status.last_dynamic_range + ' via ' + (status.last_source || 'unknown') : 'None yet';
     deliveryDisplay.textContent = status.last_delivery_at ?

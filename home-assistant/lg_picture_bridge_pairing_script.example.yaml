@@ -15,6 +15,14 @@ lg_picture_bridge_pair:
       required: true
       selector:
         text: {}
+    command_token:
+      name: Picture command token
+      description: >-
+        At least 24 characters; 32 or more is recommended. Leave empty to reuse the webhook ID. Store the
+        same value in secrets.yaml for the REST command Authorization header.
+      required: false
+      selector:
+        text: {}
     lg_tv_media_player_entity:
       name: LG TV
       required: true
@@ -36,4 +44,7 @@ lg_picture_bridge_pair:
                    }}/api/webhook/{{ webhook_id | trim }}
               device_id: living-room-lg-c9
               device_name: Living Room LG C9
-              debounce_ms: 1200
+              debounce_ms: 500
+              command_token: >-
+                {{ command_token | default(webhook_id, true) | trim }}
+              command_port: 49191

@@ -17,6 +17,9 @@ module.exports = function () {
     video: [{videoInfo: {hdrType: 'DolbyVision'}}]
   }), {
     dynamic_range: 'dolby_vision',
+    input: null,
+    picture_mode: null,
+    raw_dynamic_range: 'DolbyVision',
     raw_value: 'DolbyVision',
     source: 'videooutput'
   });
@@ -25,6 +28,9 @@ module.exports = function () {
     settings: {dimension: {dynamicRange: 'hdr10'}}
   }), {
     dynamic_range: 'hdr10',
+    input: null,
+    picture_mode: null,
+    raw_dynamic_range: 'hdr10',
     raw_value: 'hdr10',
     source: 'picture'
   });
@@ -34,7 +40,36 @@ module.exports = function () {
     settings: {pictureMode: 'expert1'}
   }), {
     dynamic_range: 'sdr',
+    input: 'hdmi3',
+    picture_mode: 'expert1',
+    raw_dynamic_range: 'sdr',
     raw_value: 'sdr',
     source: 'picture'
+  });
+
+  assert.deepStrictEqual(range.extractPictureContext({
+    dimension: {input: 'hdmi3', _3dStatus: '2d', dynamicRange: 'dolbyHdr'},
+    settings: {pictureMode: 'dolbyHdrCinema'}
+  }), {
+    input: 'hdmi3',
+    picture_mode: 'dolbyHdrCinema',
+    dynamic_range: 'dolby_vision',
+    raw_dynamic_range: 'dolbyHdr',
+    three_d_status: '2d'
+  });
+  assert.deepStrictEqual(range.extractPictureContext({
+    dimension: {input: 'hdmi3', pictureMode: 'dolbyHdrStandard'}
+  }, {
+    input: 'hdmi3',
+    picture_mode: 'dolbyHdrCinema',
+    dynamic_range: 'dolby_vision',
+    raw_dynamic_range: 'dolbyHdr',
+    three_d_status: '2d'
+  }), {
+    input: 'hdmi3',
+    picture_mode: 'dolbyHdrStandard',
+    dynamic_range: 'dolby_vision',
+    raw_dynamic_range: 'dolbyHdr',
+    three_d_status: '2d'
   });
 };
