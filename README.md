@@ -9,10 +9,11 @@ Apple TV, Shield, game console, or PC changes between SDR, HDR10, HLG, and Dolby
 not capture video, drive LEDs, or require HyperHDR.
 
 > [!IMPORTANT]
-> Version 0.3.2 is live-tested on a rooted 2019 LG C9 running webOS 4.x. It receives
+> Version 0.3.3 is live-tested on a rooted 2019 LG C9 running webOS 4.x. It receives
 > `dimension.dynamicRange`, delivers C9 webhook observations to Home Assistant, and silently writes
-> active and inactive picture banks through LG's firmware-specific synthetic categories. The
-> documented `dimension` request object is not used because this C9 returned `no result from DB`.
+> active and inactive picture banks through LG's firmware-specific synthetic categories. After an
+> active-bank write, it sends an explicit, non-storing `dimension` notification so the C9 reloads
+> the picture-processing pipeline immediately instead of waiting for a manual picture-mode cycle.
 
 ## Install from Homebrew Channel
 
@@ -88,7 +89,7 @@ Successful pairing sends:
   "dynamic_range": null,
   "device_id": "living-room-c9",
   "device_name": "Living Room C9",
-  "bridge_version": "0.3.2"
+  "bridge_version": "0.3.3"
 }
 ```
 
@@ -107,7 +108,7 @@ A signal transition sends:
   "observed_at": "2026-08-01T15:30:00.000Z",
   "device_id": "living-room-c9",
   "device_name": "Living Room C9",
-  "bridge_version": "0.3.2"
+  "bridge_version": "0.3.3"
 }
 ```
 
@@ -160,7 +161,11 @@ without writing anything.
 
 On the tested C9, preset controls use `picture$input.pictureMode.2d.x`, while range selections use
 `picture$input.x.2d.dynamicRange`. Preset controls are written before mode mappings so the visible
-picture switches only after its destination preset is ready.
+picture switches only after its destination preset is ready. If that input and dynamic-range bank
+is currently active, the bridge finishes with a base `picture` write containing the explicit
+`input`, `dynamicRange`, and `_3dStatus` dimensions plus `store: false` and `notify: true`. This
+forces webOS to reload the already-stored profile without an alert, ENTER press, or temporary mode
+cycle. Inactive inputs remain preload-only and activate normally when selected.
 
 ## How it works
 

@@ -216,6 +216,36 @@ function mappingOperation(inputName, context, mode) {
   };
 }
 
+function activationOperation(inputName, active, currentContext) {
+  return {
+    kind: 'activate_picture_profile',
+    context: active.target_context,
+    picture_mode: active.mode,
+    params: {
+      category: 'picture',
+      dimension: {
+        input: inputName,
+        dynamicRange: active.target_context,
+        _3dStatus: String(currentContext.three_d_status || '2d')
+      },
+      settings: {pictureMode: active.mode},
+      store: false,
+      notify: true
+    }
+  };
+}
+
+function optionalActiveMapping(policy, currentContext) {
+  if (!currentContext || !currentContext.input || !currentContext.raw_dynamic_range) return null;
+  if (baseInput(policy.input) !== baseInput(currentContext.input)) return null;
+  try {
+    return activeMapping(policy, currentContext);
+  } catch (error) {
+    if (error.code === 'context_not_configured') return null;
+    throw error;
+  }
+}
+
 function buildOperations(policy, currentContext) {
   var operations = [];
   var selectedModes = {};
@@ -233,6 +263,7 @@ function buildOperations(policy, currentContext) {
       selectedModes[policy.modes[context]] = true;
       mappings.push({context: context, mode: policy.modes[context]});
     });
+    active = optionalActiveMapping(policy, currentContext);
   }
 
   Object.keys(selectedModes).sort().forEach(function (mode) {
@@ -247,6 +278,9 @@ function buildOperations(policy, currentContext) {
   mappings.forEach(function (mapping) {
     operations.push(mappingOperation(policy.input, mapping.context, mapping.mode));
   });
+  if (active) {
+    operations.push(activationOperation(policy.input, active, currentContext));
+  }
   return operations;
 }
 

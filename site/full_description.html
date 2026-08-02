@@ -5,10 +5,11 @@
   webhook so picture-setting automations can be reapplied whenever content changes format.
 </p>
 <p>
-  Version 0.3.2 adds an authenticated local picture-policy API to the registered Luna monitor. It
-  silently targets active or inactive C9 picture banks without notification dialogs and has been
-  tested end-to-end on a 2019 LG C9. Pairing and status use the app's own registered service rather
-  than Homebrew Channel's generic shell-exec API.
+  Version 0.3.3 adds immediate active-profile reloads to the authenticated local picture-policy API.
+  It silently targets active or inactive C9 picture banks without notification dialogs, then asks
+  webOS to refresh the active picture-processing pipeline without cycling modes. It has been tested
+  end-to-end on a 2019 LG C9. Pairing and status use the app's own registered service rather than
+  Homebrew Channel's generic shell-exec API.
 </p>
 <h3>Requirements</h3>
 <ul>
