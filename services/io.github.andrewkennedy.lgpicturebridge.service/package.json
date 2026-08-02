@@ -1,0 +1,5 @@
+{
+  "name": "io.github.andrewkennedy.lgpicturebridge.service",
+  "version": "0.2.0",
+  "main": "service.js"
+}

@@ -37,7 +37,8 @@ function extractPictureSettings(payload) {
   var dimension;
   if (!payload) return null;
   settings = payload.settings || payload;
-  dimension = settings.dimension || settings.dimensionInfo || {};
+  dimension = payload.dimension || payload.dimensionInfo ||
+    settings.dimension || settings.dimensionInfo || {};
   if (dimension.dynamicRange !== undefined) return dimension.dynamicRange;
   if (settings.dynamicRange !== undefined) return settings.dynamicRange;
   return null;

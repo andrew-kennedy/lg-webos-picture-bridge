@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=io.github.andrewkennedy.lgpicturebridge.service
+Exec=/media/developer/apps/usr/palm/services/org.webosbrew.hbchannel.service/run-js-service -k -n /media/developer/apps/usr/palm/services/io.github.andrewkennedy.lgpicturebridge.service
+Type=dynamic

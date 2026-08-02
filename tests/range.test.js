@@ -28,4 +28,13 @@ module.exports = function () {
     raw_value: 'hdr10',
     source: 'picture'
   });
+
+  assert.deepStrictEqual(range.extract('picture', {
+    dimension: {pictureMode: 'expert1', input: 'hdmi3', dynamicRange: 'sdr'},
+    settings: {pictureMode: 'expert1'}
+  }), {
+    dynamic_range: 'sdr',
+    raw_value: 'sdr',
+    source: 'picture'
+  });
 };

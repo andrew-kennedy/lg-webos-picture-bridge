@@ -37,6 +37,7 @@ start_bridge() {
         return 0
     fi
 
+    "$APP_ROOT/scripts/install-security.sh" install
     mkdir -p "$STATE_DIR"
     rm -f "$PID_FILE"
     if [ -f "$LOG_FILE" ] && [ "$(wc -c <"$LOG_FILE")" -gt 1048576 ]; then

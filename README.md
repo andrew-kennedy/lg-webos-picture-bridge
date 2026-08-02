@@ -9,10 +9,9 @@ Apple TV, Shield, game console, or PC changes between SDR, HDR10, HLG, and Dolby
 not capture video, drive LEDs, or require HyperHDR.
 
 > [!IMPORTANT]
-> Version 0.1.0 targets rooted webOS 4.x and newer TVs, including the 2019 LG C9. The Luna payload
-> handling is derived from the proven [`hyperion-webos`](https://github.com/webosbrew/hyperion-webos)
-> subscriptions, but this independent bridge
-> should be treated as pre-release software until it has been tested on physical C9 hardware.
+> Version 0.2.0 is live-tested on a rooted 2019 LG C9 running webOS 4.x. Its registered Luna service
+> receives `dimension.dynamicRange` from the TV's picture subscription and has delivered C9 webhook
+> observations to Home Assistant with HTTP 200.
 
 ## Install from Homebrew Channel
 
@@ -24,6 +23,9 @@ https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/latest/downlo
 
 Return to the app browser, install **LG Picture Bridge**, and launch it once. Homebrew Channel must
 show **Root status: ok** because the monitor needs private Luna access and a startup hook.
+
+When upgrading from 0.1.0, install the update, open LG Picture Bridge, and select **Restart
+monitor**. Existing pairing data is preserved outside the application directory.
 
 The release workflow also deploys a browsable GitHub Pages site. The release URL above always
 selects the latest tagged feed and remains independent of account-level Pages custom-domain
@@ -81,7 +83,7 @@ Successful pairing sends:
   "dynamic_range": null,
   "device_id": "living-room-c9",
   "device_name": "Living Room C9",
-  "bridge_version": "0.1.0"
+  "bridge_version": "0.2.0"
 }
 ```
 
@@ -92,12 +94,12 @@ A signal transition sends:
   "event": "dynamic_range_changed",
   "dynamic_range": "dolby_vision",
   "previous_dynamic_range": "sdr",
-  "source": "videooutput",
-  "raw_value": "DolbyVision",
+  "source": "picture",
+  "raw_value": "dolbyHdr",
   "observed_at": "2026-08-01T15:30:00.000Z",
   "device_id": "living-room-c9",
   "device_name": "Living Room C9",
-  "bridge_version": "0.1.0"
+  "bridge_version": "0.2.0"
 }
 ```
 
@@ -107,15 +109,16 @@ diagnostics.
 ## How it works
 
 ```text
-com.webos.service.videooutput/getStatus ─┐
-                                        ├─> debounce + normalize ─> HA webhook
-settingsservice picture subscription ───┘
+settingsservice picture subscription ──> debounce + normalize ──> HA webhook
+                  dimension.dynamicRange
 ```
 
-The app provisions a persistent Node process through Homebrew Channel's elevated `exec` service.
+The IPK includes a registered JavaScript Luna service named
+`io.github.andrewkennedy.lgpicturebridge.service`. A narrow installed role permits outbound calls
+only to `com.webos.settingsservice` and the optional `com.webos.service.videooutput` fallback.
+Homebrew Channel's elevated JS-service runner launches it outside the normal third-party jail.
 [LG ships Node.js 0.12.2 on webOS TV 4.x](https://webostv.developer.lge.com/develop/guides/js-service-basics);
-the monitor is deliberately written to that older
-JavaScript runtime and uses the TV's `/usr/bin/node` executable directly.
+the monitor is deliberately written to that older JavaScript runtime.
 It creates this startup hook:
 
 ```text
@@ -126,11 +129,13 @@ Configuration and logs are stored outside the application directory:
 
 ```text
 /var/lib/io.github.andrewkennedy.lgpicturebridge/config.json
+/var/lib/io.github.andrewkennedy.lgpicturebridge/health.json
 /var/lib/io.github.andrewkennedy.lgpicturebridge/bridge.log
 ```
 
 The callback URL is stored with mode `0600` when supported. The app status screen always redacts the
-webhook ID.
+webhook ID. It reports each subscription's actual state, last detected dynamic range, and last
+webhook result; a running supervisor alone is no longer shown as healthy.
 
 ## Troubleshooting
 
@@ -139,8 +144,13 @@ webhook ID.
   may not resolve on older webOS versions; a reserved LAN IP is safer.
 - **The monitor stops after a reboot:** launch Homebrew Channel once and verify its root startup hook
   is current. Then open LG Picture Bridge and select **Refresh status**.
-- **No format changes arrive:** inspect `bridge.log` over SSH. The raw Luna service names and payloads
-  can vary on unsupported firmware.
+- **After upgrading from 0.1.0:** open LG Picture Bridge and select **Restart monitor** so the new
+  registered service and Luna role are installed without changing the existing pairing.
+- **No format changes arrive:** select **Refresh status**. At least one Luna subscription must show
+  `subscribed` or `responding`; inspect `bridge.log` over SSH for its exact error or payload.
+- **`videooutput` says unavailable:** this is expected on the tested C9 when the picture subscription
+  is subscribed. The bridge needs only one working source, and the C9 publishes
+  `dimension.dynamicRange` through `com.webos.settingsservice`.
 - **HTTPS fails on an older TV:** use an isolated local HTTP URL or a reverse proxy compatible with
   the TV's older TLS stack. Keep the webhook local-only.
 
@@ -167,6 +177,7 @@ versions before tagging.
 
 - The bridge accepts only HTTP(S) callback URLs without embedded credentials.
 - There is no generic command endpoint on the TV.
+- The installed Luna role restricts outbound calls to the two read-only monitoring services.
 - Pairing payloads are validated before being written.
 - The webhook sends observations only; it does not accept commands from Home Assistant.
 - Home Assistant should keep the webhook local-only and use a unique, non-guessable ID.

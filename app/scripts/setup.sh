@@ -23,7 +23,9 @@ case "${1:-}" in
     clear)
         "$APP_ROOT/scripts/startup.sh" stop
         "$NODE_BIN" "$APP_ROOT/bridge/configure.js" clear
+        rm -f "$STATE_DIR/health.json"
         rm -f "$STARTUP_LINK"
+        "$APP_ROOT/scripts/install-security.sh" remove
         ;;
     status)
         "$NODE_BIN" "$APP_ROOT/bridge/status.js"

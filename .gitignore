@@ -3,4 +3,5 @@ build/
 dist/
 *.ipk
 *.manifest.json
+!app/security/*.manifest.json
 .DS_Store
