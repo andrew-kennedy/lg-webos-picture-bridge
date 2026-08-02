@@ -9,7 +9,7 @@ Apple TV, Shield, game console, or PC changes between SDR, HDR10, HLG, and Dolby
 not capture video, drive LEDs, or require HyperHDR.
 
 > [!IMPORTANT]
-> Version 0.3.1 is live-tested on a rooted 2019 LG C9 running webOS 4.x. It receives
+> Version 0.3.2 is live-tested on a rooted 2019 LG C9 running webOS 4.x. It receives
 > `dimension.dynamicRange`, delivers C9 webhook observations to Home Assistant, and silently writes
 > active and inactive picture banks through LG's firmware-specific synthetic categories. The
 > documented `dimension` request object is not used because this C9 returned `no result from DB`.
@@ -88,7 +88,7 @@ Successful pairing sends:
   "dynamic_range": null,
   "device_id": "living-room-c9",
   "device_name": "Living Room C9",
-  "bridge_version": "0.3.1"
+  "bridge_version": "0.3.2"
 }
 ```
 
@@ -107,7 +107,7 @@ A signal transition sends:
   "observed_at": "2026-08-01T15:30:00.000Z",
   "device_id": "living-room-c9",
   "device_name": "Living Room C9",
-  "bridge_version": "0.3.1"
+  "bridge_version": "0.3.2"
 }
 ```
 
@@ -199,7 +199,8 @@ result; a running supervisor alone is not shown as healthy.
 ## Troubleshooting
 
 - **Pairing fails immediately:** confirm Homebrew Channel reports `Root status: ok` and install at
-  least version 0.3.1, whose UI talks directly to the registered bridge service.
+  least version 0.3.2, which grants the web app its required Luna client permissions and talks
+  directly to the registered bridge service.
 - **Test event fails:** use a Home Assistant URL reachable directly from the TV. `homeassistant.local`
   may not resolve on older webOS versions; a reserved LAN IP is safer.
 - **The monitor stops after a reboot:** launch Homebrew Channel once and verify its root startup hook

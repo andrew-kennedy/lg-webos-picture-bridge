@@ -37,7 +37,9 @@ function respondError(message, error) {
 }
 
 function appIsAuthorized(message) {
-  if (message.sender === APP_ID) return true;
+  if (message.sender === APP_ID || String(message.sender || '').indexOf(APP_ID + '-') === 0) {
+    return true;
+  }
   message.respond({
     returnValue: false,
     errorCode: 'unauthorized',

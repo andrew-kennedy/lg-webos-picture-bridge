@@ -24,6 +24,8 @@ var required = [
   'app/scripts/setup.sh',
   'app/scripts/startup.sh',
   'app/security/io.github.andrewkennedy.lgpicturebridge.manifest.json',
+  'app/security/io.github.andrewkennedy.lgpicturebridge.app.perm.json',
+  'app/security/io.github.andrewkennedy.lgpicturebridge.app.role.json',
   'app/security/io.github.andrewkennedy.lgpicturebridge.service.perm.json',
   'app/security/io.github.andrewkennedy.lgpicturebridge.service.role.json',
   'app/security/io.github.andrewkennedy.lgpicturebridge.service.service',
