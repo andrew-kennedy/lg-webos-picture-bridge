@@ -1,6 +1,6 @@
 {
   "id": "io.github.andrewkennedy.lgpicturebridge",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "roleFiles": [
     "/var/luna-service2/roles.d/io.github.andrewkennedy.lgpicturebridge.service.role.json"
   ],

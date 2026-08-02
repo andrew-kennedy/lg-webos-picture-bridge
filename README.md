@@ -9,7 +9,7 @@ Apple TV, Shield, game console, or PC changes between SDR, HDR10, HLG, and Dolby
 not capture video, drive LEDs, or require HyperHDR.
 
 > [!IMPORTANT]
-> Version 0.3.0 is live-tested on a rooted 2019 LG C9 running webOS 4.x. It receives
+> Version 0.3.1 is live-tested on a rooted 2019 LG C9 running webOS 4.x. It receives
 > `dimension.dynamicRange`, delivers C9 webhook observations to Home Assistant, and silently writes
 > active and inactive picture banks through LG's firmware-specific synthetic categories. The
 > documented `dimension` request object is not used because this C9 returned `no result from DB`.
@@ -57,9 +57,10 @@ into `scripts.yaml`, or recreate it in the UI. Run **Pair LG Picture Bridge** an
 - an optional command token (leaving it empty reuses the webhook ID);
 - the LG webOS media-player entity.
 
-The script uses `webostv.command` to launch the app with a `callback_url` parameter. The app stores
-the configuration, starts its monitor, and sends a test event. Nothing needs to be typed with the TV
-remote.
+The script uses `webostv.command` to launch the app with a `callback_url` parameter. The app sends
+the validated configuration directly to its narrowly scoped registered service, starts its monitor,
+and sends a test event. Pairing and status no longer depend on Homebrew Channel's generic shell-exec
+API, and nothing needs to be typed with the TV remote.
 
 The app also accepts split launch parameters:
 
@@ -87,7 +88,7 @@ Successful pairing sends:
   "dynamic_range": null,
   "device_id": "living-room-c9",
   "device_name": "Living Room C9",
-  "bridge_version": "0.3.0"
+  "bridge_version": "0.3.1"
 }
 ```
 
@@ -106,7 +107,7 @@ A signal transition sends:
   "observed_at": "2026-08-01T15:30:00.000Z",
   "device_id": "living-room-c9",
   "device_name": "Living Room C9",
-  "bridge_version": "0.3.0"
+  "bridge_version": "0.3.1"
 }
 ```
 
@@ -197,7 +198,8 @@ result; a running supervisor alone is not shown as healthy.
 
 ## Troubleshooting
 
-- **Pairing fails immediately:** confirm Homebrew Channel reports `Root status: ok`.
+- **Pairing fails immediately:** confirm Homebrew Channel reports `Root status: ok` and install at
+  least version 0.3.1, whose UI talks directly to the registered bridge service.
 - **Test event fails:** use a Home Assistant URL reachable directly from the TV. `homeassistant.local`
   may not resolve on older webOS versions; a reserved LAN IP is safer.
 - **The monitor stops after a reboot:** launch Homebrew Channel once and verify its root startup hook
@@ -243,7 +245,8 @@ versions before tagging.
 - Picture setting keys, input names, mode names, body size, nesting, and command queue length are
   bounded before a request reaches Luna.
 - The installed Luna role restricts outbound calls to settingsservice and the optional read-only
-  video-output monitor.
+  video-output monitor. Runtime LS2 sender checks limit pairing/status methods to the LG Picture
+  Bridge app itself.
 - Pairing payloads are validated before being written.
 - The webhook sends observations only; it does not accept commands from Home Assistant.
 - Home Assistant should keep the webhook local-only and use a unique, non-guessable ID.
