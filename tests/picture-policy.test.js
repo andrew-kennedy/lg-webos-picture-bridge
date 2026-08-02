@@ -31,7 +31,15 @@ module.exports = function () {
     input: 'hdmi3',
     dynamic_range: 'dolby_vision',
     raw_dynamic_range: 'dolbyHdr',
-    picture_mode: 'dolbyHdrStandard'
+    picture_mode: 'dolbyHdrStandard',
+    three_d_status: '2d'
+  });
+  var fullWhileActive = picturePolicy.buildOperations(samplePolicy('all'), {
+    input: 'hdmi3',
+    dynamic_range: 'sdr',
+    raw_dynamic_range: 'sdr',
+    picture_mode: 'expert2',
+    three_d_status: '2d'
   });
 
   assert.deepStrictEqual(full.map(function (operation) { return operation.params.category; }), [
@@ -47,9 +55,33 @@ module.exports = function () {
   assert.strictEqual(full[2].params.current_app, true);
   assert.deepStrictEqual(active.map(function (operation) { return operation.params.category; }), [
     'picture$hdmi3.dolbyHdrCinema.2d.x',
-    'picture$hdmi3.x.2d.dolbyHdr'
+    'picture$hdmi3.x.2d.dolbyHdr',
+    'picture'
   ]);
   assert.strictEqual(active[1].params.settings.pictureMode, 'dolbyHdrCinema');
+  assert.deepStrictEqual(active[2], {
+    kind: 'activate_picture_profile',
+    context: 'dolbyHdr',
+    picture_mode: 'dolbyHdrCinema',
+    params: {
+      category: 'picture',
+      dimension: {
+        input: 'hdmi3',
+        dynamicRange: 'dolbyHdr',
+        _3dStatus: '2d'
+      },
+      settings: {pictureMode: 'dolbyHdrCinema'},
+      store: false,
+      notify: true
+    }
+  });
+  assert.strictEqual(fullWhileActive.length, full.length + 1);
+  assert.strictEqual(fullWhileActive[fullWhileActive.length - 1].kind, 'activate_picture_profile');
+  assert.strictEqual(fullWhileActive[fullWhileActive.length - 1].picture_mode, 'expert1');
+
+  assert.strictEqual(picturePolicy.buildOperations(samplePolicy('all'), {
+    input: 'hdmi4', dynamic_range: 'sdr', raw_dynamic_range: 'sdr'
+  }).length, full.length);
 
   assert.throws(function () {
     picturePolicy.buildOperations(samplePolicy('active'), {
