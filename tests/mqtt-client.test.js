@@ -28,7 +28,7 @@ module.exports = async function () {
         }
         if (header === 130) {
           socket.write(Buffer.from([144, 3, body[0], body[1], 0]));
-          socket.write(mqtt.packet(48, Buffer.concat([mqtt.string('homeassistant/status'), Buffer.from('online')])));
+          socket.write(mqtt.packet(49, Buffer.concat([mqtt.string('homeassistant/status'), Buffer.from('online')])));
         }
       }
     });
@@ -43,8 +43,12 @@ module.exports = async function () {
         client.publish('test/state', '{"signal_present":true}', false);
         client.subscribe('homeassistant/status');
       });
-      client.on('message', function (topic, payload) {
-        try { assert.strictEqual(topic, 'homeassistant/status'); assert.strictEqual(payload, 'online'); }
+      client.on('subscribed', function (topic) { assert.strictEqual(topic, 'homeassistant/status'); });
+      client.on('message', function (topic, payload, metadata) {
+        try {
+          assert.strictEqual(topic, 'homeassistant/status'); assert.strictEqual(payload, 'online');
+          assert.deepStrictEqual(metadata, {retain:true, duplicate:false, qos:0});
+        }
         catch (error) { clearTimeout(timer); reject(error); return; }
         clearTimeout(timer); resolve();
       });

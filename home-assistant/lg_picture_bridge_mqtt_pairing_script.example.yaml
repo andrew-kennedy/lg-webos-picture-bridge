@@ -1,7 +1,7 @@
 alias: Pair LG Picture Bridge MQTT
 description: >-
   MQTT discovery setup. Store credentials in secrets.yaml. This replaces the
-  webhook transport but preserves the existing picture-policy command token.
+  webhook transport and enables broker-authorized picture-policy commands.
 sequence:
   - action: webostv.command
     data:
@@ -14,8 +14,8 @@ sequence:
             transport: mqtt
             device_id: living-room-lg-c9
             device_name: Living Room LG TV
-            command_token: !secret lg_picture_bridge_command_token_raw
             mqtt:
+              commands_enabled: true
               host: 10.0.0.4
               port: 1883
               username: !secret lg_picture_bridge_mqtt_username

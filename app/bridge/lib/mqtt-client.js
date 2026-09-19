@@ -1,7 +1,7 @@
 'use strict';
 
-// Small publisher-only MQTT 3.1.1 client for webOS 4's Node 0.12 runtime.
-// QoS 0 snapshots are periodically refreshed; no command topics or offline queue.
+// Bounded MQTT 3.1.1 client for webOS 4's Node 0.12 runtime.
+// QoS 0 sends, clean sessions and no offline queue. Application replies confirm commands.
 var net = require('net');
 var tls = require('tls');
 var EventEmitter = require('events').EventEmitter;
@@ -80,6 +80,7 @@ function create(options, dependencies) {
     } else if (kind === 9 && header === 144 && body.length === 3) {
       id = body.readUInt16BE(0);
       if (!pendingSubscriptions[id] || body[2] !== 0) { fail('MQTT subscription rejected'); return; }
+      client.emit('subscribed', pendingSubscriptions[id]);
       delete pendingSubscriptions[id];
     } else if (kind === 3) {
       qos = (header >> 1) & 3;
@@ -93,7 +94,8 @@ function create(options, dependencies) {
         write(packet(64, word(id)));
       }
       client.emit('message', body.slice(2, offset).toString('utf8'),
-        body.slice(offset + (qos ? 2 : 0)).toString('utf8'));
+        body.slice(offset + (qos ? 2 : 0)).toString('utf8'),
+        {retain: Boolean(header & 1), duplicate: Boolean(header & 8), qos: qos});
     } else {
       fail('Unexpected MQTT packet');
     }
@@ -171,7 +173,7 @@ function create(options, dependencies) {
   client.subscribe = function (topic) {
     if (!connected) return;
     nextId = nextId % 65535 + 1;
-    pendingSubscriptions[nextId] = true;
+    pendingSubscriptions[nextId] = topic;
     write(packet(130, Buffer.concat([word(nextId), string(topic), buffer([0])])));
   };
   client.start = function () {

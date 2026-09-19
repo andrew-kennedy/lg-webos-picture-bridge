@@ -1,0 +1,87 @@
+# Merge this keyed entry into scripts.yaml (or paste its contents into the UI YAML editor).
+# No rest_command/package, TV IP, HTTP token, or broker password belongs here.
+lg_tv_mqtt_picture_policy:
+  alias: LG TV MQTT Picture Policy
+  description: >-
+    Send one bounded policy and wait for its correlated bridge result. Retries reuse
+    the exact request so they do not repeat writes. A failure/timeout aborts this
+    script with an error and no response; callers must require an ok result.
+  mode: queued
+  max: 10
+  fields:
+    policy:
+      name: Picture policy
+      required: true
+      selector:
+        object: {}
+    command_entity:
+      name: Discovered command status sensor
+      default: sensor.lg_tv_picture_command
+      selector:
+        entity:
+          domain: sensor
+  sequence:
+    - variables:
+        reply_entity: "{{ command_entity | default('sensor.lg_tv_picture_command', true) }}"
+        policy_object: "{{ policy | from_json if policy is string else policy }}"
+    - wait_template: >-
+        {{ states(reply_entity) not in ['unknown', 'unavailable']
+           and state_attr(reply_entity, 'ready') == true
+           and state_attr(reply_entity, 'session_id') is string
+           and state_attr(reply_entity, 'command_topic') is string }}
+      timeout: "00:00:10"
+      continue_on_timeout: true
+    - if: "{{ not wait.completed }}"
+      then:
+        - stop: MQTT picture command endpoint is unavailable; nothing sent
+          error: true
+    - variables:
+        request_id: "ha-{{ (as_timestamp(now()) * 1000000) | int }}-{{ range(10000) | random }}"
+        command_session: "{{ state_attr(reply_entity, 'session_id') }}"
+        command_topic: "{{ state_attr(reply_entity, 'command_topic') }}"
+    - variables:
+        command_payload: >-
+          {{ {'protocol': 1, 'request_id': request_id, 'session_id': command_session,
+              'expires_at': as_timestamp(now()) + 30,
+              'policy': policy_object | combine({'request_id': request_id})} | to_json }}
+    - repeat:
+        count: 3
+        sequence:
+          - if: >-
+              {{ request_id not in (state_attr(reply_entity, 'results') or {})
+                 and state_attr(reply_entity, 'session_id') == command_session
+                 and state_attr(reply_entity, 'ready') == true
+                 and states(reply_entity) not in ['unknown', 'unavailable'] }}
+            then:
+              - action: mqtt.publish
+                data:
+                  topic: "{{ command_topic }}"
+                  payload: "{{ command_payload }}"
+                  qos: 0
+                  retain: false
+              # The discovered sensor caches replies: an immediate reply arriving before
+              # this wait starts is still seen, unlike publish-then-wait_for_trigger.
+              - wait_template: >-
+                  {{ request_id in (state_attr(reply_entity, 'results') or {})
+                     or state_attr(reply_entity, 'session_id') != command_session
+                     or states(reply_entity) in ['unknown', 'unavailable'] }}
+                timeout: "00:00:10"
+                continue_on_timeout: true
+    - variables:
+        command_result: >-
+          {{ (state_attr(reply_entity, 'results') or {}).get(request_id, {})
+             if state_attr(reply_entity, 'session_id') == command_session else {} }}
+    - if: "{{ not command_result }}"
+      then:
+        - stop: >-
+            No confirmed MQTT result for {{ request_id }} (timeout/disconnect).
+            The policy may have partially applied; no fallback write was sent.
+          error: true
+    - if: "{{ command_result.get('ok') != true }}"
+      then:
+        - stop: >-
+            Picture policy failed: {{ command_result.get('error', 'unknown') }}:
+            {{ command_result.get('message', 'No details') }}
+          error: true
+    - stop: Picture policy confirmed by LG bridge
+      response_variable: command_result

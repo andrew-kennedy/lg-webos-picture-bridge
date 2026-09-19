@@ -102,7 +102,8 @@
     callbackDisplay.textContent = status.transport === 'mqtt' ? 'MQTT discovery' : (status.callback_display || 'Not paired');
     processDisplay.textContent = status.running ? 'Running' : (status.paired ? 'Stopped' : 'Not configured');
     lunaDisplay.textContent = subscriptionSummary || status.monitor_state || 'Not started';
-    commandDisplay.textContent = status.command_api_enabled ?
+    commandDisplay.textContent = status.mqtt && status.mqtt.commands_enabled ?
+      ('MQTT ' + (status.mqtt.commands_ready ? 'ready' : 'connecting')) : status.command_api_enabled ?
       ((status.command_api && status.command_api.state) || 'starting') +
         ' on port ' + status.command_api_port :
       'Disabled — re-pair with a command token';

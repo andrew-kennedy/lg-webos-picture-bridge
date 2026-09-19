@@ -1,4 +1,4 @@
-# MQTT discovery and HDMI signal sensors
+# MQTT discovery, HDMI signal sensors and picture commands
 
 ## Setup
 
@@ -22,7 +22,8 @@ Launch parameters can contain this `setup` object:
     "password": "YOUR_MQTT_PASSWORD",
     "topic_prefix": "lg_picture_bridge",
     "discovery_prefix": "homeassistant",
-    "tls": false
+    "tls": false,
+    "commands_enabled": true
   }
 }
 ```
@@ -37,7 +38,9 @@ contains the webhook and HTTP command credentials.
 Use `transport: both` and supply your existing `callback_url` to retain webhook observations during
 migration. With `transport: mqtt`, callback_url is optional and no webhook is sent. With no MQTT
 settings, old configurations default to `webhook`. Always preserve the existing `device_id` and
-`command_token` when migrating, so entity identities and picture-writing authorization stay stable.
+`command_token` when keeping HTTP rollback, so entity identities and HTTP authorization stay stable.
+The token is optional for MQTT-only installations and is never sent in MQTT commands.
+Commands remain disabled unless `mqtt.commands_enabled` is explicitly `true`.
 
 TLS is supported with `tls: true` (default port 8883), certificate verification enabled, and an
 optional PEM `ca` string. The C9's old Node/OpenSSL runtime may not negotiate a modern broker's TLS
@@ -46,7 +49,8 @@ on the network; use it only on an appropriately isolated trusted LAN.
 
 ## Discovery and state
 
-The TV publishes six single-component discovery messages under `homeassistant`, grouped into one
+The TV publishes six observation discovery messages, plus a seventh command-status sensor when
+commands are enabled, under `homeassistant`, grouped into one
 device with stable IDs derived from `device_id`. Default entity names are listed in the README;
 Home Assistant may add a suffix on collision, and user-renamed entity IDs are preserved. Nothing
 requires `c9` in an entity ID. Changing `device_id` creates a new MQTT device; remove old discovery
@@ -57,7 +61,7 @@ The bridge republishes discovery, its latest state and availability on broker co
 `homeassistant/status = online`, and refreshes state every 30 seconds. Sensors expire after 90
 seconds without a fresh publish. Abrupt disconnection uses a retained offline Last Will; orderly
 shutdown sends offline explicitly. HA restarts must not replay an old no-signal reading as a new
-event. MQTT 3.1.1 QoS 0 snapshots, not a command queue, are used; the regular refresh repairs dropped
+event. MQTT 3.1.1 QoS 0 snapshots are used; the regular refresh repairs dropped
 updates. A small bounded client uses only Node built-ins to support webOS 4's Node 0.12.2.
 
 The state object includes physical `input`, `picture_input_dimension` (e.g. `hdmi1_pc`),
@@ -68,21 +72,102 @@ input matches; range becomes unknown because stored picture settings can retain 
 bank while no video is arriving. A failed picture subscription clears that picture data.
 
 Use broker ACLs allowing the device to publish only its discovery topics and
-`lg_picture_bridge/lgpb_<device-hash>/#`, and to subscribe to `homeassistant/status`.
-The bridge does not subscribe to command topics; continue using the authenticated HTTP policy API.
+its state/availability/command-status topics, and to subscribe to `homeassistant/status` plus its
+own `lg_picture_bridge/lgpb_<device-hash>/command` topic when commands are enabled. Authorize HA to
+publish that command topic and consume the device's state/discovery. Other broker clients must not
+be allowed to impersonate either endpoint. MQTT permissions replace the HTTP bearer token for this
+path. Anyone able to publish authorized commands can change picture settings; keep the broker private.
+
+## Picture-policy commands
+
+Install [the MQTT request/reply script](../home-assistant/lg_picture_bridge_mqtt_command.example.yaml)
+as `script.lg_tv_mqtt_picture_policy`. It defaults to `sensor.lg_tv_picture_command`; pass
+`command_entity` if you renamed that discovered entity. The script serializes requests, publishes
+with `retain: false`, and waits for a matching result from the same connection session. It checks
+cached sensor attributes, so an immediate reply cannot race a publish-then-subscribe wait.
+
+```yaml
+action: script.lg_tv_mqtt_picture_policy
+data:
+  policy:
+    input: hdmi3
+    scope: active
+    dry_run: true
+    modes: {sdr: expert1, hdr: hdrCinema, dolbyHdr: dolbyHdrCinema}
+    presets:
+      expert1: {settings: {backlight: 80}}
+      hdrCinema: {settings: {backlight: 100}}
+      dolbyHdrCinema: {settings: {backlight: 100}}
+```
+
+The script returns `{ok: true, request_id, state: completed, dry_run, input, scope,
+operation_count, completed_at}` only after the bridge finishes (or validates the dry run).
+It aborts its sequence with `stop`/`error: true` for an explicit rejection or timeout, with no
+automatic HTTP/alert fallback. HA may return a null service response for an aborted script, so
+callers must require a mapping with `ok: true` before continuing (see the README facade example).
+The REST service-call API can also expose this as an empty response object, not an HTTP error.
+**Timeout means unconfirmed, not necessarily unapplied.** `ok` means the firmware accepted each
+write, not that every setting is meaningful on every model. Existing recipes remain firmware-specific.
+
+Protocol, under `lg_picture_bridge/lgpb_<device-hash>`:
+
+| Topic | Direction | Payload |
+| --- | --- | --- |
+| `/command` | HA → TV | JSON envelope below; never retain |
+| `/command_status` | TV → HA | Non-retained readiness, session ID and last 16 terminal results |
+
+```json
+{
+  "protocol": 1,
+  "request_id": "ha-unique-request-id",
+  "session_id": "COPY_FROM_CURRENT_COMMAND_SENSOR",
+  "expires_at": 1789800030,
+  "policy": {"input": "hdmi3", "scope": "active", "modes": {"sdr": "expert1"},
+             "presets": {"expert1": {"settings": {"backlight": 80}}}}
+}
+```
+
+`expires_at` is Unix seconds, greater than the TV's current time and at most 60 seconds ahead (keep
+HA/TV clocks synchronized; the example timestamp is illustrative). The wrapper chooses 30 seconds,
+retries the identical envelope up to three times, and waits at most 30 seconds after readiness.
+The request ID is 1–96 ASCII letters/digits/underscores/hyphens, starting with a letter/digit.
+The policy's request ID is replaced with the envelope's. Maximum envelope size is 48 KiB.
+
+- A new unpredictable session ID is issued on each broker connection; readiness waits for SUBACK.
+- Clean MQTT sessions, no offline command buffer, ignored retained deliveries and short expiries
+  prevent reconnect replay. MQTT 3.1.1 strips RETAIN for live subscribers, so publishers **must not
+  retain**; the session/expiry checks also guard future retained replays.
+- Up to 64 recent accepted requests are deduplicated for at least two minutes within a session.
+  Identical retries return the original result without rewriting. Reusing an ID for different bytes
+  returns `request_id_conflict`. The result sensor keeps the last 16 results and refreshes every 30s.
+- HTTP and MQTT share the existing bounded execution queue. Session, expiry and input/range/signal
+  guards run at queue entry and before every Luna write. `active` requires a confirmed HDMI picture.
+  Mode changes caused by the writer itself do not invalidate the request.
+- A changed context, failed write or timeout can leave earlier operations applied. They are not
+  rolled back. Error replies include `error`, `message`, and where applicable `operation_index`.
+- No command publishes power, IR, input selection, arbitrary Luna URI or shell requests.
+
+After migrating the HA facade, the dedicated `lg_rooted_bridge.yaml` REST package is unnecessary.
+Back it up outside the packages include directory, remove only that dedicated package, reload REST
+commands and run a HA configuration check. Do not remove the backend-selection helper or recipes.
+Leaving `command_token` on the TV keeps optional HTTP rollback available; clearing it disables HTTP.
 
 ## Migrating existing automations
 
 1. Pair in `both` mode first and confirm the new entities and their actual entity IDs.
 2. Confirm signal loss/recovery on the actual device/switch chain, and broker/TV reconnection.
-3. Disable the old webhook receiver, then enable the
+3. Prefer triggering your picture dispatcher directly on input/range/signal sensors, with a settling
+   delay and readiness checks. Do not trigger it on picture-mode writes or command-result updates.
+   For installations that still require the old custom event, the optional
    [MQTT compatibility event adapter](../home-assistant/lg_picture_bridge_mqtt_events.example.yaml).
    It feeds the existing `lg_picture_bridge_dynamic_range_changed` consumer without changing power
    or input routing. It responds to signal recovery, input, and range changes, **not picture-mode
    writes**, avoiding a write/report/write feedback loop. Each context-state change restarts a
    one-second settling delay before the combined state is checked, coalescing simultaneous signal
    and range changes. Consumers should remain idempotent if events repeat.
-4. Switch to `transport: mqtt` once verified. Keep the HTTP `rest_command` and token unchanged.
+4. Switch to `transport: mqtt` once verified. Migrate commands using the script above, then remove
+   the HA REST entry/package after successful verification. Direct-sensor dispatchers need neither
+   the old webhook receiver nor the compatibility adapter.
 
 Alternatively, new automations can trigger directly on these sensor states. For a Switch shutdown
 inference, require a previously observed valid signal in the same Switch session, the TV still on
@@ -109,6 +194,15 @@ implementation still requires rooted/private Luna access. A future unrooted-TV r
 the discovery model if it can obtain equivalent data by another supported mechanism.
 
 ## Live validation
+
+The 0.5 MQTT command implementation passes the automated suite, parses/runs its command smoke
+test under Node 0.12.2, and has been exercised against Home Assistant 2026.9.3 and a real Mosquitto
+broker with a **simulated, dry-run-only picture writer**. Those HA tests confirmed immediate replies,
+a 12-second delayed reply with a deduplicated retry, and rejection reported as an aborted script
+without an `ok` response. The temporary test discovery entity was removed afterward.
+The actual C9 was in standby: installing 0.5, confirming a real Luna write through MQTT, switching
+the live facade, and removing the HA REST package remain pending. No power/routing automation was
+changed by these command-transport tests.
 
 Version 0.4.0 was tested on a rooted C9 with Node 0.12.2 and Home Assistant MQTT discovery:
 

@@ -30,8 +30,8 @@ function executeOne(service, operation, callback) {
       finished = true;
       clearTimeout(timer);
       payload = payloadFromMessage(message) || {};
-      if (payload.returnValue === false || payload.errorText || payload.errorCode) {
-        error = new Error(payload.errorText || String(payload.errorCode) || 'Luna write failed');
+      if (payload.returnValue !== true || payload.errorText || payload.errorCode) {
+        error = new Error(payload.errorText || (payload.errorCode ? String(payload.errorCode) : 'Luna did not confirm the write'));
         error.code = 'luna_write_failed';
         error.statusCode = 502;
         error.luna_payload = payload;
@@ -50,12 +50,18 @@ function executeOne(service, operation, callback) {
   }
 }
 
-function execute(service, operations, onOperation, callback) {
+function execute(service, operations, onOperation, callback, guard) {
   var responses = [];
   function next(index) {
     if (index >= operations.length) {
       callback(null, responses);
       return;
+    }
+    if (guard) {
+      try { guard(); } catch (error) {
+        error.operation_index = index; error.operation = operations[index];
+        callback(error, responses); return;
+      }
     }
     executeOne(service, operations[index], function (error, response) {
       if (error) {

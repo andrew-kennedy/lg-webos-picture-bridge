@@ -45,17 +45,55 @@ module.exports = function () {
   fake.stop = function () {};
   var publisher = discovery.create(config, function () {}, {client: {create: function () { return fake; }}});
   publisher.picture(picture); publisher.signal(signal); publisher.start();
-  assert.strictEqual(sent.filter(function (s) { return s.topic.endsWith('/config'); }).length, 6);
+  assert.strictEqual(sent.filter(function (s) { return s.topic.endsWith('/config') && s.payload; }).length, 6);
+  assert.strictEqual(sent.filter(function (s) { return s.topic.endsWith('_picture_command/config') && !s.payload; }).length, 1);
   assert.strictEqual(sent.find(function (s) { return s.topic.endsWith('/state'); }).retain, false);
   signal = {input: 'hdmi1', signal_present: false, signal_state: 'bad'};
   publisher.signal(signal);
   assert.strictEqual(JSON.parse(sent[sent.length - 1].payload).signal_present, false);
   var previous = sent.length;
   fake.emit('message', 'homeassistant/status', 'online');
-  assert.strictEqual(sent.length, previous + 8, 'HA birth must republish discovery, state, availability');
+  assert.strictEqual(sent.length, previous + 9, 'HA birth must republish discovery, command tombstone, state, availability');
   fake.emit('disconnect');
   previous = sent.length;
   publisher.signal(null);
   assert.strictEqual(sent.length, previous);
+  publisher.stop();
+
+  config.mqtt.commands_enabled = true;
+  messages = discovery.buildDiscovery(config);
+  assert.strictEqual(messages.length, 7);
+  assert.ok(messages[6].payload.json_attributes_topic.endsWith('/command_status'));
+  assert.throws(function () { store.validate({mqtt: {host: 'localhost', commands_enabled: 'true'}}); });
+  var subscriptions = [], applications = [], lastGuard;
+  fake = new EventEmitter(); sent = [];
+  fake.publish = function (topic, payload, retain) { sent.push({topic: topic, payload: payload, retain: retain}); return true; };
+  fake.subscribe = function (topic) { subscriptions.push(topic); };
+  fake.start = function () { fake.emit('connect'); };
+  fake.stop = function () {};
+  publisher = discovery.create(config, function () {}, {client: {create: function () { return fake; }},
+    applyPolicy: function (policy, callback, guard) {
+      lastGuard = guard;
+      applications.push(policy); guard(); callback(null, {dry_run: true, operation_count: 3});
+    }});
+  picture = {input: 'hdmi3', raw_dynamic_range: 'sdr', dynamic_range: 'sdr'};
+  publisher.picture(picture); publisher.signal({input: 'hdmi3', signal_present: true}); publisher.start();
+  assert.strictEqual(sent.filter(function (s) { return s.topic.endsWith('/command_status'); }).length, 0,
+    'Commands are not ready until the broker accepts the subscription');
+  var topic = subscriptions.find(function (t) { return t.endsWith('/command'); });
+  fake.emit('subscribed', topic);
+  var status = JSON.parse(sent[sent.length - 1].payload);
+  assert.strictEqual(status.ready, true);
+  var request = {protocol: 1, session_id: status.session_id, request_id: 'ha-test', expires_at: Date.now()/1000+30,
+    policy: {input:'hdmi3', scope:'active', dry_run:true, modes:{sdr:'expert1'}, presets:{expert1:{settings:{backlight:80}}}}};
+  fake.emit('message', topic, JSON.stringify(request), {retain:false});
+  assert.strictEqual(applications.length, 1);
+  assert.strictEqual(JSON.parse(sent[sent.length - 1].payload).results['ha-test'].ok, true);
+  assert.strictEqual(sent[sent.length - 1].retain, false);
+  publisher.picture({input:'hdmi3',raw_dynamic_range:'sdr',dynamic_range:'sdr',picture_mode:'expert2'});
+  assert.doesNotThrow(lastGuard, 'Our own picture-mode update must not invalidate work');
+  publisher.signal({input:'hdmi3',signal_present:false});
+  publisher.signal({input:'hdmi3',signal_present:true});
+  assert.throws(lastGuard, /changed/, 'Signal loss and recovery to the same context must invalidate older work');
   publisher.stop();
 };

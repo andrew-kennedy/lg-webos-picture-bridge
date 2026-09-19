@@ -96,7 +96,7 @@ function start(service, dependencies) {
         if (epoch !== mqttGeneration) return;
         health.mqtt = state;
         saveHealth();
-      });
+      }, {applyPolicy: applyPolicy});
       mqttPublisher.picture(currentPictureContext);
       mqttPublisher.signal(currentSignal);
       mqttPublisher.start();
@@ -296,6 +296,7 @@ function start(service, dependencies) {
     queued = commandQueue.shift();
     commandRunning = true;
     try {
+      if (queued.guard) queued.guard();
       normalized = picturePolicy.normalize(queued.payload);
       operations = picturePolicy.buildOperations(normalized, currentPictureContext);
     } catch (error) {
@@ -359,10 +360,10 @@ function start(service, dependencies) {
         active_context: currentPictureContext
       });
       runNextCommand();
-    });
+    }, queued.guard);
   }
 
-  function applyPolicy(payload, callback) {
+  function applyPolicy(payload, callback, guard) {
     var error;
     if (commandQueue.length >= 10) {
       error = new Error('Picture command queue is full');
@@ -371,7 +372,7 @@ function start(service, dependencies) {
       callback(error);
       return;
     }
-    commandQueue.push({payload: payload, callback: callback});
+    commandQueue.push({payload: payload, callback: callback, guard: guard});
     runNextCommand();
   }
 

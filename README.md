@@ -2,12 +2,18 @@
 
 LG Picture Bridge is a small Homebrew app for rooted LG webOS TVs. It watches the TV's private
 picture-dimension Luna service, reports context transitions to Home Assistant, and accepts narrowly
-scoped authenticated picture-policy commands from the local network. Version 0.4 adds Home
-Assistant MQTT discovery and event-driven HDMI signal presence, independently of the selected TV input.
+scoped picture-policy commands from the local network. Version 0.5 uses Home Assistant MQTT
+discovery for both observations and confirmed picture commands: no webhook or HA REST package is
+required. Event-driven HDMI signal presence is independent of the selected TV input.
 
 It is intended for automations that need to reapply the currently active picture preset when an
 Apple TV, Shield, game console, or PC changes between SDR, HDR10, HLG, and Dolby Vision. It does
 not capture video, drive LEDs, or require HyperHDR.
+
+> Version 0.5 MQTT commands are currently available in source on `main`. The Homebrew install feed
+> remains on the last tagged release until real-TV command verification and the 0.5 release.
+> The command path has passed Node 0.12.2 compatibility checks and a real HA/MQTT round-trip test
+> using a simulated picture writer; that is not a live C9 write test.
 
 > [!IMPORTANT]
 > Version 0.3.3 is live-tested on a rooted 2019 LG C9 running webOS 4.x. It receives
@@ -27,8 +33,9 @@ https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/latest/downlo
 Return to the app browser, install **LG Picture Bridge**, and launch it once. Homebrew Channel must
 show **Root status: ok** because the monitor needs private Luna access and a startup hook.
 
-When upgrading, install the update and re-run the supplied pairing script once to enable the new
-authenticated command API. Existing pairing data remains outside the application directory.
+When upgrading, existing pairing data remains outside the application directory. MQTT commands
+are opt-in: enable `mqtt.commands_enabled: true` using the MQTT pairing script or protected SSH
+configuration. Existing HTTP commands and webhook-only configurations remain supported.
 
 The release workflow also deploys a browsable GitHub Pages site. The release URL above always
 selects the latest tagged feed and remains independent of account-level Pages custom-domain
@@ -48,9 +55,36 @@ See [MQTT setup and migration](docs/mqtt.md). The bridge publishes one MQTT devi
 | `sensor.lg_tv_picture_mode` | Selected picture preset, including while the input has no signal |
 | `sensor.lg_tv_signal_state` | Diagnostic firmware value, e.g. `good` or `bad` |
 | `sensor.lg_tv_screensaver_type` | Diagnostic firmware value, e.g. `NO_SIGNAL` |
+| `sensor.lg_tv_picture_command` | Opt-in command readiness and correlated success/error results |
 
-All entities share bridge availability. The picture-policy HTTP API remains unchanged. Existing
-webhook-only configurations still work; `transport: both` supports staged migration.
+All entities share bridge availability. With MQTT commands enabled, install the
+[`lg_tv_mqtt_picture_policy` script](home-assistant/lg_picture_bridge_mqtt_command.example.yaml)
+and send the same policy object through it. It discovers the command topic/session from the status
+sensor and waits for the matching application-level result. A broker publish alone is not success.
+Keep source routing, game/movie recipes, and the backend-selection helper unchanged; only replace
+the HTTP action inside the picture-policy facade:
+
+```yaml
+- action: script.lg_tv_mqtt_picture_policy
+  data:
+    policy: "{{ bridge_policy_json }}"
+  response_variable: picture_bridge_response
+- if: >-
+    {{ picture_bridge_response is not mapping
+       or picture_bridge_response.get('ok') != true }}
+  then:
+    - stop: MQTT picture policy was not confirmed; inspect the command script trace
+      error: true
+```
+
+After a successful dry run and live test, remove the old `rest_command` entry (or its dedicated HA
+package) and reload REST commands. Keep unrelated package contents. The optional HTTP endpoint on
+the TV can remain as a rollback path; it is not used by this script. There is no automatic fallback
+after an MQTT timeout because some writes may already have applied.
+
+These are batched recipe commands, not separate sliders for every LG setting. The result sensor
+reports Luna completion/error, not a calibrated measurement of the panel. See
+[the MQTT command protocol](docs/mqtt.md#picture-policy-commands) for limits and security.
 
 ### Legacy webhook setup
 
@@ -134,9 +168,10 @@ A signal transition sends:
 `dynamic_range` is one of `sdr`, `hdr10`, `hlg`, or `dolby_vision`. The raw LG value is retained for
 diagnostics.
 
-## Direct picture-policy commands
+## Picture-policy payload (MQTT or optional HTTP)
 
-Merge
+MQTT is the recommended command transport. The policy schema below is shared by both transports.
+For optional HTTP access, merge
 [`home-assistant/lg_picture_bridge_rest_command.example.yaml`](home-assistant/lg_picture_bridge_rest_command.example.yaml)
 into Home Assistant and store the same pairing token in `secrets.yaml` with the `Bearer ` prefix.
 Home Assistant sends one policy object to:
@@ -175,8 +210,10 @@ For example:
 Use `scope: all` when a source, room profile, or shared HDMI-switch role changes. It preloads every
 supplied preset and range mapping. Use `scope: active` after a signal transition; the bridge reads
 the TV's current raw range, applies only its matching preset and mapping, and returns HTTP 409 if the
-requested physical input does not match. Add `"dry_run": true` to validate and list operations
-without writing anything.
+requested physical input does not match (MQTT returns a correlated `stale_input` error instead).
+Add `"dry_run": true` to validate without writing anything; MQTT replies with the planned operation
+count and HTTP additionally lists the operations. Automatic content transitions should use
+`scope: active`; a manual preload can still use `all`.
 
 On the tested C9, preset controls use `picture$input.pictureMode.2d.x`, while range selections use
 `picture$input.x.2d.dynamicRange`. Preset controls are written before mode mappings so the visible
@@ -189,10 +226,10 @@ cycle. Inactive inputs remain preload-only and activate normally when selected.
 ## How it works
 
 ```text
-settingsservice picture subscription ──> debounce + normalize ──> HA webhook
-                  dimension.dynamicRange                         │
-                                                                ▼
-settingsservice synthetic categories <── authenticated policy API
+TV picture + signal subscriptions ──> MQTT discovery sensors ──> HA picture dispatcher
+                                                                     │
+TV settingsservice <── shared policy writer <── MQTT command <── game/movie recipe
+                               └── MQTT command-status results ──> waiting HA script
 ```
 
 The IPK includes a registered JavaScript Luna service named
@@ -278,8 +315,13 @@ versions before tagging.
 - The webhook sends observations only; it does not accept commands from Home Assistant.
 - Home Assistant should keep the webhook local-only and use a unique, non-guessable ID.
 - MQTT credentials are stored only in the protected configuration, never in discovery messages or
-  status output. The MQTT connection publishes observations, subscribes only to HA's birth topic,
-  and does not accept commands. Use broker ACLs and a dedicated account where possible.
+  status output. Commands are disabled by default. Enabling them trusts broker authentication and
+  topic ACLs to authorize picture changes; the HTTP token does not authorize MQTT messages. Use a
+  private broker and dedicated account/ACLs where possible. No shell or arbitrary Luna command
+  endpoint is exposed.
+- MQTT commands require a current connection session, a request ID and a short expiry. Retained
+  deliveries are ignored; exact retries are deduplicated. Guards run before each write. A context
+  change/failure can leave partial writes; it is not a transaction and there is no blind fallback.
 
 ## License
 

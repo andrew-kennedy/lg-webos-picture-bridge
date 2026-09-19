@@ -2,10 +2,11 @@
 <p>
   LG Picture Bridge monitors a rooted LG webOS TV's internal video-output and picture-dimension
   services. It reports SDR, HDR10, HLG, and Dolby Vision transitions to a local Home Assistant
-  webhook so picture-setting automations can be reapplied whenever content changes format.
+  MQTT device, including HDMI signal presence, so picture-setting automations can be reapplied whenever content changes format.
 </p>
 <p>
-  Version 0.3.3 adds immediate active-profile reloads to the authenticated local picture-policy API.
+  Version 0.5 adds opt-in MQTT picture commands with correlated success/error results, short expiry,
+  duplicate protection and context guards. A Home Assistant REST package is no longer necessary.
   It silently targets active or inactive C9 picture banks without notification dialogs, then asks
   webOS to refresh the active picture-processing pipeline without cycling modes. It has been tested
   end-to-end on a 2019 LG C9. Pairing and status use the app's own registered service rather than
@@ -17,4 +18,4 @@
   <li>Home Assistant reachable from the TV over the local network</li>
   <li>The pairing script from the project documentation</li>
 </ul>
-<p>No ambient-light capture server is required. Pairing is sent from Home Assistant as application launch parameters, so no webhook URL needs to be typed with the TV remote.</p>
+<p>No ambient-light capture server is required. Pairing is sent from Home Assistant as application launch parameters, so no credentials need to be typed with the TV remote. Optional HTTP commands and legacy webhooks remain supported.</p>

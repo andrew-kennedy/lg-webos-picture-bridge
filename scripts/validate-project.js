@@ -20,6 +20,7 @@ var required = [
   'app/bridge/lib/picture-policy.js',
   'app/bridge/lib/ui-status.js',
   'app/bridge/lib/mqtt-client.js',
+  'app/bridge/lib/mqtt-commands.js',
   'app/bridge/lib/mqtt-discovery.js',
   'app/bridge/lib/signal-monitor.js',
   'app/scripts/runner.sh',
