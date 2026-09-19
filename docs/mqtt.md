@@ -79,8 +79,9 @@ The bridge does not subscribe to command topics; continue using the authenticate
    [MQTT compatibility event adapter](../home-assistant/lg_picture_bridge_mqtt_events.example.yaml).
    It feeds the existing `lg_picture_bridge_dynamic_range_changed` consumer without changing power
    or input routing. It responds to signal recovery, input, and range changes, **not picture-mode
-   writes**, avoiding a write/report/write feedback loop. The one-second stable-state trigger
-   normally coalesces context changes. Consumers should remain idempotent if events repeat.
+   writes**, avoiding a write/report/write feedback loop. Each context-state change restarts a
+   one-second settling delay before the combined state is checked, coalescing simultaneous signal
+   and range changes. Consumers should remain idempotent if events repeat.
 4. Switch to `transport: mqtt` once verified. Keep the HTTP `rest_command` and token unchanged.
 
 Alternatively, new automations can trigger directly on these sensor states. For a Switch shutdown
@@ -106,3 +107,18 @@ take screenshots, change power, or infer signal from a stale picture-mode settin
 These are firmware-specific APIs. MQTT standardizes the HA interface, not TV capabilities; this
 implementation still requires rooted/private Luna access. A future unrooted-TV reader can reuse
 the discovery model if it can obtain equivalent data by another supported mechanism.
+
+## Live validation
+
+Version 0.4.0 was tested on a rooted C9 with Node 0.12.2 and Home Assistant MQTT discovery:
+
+- All six entities were discovered and resumed reporting after TV standby/wake.
+- A controlled external-switch change produced signal `on -> off -> on` without changing the TV's
+  HDMI input or restarting the bridge. Range became unknown during signal loss and returned to
+  Dolby Vision when video recovered.
+- The authenticated picture-policy API accepted a dry-run request without writing settings.
+- MQTT sensor changes drove the existing picture-policy event consumer after webhook migration.
+- The stdin pairing helper was exercised on the TV using an isolated temporary configuration.
+
+These checks do not yet validate Nintendo Switch sleep inference, cold-boot behavior, broker-outage
+recovery, or compatibility with other firmware versions.
