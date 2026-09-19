@@ -5,3 +5,12 @@ dist/
 *.manifest.json
 !app/security/*.manifest.json
 .DS_Store
+
+# Local pairing and Home Assistant credentials must never be published.
+.env
+.env.*
+!.env.example
+secrets.yaml
+secrets.yml
+/config.json
+/credentials.json

@@ -1,0 +1,35 @@
+alias: LG Picture Bridge MQTT - Picture Context Changed
+description: >-
+  Optional compatibility adapter for the existing dynamic-range event consumer.
+  Disable the webhook receiver before enabling this, to avoid duplicate writes.
+  This automation never changes power or HDMI routing. Names shown are discovery
+  defaults; check actual entity IDs if HA already has entities with these names.
+triggers:
+  - trigger: state
+    entity_id:
+      - sensor.lg_tv_dynamic_range
+      - sensor.lg_tv_input
+      - binary_sensor.lg_tv_hdmi_signal
+    for:
+      seconds: 1
+conditions:
+  - condition: state
+    entity_id: binary_sensor.lg_tv_hdmi_signal
+    state: 'on'
+  - condition: template
+    value_template: >-
+      {{ states('sensor.lg_tv_dynamic_range') in ['sdr', 'hdr10', 'hlg', 'dolby_vision']
+         and states('sensor.lg_tv_input') in ['hdmi1', 'hdmi2', 'hdmi3', 'hdmi4'] }}
+actions:
+  - event: lg_picture_bridge_dynamic_range_changed
+    event_data:
+      device_id: living-room-lg-c9
+      device_name: Living Room LG TV
+      input: "{{ states('sensor.lg_tv_input') }}"
+      dynamic_range: "{{ states('sensor.lg_tv_dynamic_range') }}"
+      picture_mode: "{{ states('sensor.lg_tv_picture_mode') }}"
+      previous_dynamic_range: >-
+        {{ trigger.from_state.state if trigger.entity_id == 'sensor.lg_tv_dynamic_range'
+           and trigger.from_state is not none else 'unknown' }}
+      source: mqtt
+mode: restart

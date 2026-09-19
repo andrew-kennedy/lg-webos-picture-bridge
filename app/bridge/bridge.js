@@ -7,6 +7,8 @@ var webhook = require('./lib/webhook');
 var commandServer = require('./lib/command-server');
 var lunaExecutor = require('./lib/luna-executor');
 var picturePolicy = require('./lib/picture-policy');
+var signalMonitor = require('./lib/signal-monitor');
+var mqttDiscovery = require('./lib/mqtt-discovery');
 var appInfo = require('../appinfo.json');
 
 function now() {
@@ -33,6 +35,12 @@ function start(service, dependencies) {
   var sending = false;
   var stopping = false;
   var currentPictureContext = null;
+  var currentSignal = null;
+  var signalWatcher = null;
+  var mqttPublisher = null;
+  var mqttGeneration = 0;
+  var subscriptionRetries = {};
+  var subscriptionEpochs = {};
   var policyServer = null;
   var commandQueue = [];
   var commandRunning = false;
@@ -42,6 +50,7 @@ function start(service, dependencies) {
     started_at: now(),
     heartbeat_at: now(),
     subscriptions: {
+      hdmi_signal: {state: 'starting', last_error: null},
       videooutput: {
         state: 'starting',
         last_response_at: null,
@@ -71,6 +80,31 @@ function start(service, dependencies) {
     last_command: null,
     last_error: null
   };
+  health.mqtt = {state: 'disabled'};
+  health.hdmi_signal = null;
+
+  function usesMqtt() { return config.mqtt && config.transport !== 'webhook'; }
+  function usesWebhook() { return config.callback_url && config.transport !== 'mqtt'; }
+  function startMqtt() {
+    var previous = mqttPublisher;
+    var epoch = ++mqttGeneration;
+    mqttPublisher = null;
+    health.mqtt = {state: usesMqtt() ? 'starting' : 'disabled'};
+    function launch() {
+      if (stopping || epoch !== mqttGeneration || !usesMqtt()) return;
+      mqttPublisher = (injected.mqttDiscovery || mqttDiscovery).create(config, function (state) {
+        if (epoch !== mqttGeneration) return;
+        health.mqtt = state;
+        saveHealth();
+      });
+      mqttPublisher.picture(currentPictureContext);
+      mqttPublisher.signal(currentSignal);
+      mqttPublisher.start();
+    }
+    // Drain the previous retained offline message before the new connection announces online.
+    if (previous) previous.stop(launch);
+    else launch();
+  }
 
   function log(message) {
     process.stdout.write(now() + ' ' + message + '\n');
@@ -109,7 +143,7 @@ function start(service, dependencies) {
   function deliverPending() {
     var candidate;
     var payload;
-    if (sending || !pending || stopping) return;
+    if (sending || !pending || stopping || !usesWebhook()) return;
     candidate = pending;
     payload = {
       event: 'dynamic_range_changed',
@@ -154,6 +188,7 @@ function start(service, dependencies) {
   }
 
   function scheduleDelivery() {
+    if (!usesWebhook()) return;
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(function () {
       var selected = selectNewestCandidate();
@@ -208,6 +243,7 @@ function start(service, dependencies) {
     if (pictureContext) {
       currentPictureContext = pictureContext;
       health.current_picture_context = pictureContext;
+      if (mqttPublisher) mqttPublisher.picture(pictureContext);
     }
     if (!extracted) {
       if (pictureContext) {
@@ -373,7 +409,16 @@ function start(service, dependencies) {
   function reconfigure(nextConfig, callback) {
     var commandServerChanged = config.command_token !== nextConfig.command_token ||
       config.command_port !== nextConfig.command_port;
+    var mqttChanged = config.transport !== nextConfig.transport || config.device_id !== nextConfig.device_id ||
+      config.device_name !== nextConfig.device_name || config.debounce_ms !== nextConfig.debounce_ms ||
+      JSON.stringify(config.mqtt) !== JSON.stringify(nextConfig.mqtt);
     config = nextConfig;
+    if (mqttChanged) startMqtt();
+    if (!usesWebhook()) {
+      pending = null;
+      clearTimeout(debounceTimer); clearTimeout(retryTimer);
+      debounceTimer = null; retryTimer = null;
+    }
     if (!commandServerChanged) {
       saveHealth();
       callback(null);
@@ -398,28 +443,51 @@ function start(service, dependencies) {
     health.subscriptions[source].state = 'error';
     health.subscriptions[source].last_error = message;
     health.last_error = source + ' subscription error: ' + message;
+    if (source === 'picture') {
+      currentPictureContext = null;
+      health.current_picture_context = null;
+      if (mqttPublisher) mqttPublisher.picture(null);
+    }
     saveHealth();
     log(health.last_error);
   }
 
   function subscribe(source, uri, payload) {
     var subscription;
+    var epoch = (subscriptionEpochs[source] || 0) + 1;
+    subscriptionEpochs[source] = epoch;
+    function failed(error) {
+      if (stopping || subscriptionEpochs[source] !== epoch) return;
+      subscriptionEpochs[source] += 1;
+      markSubscriptionError(source, error);
+      if (subscription) {
+        try { subscription.cancel(); } catch (ignored) { /* Already closed. */ }
+        var index = subscriptions.indexOf(subscription);
+        if (index !== -1) subscriptions.splice(index, 1);
+      }
+      subscriptionRetries[source] = setTimeout(function () { subscribe(source, uri, payload); }, 10000);
+    }
     health.subscriptions[source].state = 'subscribing';
     saveHealth();
     try {
       subscription = service.subscribe(uri, payload);
       subscriptions.push(subscription);
       subscription.on('response', function (message) {
-        handlePayload(source, message && message.payload ? message.payload : message);
+        var response = message && message.payload ? message.payload : message;
+        if (stopping || subscriptionEpochs[source] !== epoch) return;
+        if (response && (response.returnValue === false || response.subscribed === false)) {
+          // videooutput is absent on the C9; do not hammer a nonexistent fallback.
+          if (source === 'videooutput' && /service does not exist/i.test(response.errorText || '')) {
+            handlePayload(source, response); return;
+          }
+          failed(new Error(response.errorText || 'Luna subscription rejected')); return;
+        }
+        handlePayload(source, response);
       });
-      subscription.on('error', function (error) {
-        markSubscriptionError(source, error);
-      });
-      subscription.on('cancel', function () {
-        markSubscriptionError(source, new Error('subscription cancelled'));
-      });
+      subscription.on('error', failed);
+      subscription.on('cancel', function () { failed(new Error('subscription cancelled')); });
     } catch (error) {
-      markSubscriptionError(source, error);
+      failed(error);
     }
   }
 
@@ -429,6 +497,9 @@ function start(service, dependencies) {
     log('Stopping after ' + signal);
     if (debounceTimer) clearTimeout(debounceTimer);
     if (retryTimer) clearTimeout(retryTimer);
+    Object.keys(subscriptionRetries).forEach(function (source) { clearTimeout(subscriptionRetries[source]); });
+    if (signalWatcher) signalWatcher.stop();
+    if (mqttPublisher) mqttPublisher.stop();
     if (policyServer) {
       try { policyServer.close(); } catch (serverError) { /* Already closed. */ }
     }
@@ -454,6 +525,17 @@ function start(service, dependencies) {
 
   log('Starting registered LG Picture Bridge ' + appInfo.version + ' for ' + config.device_id);
   saveHealth();
+  startMqtt();
+  signalWatcher = (injected.signalMonitor || signalMonitor).create(service, function (state) {
+    currentSignal = state;
+    health.hdmi_signal = state;
+    if (mqttPublisher) mqttPublisher.signal(state);
+    saveHealth();
+  }, function (state) {
+    health.subscriptions.hdmi_signal = state;
+    saveHealth();
+  });
+  signalWatcher.start();
   subscribe('videooutput', 'luna://com.webos.service.videooutput/getStatus', {subscribe: true});
   subscribe('picture', 'luna://com.webos.settingsservice/getSystemSettings', {
     category: 'picture',
@@ -466,6 +548,7 @@ function start(service, dependencies) {
     health: health,
     handlePayload: handlePayload,
     reconfigure: reconfigure,
+    refreshMqtt: function () { if (mqttPublisher) mqttPublisher.refresh(); },
     stop: stop
   };
 }

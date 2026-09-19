@@ -76,7 +76,17 @@ function pairingEvent(config) {
 }
 
 function sendPairingTest(config, callback) {
+  if (config.transport === 'mqtt') {
+    if (controller) controller.refreshMqtt();
+    callback(null, {statusCode: null});
+    return;
+  }
   webhook.postJson(config.callback_url, pairingEvent(config), callback);
+}
+
+function deliveryStatus(config, response) {
+  return config.transport === 'mqtt' ? 'mqtt_' + (controller.health.mqtt.state || 'connecting') :
+    'http_' + response.statusCode;
 }
 
 service.register('uiStatus', function (message) {
@@ -107,7 +117,7 @@ service.register('configure', function (message) {
       }
       message.respond({
         returnValue: true,
-        delivery_status: 'http_' + response.statusCode,
+        delivery_status: deliveryStatus(saved, response),
         status: statusSnapshot()
       });
     });
@@ -141,7 +151,7 @@ service.register('testWebhook', function (message) {
     }
     message.respond({
       returnValue: true,
-      delivery_status: 'http_' + response.statusCode,
+      delivery_status: deliveryStatus(config, response),
       status: statusSnapshot()
     });
   });

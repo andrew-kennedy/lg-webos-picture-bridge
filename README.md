@@ -2,7 +2,8 @@
 
 LG Picture Bridge is a small Homebrew app for rooted LG webOS TVs. It watches the TV's private
 picture-dimension Luna service, reports context transitions to Home Assistant, and accepts narrowly
-scoped authenticated picture-policy commands from the local network.
+scoped authenticated picture-policy commands from the local network. Version 0.4 adds Home
+Assistant MQTT discovery and event-driven HDMI signal presence, independently of the selected TV input.
 
 It is intended for automations that need to reapply the currently active picture preset when an
 Apple TV, Shield, game console, or PC changes between SDR, HDR10, HLG, and Dolby Vision. It does
@@ -34,6 +35,24 @@ selects the latest tagged feed and remains independent of account-level Pages cu
 redirects and branch-content cache delays.
 
 ## Configure Home Assistant
+
+### MQTT discovery (recommended for new setups)
+
+See [MQTT setup and migration](docs/mqtt.md). The bridge publishes one MQTT device with:
+
+| Default entity ID | Meaning |
+| --- | --- |
+| `binary_sensor.lg_tv_hdmi_signal` | Current HDMI session has valid video; unknown is not off |
+| `sensor.lg_tv_input` | Active physical HDMI input (`hdmi1`…`hdmi4`) |
+| `sensor.lg_tv_dynamic_range` | SDR/HDR10/HLG/Dolby Vision; unknown without valid signal |
+| `sensor.lg_tv_picture_mode` | Selected picture preset, including while the input has no signal |
+| `sensor.lg_tv_signal_state` | Diagnostic firmware value, e.g. `good` or `bad` |
+| `sensor.lg_tv_screensaver_type` | Diagnostic firmware value, e.g. `NO_SIGNAL` |
+
+All entities share bridge availability. The picture-policy HTTP API remains unchanged. Existing
+webhook-only configurations still work; `transport: both` supports staged migration.
+
+### Legacy webhook setup
 
 ### 1. Create a random local webhook
 
@@ -178,7 +197,9 @@ settingsservice synthetic categories <── authenticated policy API
 
 The IPK includes a registered JavaScript Luna service named
 `io.github.andrewkennedy.lgpicturebridge.service`. A narrow installed role permits outbound calls
-only to `com.webos.settingsservice` and the optional `com.webos.service.videooutput` fallback.
+to `com.webos.settingsservice`, the optional `com.webos.service.videooutput` fallback, and the
+read-only foreground-session and HDMI signal methods on `com.webos.service.acb` and
+`com.webos.service.tv.externaldevice`.
 Homebrew Channel's elevated JS-service runner launches it outside the normal third-party jail.
 [LG ships Node.js 0.12.2 on webOS TV 4.x](https://webostv.developer.lge.com/develop/guides/js-service-basics);
 the monitor is deliberately written to that older JavaScript runtime.
@@ -250,12 +271,15 @@ versions before tagging.
   and a schema-validated `picture` policy route; it cannot invoke arbitrary Luna URIs or categories.
 - Picture setting keys, input names, mode names, body size, nesting, and command queue length are
   bounded before a request reaches Luna.
-- The installed Luna role restricts outbound calls to settingsservice and the optional read-only
-  video-output monitor. Runtime LS2 sender checks limit pairing/status methods to the LG Picture
+- The installed Luna role restricts outbound calls to settingsservice, the optional read-only
+  video-output monitor, and the foreground/HDMI signal services. Runtime LS2 sender checks limit pairing/status methods to the LG Picture
   Bridge app itself.
 - Pairing payloads are validated before being written.
 - The webhook sends observations only; it does not accept commands from Home Assistant.
 - Home Assistant should keep the webhook local-only and use a unique, non-guessable ID.
+- MQTT credentials are stored only in the protected configuration, never in discovery messages or
+  status output. The MQTT connection publishes observations, subscribes only to HA's birth topic,
+  and does not accept commands. Use broker ACLs and a dedicated account where possible.
 
 ## License
 

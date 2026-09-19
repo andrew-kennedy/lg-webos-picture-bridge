@@ -43,7 +43,9 @@ module.exports = function () {
   }));
   assert.deepStrictEqual(role.permissions[0].outbound, [
     'com.webos.service.videooutput',
-    'com.webos.settingsservice'
+    'com.webos.settingsservice',
+    'com.webos.service.acb',
+    'com.webos.service.tv.externaldevice'
   ]);
   assert.deepStrictEqual(role.permissions[0].inbound, ['*']);
 };

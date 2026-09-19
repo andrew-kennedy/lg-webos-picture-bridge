@@ -7,6 +7,10 @@ var appInfo = require('../appinfo.json');
 
 try {
   var config = store.load();
+  if (config.transport === 'mqtt') {
+    process.stdout.write('MQTT-only configuration: use app Refresh/Test and check broker availability.\n');
+    process.exit(0);
+  }
   webhook.postJson(config.callback_url, {
     event: 'pairing_test',
     dynamic_range: null,

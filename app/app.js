@@ -76,13 +76,15 @@
       callbackUrl = String(candidate.home_assistant_url).replace(/\/$/, '') +
         '/api/webhook/' + String(candidate.webhook_id);
     }
-    if (!callbackUrl) return null;
-    if (!/^https?:\/\/[^\s]+$/i.test(callbackUrl)) {
+    if (!callbackUrl && !candidate.mqtt) return null;
+    if (callbackUrl && !/^https?:\/\/[^\s]+$/i.test(callbackUrl)) {
       throw new Error('The supplied callback_url must be an HTTP or HTTPS URL.');
     }
 
     return {
       callback_url: callbackUrl,
+      mqtt: candidate.mqtt || null,
+      transport: candidate.transport || (candidate.mqtt ? (callbackUrl ? 'both' : 'mqtt') : 'webhook'),
       device_id: candidate.device_id || 'lg-webos-tv',
       device_name: candidate.device_name || 'LG webOS TV',
       debounce_ms: candidate.debounce_ms || 500,
@@ -97,7 +99,7 @@
       return name + ': ' + subscriptionStates[name].state;
     }).join(' · ');
     clearError();
-    callbackDisplay.textContent = status.callback_display || 'Not paired';
+    callbackDisplay.textContent = status.transport === 'mqtt' ? 'MQTT discovery' : (status.callback_display || 'Not paired');
     processDisplay.textContent = status.running ? 'Running' : (status.paired ? 'Stopped' : 'Not configured');
     lunaDisplay.textContent = subscriptionSummary || status.monitor_state || 'Not started';
     commandDisplay.textContent = status.command_api_enabled ?
@@ -108,8 +110,21 @@
       status.last_dynamic_range + ' via ' + (status.last_source || 'unknown') : 'None yet';
     deliveryDisplay.textContent = status.last_delivery_at ?
       (status.last_delivery_status || 'delivered') + ' at ' + status.last_delivery_at : 'None yet';
+    if (status.mqtt && status.mqtt.state !== 'disabled') {
+      deliveryDisplay.textContent = 'MQTT: ' + status.mqtt.state +
+        (status.mqtt.last_published_at ? ' · ' + status.mqtt.last_published_at : '');
+    }
+    if (status.hdmi_signal) {
+      signalDisplay.textContent += ' · HDMI signal: ' +
+        (status.hdmi_signal.signal_present === true ? 'present' :
+          (status.hdmi_signal.signal_present === false ? 'no signal' : 'unknown'));
+    }
 
-    if (status.paired && status.running && status.monitor_healthy) {
+    if (status.paired && status.running && status.mqtt &&
+        ['disabled', 'connected'].indexOf(status.mqtt.state) === -1) {
+      statusDot.className = 'status-dot pending';
+      statusTitle.textContent = 'Running · MQTT ' + status.mqtt.state;
+    } else if (status.paired && status.running && status.monitor_healthy) {
       statusDot.className = 'status-dot ok';
       statusTitle.textContent = 'Paired and monitoring';
     } else if (status.paired && status.running && status.monitor_state === 'starting') {
@@ -125,8 +140,8 @@
       statusDot.className = 'status-dot pending';
       statusTitle.textContent = 'Not paired';
     }
-    if (status.last_error) {
-      details.textContent = status.last_error;
+    if (status.last_error || (status.mqtt && status.mqtt.last_error)) {
+      details.textContent = status.last_error || status.mqtt.last_error;
       details.className = 'details visible';
     }
   }
@@ -157,7 +172,7 @@
       }
       if (response.status) renderStatus(response.status);
       else refreshStatus();
-      setOperation('Pairing saved and test event sent');
+      setOperation('Pairing saved · ' + (response.delivery_status || 'monitoring'));
     });
   }
 
