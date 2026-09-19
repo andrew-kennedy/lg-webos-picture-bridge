@@ -28,12 +28,23 @@ Launch parameters can contain this `setup` object:
 }
 ```
 
-The [pairing script](../home-assistant/lg_picture_bridge_mqtt_pairing_script.example.yaml) avoids TV
+The [Configure LG Picture Bridge MQTT script](../home-assistant/lg_picture_bridge_mqtt_pairing_script.example.yaml) avoids TV
 keyboard entry. Keep its secrets outside source control. HA action traces may include resolved
 launch parameters; for environments where that is unacceptable, transfer configuration over SSH
 and pipe it into `bridge/configure.js pair-stdin`, then restart the bridge. That command reads JSON
 from stdin and prints only paired/transport status. Never print the full existing config because it
-contains the webhook and HTTP command credentials.
+contains broker credentials and any webhook/HTTP command credentials.
+
+Configuration persists across updates, so do not run setup again just to upgrade. Launch setup
+replaces the saved configuration rather than merging it. Use the MQTT script, not the legacy
+webhook-only script, for an MQTT installation. The filename retains `pairing` for existing links;
+the TV UI calls this configuration, not pairing or an HA authentication handshake.
+
+In 0.5.1+, **Republish discovery** reports only submission, never confirmed HA receipt. It errors
+if the MQTT publisher is disconnected/stopped or cannot submit the discovery/state/availability
+batch. The new app-only Luna method is `refreshReporting`; `testWebhook` remains as a compatibility
+alias with the same behavior. Neither method applies picture settings. See the
+[TV status screen guide](../README.md#tv-status-screen-051) for all controls.
 
 Use `transport: both` and supply your existing `callback_url` to retain webhook observations during
 migration. With `transport: mqtt`, callback_url is optional and no webhook is sent. With no MQTT

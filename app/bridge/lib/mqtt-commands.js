@@ -20,7 +20,7 @@ function create(options) {
     return {protocol: 1, session_id: session, ready: ready, state: state,
       command_topic: options.topic, request_id: lastId, results: results};
   }
-  function publish() { if (ready) options.publish(status()); }
+  function publish() { return ready ? options.publish(status()) : false; }
   function remember(id, result) {
     results[id] = result;
     resultOrder = resultOrder.filter(function (key) { return key !== id; });

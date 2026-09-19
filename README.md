@@ -29,7 +29,7 @@ https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/latest/downlo
 Return to the app browser, install **LG Picture Bridge**, and launch it once. Homebrew Channel must
 show **Root status: ok** because the monitor needs private Luna access and a startup hook.
 
-When upgrading, existing pairing data remains outside the application directory. MQTT commands
+When upgrading, existing configuration remains outside the application directory. MQTT commands
 are opt-in: enable `mqtt.commands_enabled: true` using the MQTT pairing script or protected SSH
 configuration. Existing HTTP commands and webhook-only configurations remain supported.
 
@@ -40,6 +40,13 @@ redirects and branch-content cache delays.
 ## Configure Home Assistant
 
 ### MQTT discovery (recommended for new setups)
+
+Use [Configure LG Picture Bridge MQTT](home-assistant/lg_picture_bridge_mqtt_pairing_script.example.yaml)
+to send broker settings from Home Assistant to the TV app. Keep the username/password in HA secrets.
+No webhook URL or Home Assistant access token is required. The bridge saves configuration and runs
+in the background after the app closes. **Already configured? An app update does not require setup
+again.** Setup replaces saved configuration; do not run the old webhook-only script over an MQTT
+installation. Preserve the existing `device_id` when changing settings to keep entity identities.
 
 See [MQTT setup and migration](docs/mqtt.md). The bridge publishes one MQTT device with:
 
@@ -81,6 +88,24 @@ after an MQTT timeout because some writes may already have applied.
 These are batched recipe commands, not separate sliders for every LG setting. The result sensor
 reports Luna completion/error, not a calibrated measurement of the panel. See
 [the MQTT command protocol](docs/mqtt.md#picture-policy-commands) for limits and security.
+
+### TV status screen (0.5.1+)
+
+The screen refreshes every five seconds while visible. **Configured** means settings were saved;
+**broker connected** means the MQTT connection is up; **MQTT listener ready** means the broker
+accepted the picture-command subscription, not that a picture command has run. If an optional HTTP
+endpoint is configured, its status is shown separately. No credentials are displayed.
+
+- **Refresh status** reads the bridge's current status.
+- **Restart monitor** restarts the background service without changing saved settings.
+- **Republish discovery** submits MQTT discovery, the current state, availability and enabled
+  command status again. It does not change picture settings. Disconnected/failed submissions report
+  an error; QoS 0 submission does **not** confirm broker or HA receipt. Check entities in HA for that.
+- Webhook-only setups show **Send webhook test**; mixed setups show **Republish + test webhook**.
+  An HTTP response is reported separately and does not prove an HA automation ran.
+- **Remove configuration** asks for confirmation, stops monitoring, removes saved configuration
+  and the startup hook. It does not delete retained MQTT discovery or entities from HA; remove those
+  separately if retiring the bridge. Ordinary upgrades do not need this action.
 
 ### Legacy webhook setup
 
@@ -250,17 +275,19 @@ Configuration and logs are stored outside the application directory:
 /var/lib/io.github.andrewkennedy.lgpicturebridge/bridge.log
 ```
 
-The callback URL and command token are stored in `config.json` with mode `0600` when supported. The
-app status screen always redacts secrets. It reports each subscription's actual state, current
-picture context, command-API state, last detected dynamic range, last command, and last webhook
-result; a running supervisor alone is not shown as healthy.
+Broker credentials, the callback URL and any HTTP command token are stored in `config.json` with
+mode `0600` when supported. The app status screen redacts secrets and shows subscription states,
+command transport readiness, the last observed signal and reporting status. A running supervisor
+alone is not shown as healthy. Detailed command results remain available in the MQTT command sensor.
 
 ## Troubleshooting
 
-- **Pairing fails immediately:** confirm Homebrew Channel reports `Root status: ok` and install at
+- **Configuration fails immediately:** confirm Homebrew Channel reports `Root status: ok` and install at
   least version 0.3.2, which grants the web app its required Luna client permissions and talks
   directly to the registered bridge service.
-- **Test event fails:** use a Home Assistant URL reachable directly from the TV. `homeassistant.local`
+- **MQTT republish fails:** check the broker address, credentials, connection and ACLs. Discovery is
+  republished automatically after reconnecting. A saved configuration alone does not mean connected.
+- **Legacy webhook test fails:** use a Home Assistant URL reachable directly from the TV. `homeassistant.local`
   may not resolve on older webOS versions; a reserved LAN IP is safer.
 - **The monitor stops after a reboot:** launch Homebrew Channel once and verify its root startup hook
   is current. Then open LG Picture Bridge and select **Refresh status**.
@@ -278,7 +305,7 @@ result; a running supervisor alone is not shown as healthy.
 - **A picture command returns HTTP 502:** inspect the returned Luna error and failed category. An
   unsupported setting key or picture-mode name can cause the C9 to reject that operation.
 
-To remove the persistent configuration, open the app and select **Clear pairing** before uninstalling.
+To remove the persistent configuration, open the app and confirm **Remove configuration** before uninstalling.
 
 ## Development
 

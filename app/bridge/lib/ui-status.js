@@ -26,6 +26,8 @@ function build(config, health, running, currentTime) {
   else if (config && running) monitorState = 'waiting_for_luna';
 
   return {
+    configured: Boolean(config),
+    // Keep the old field for existing status consumers; it is not an HA handshake.
     paired: Boolean(config),
     running: Boolean(running),
     monitor_healthy: monitorHealthy,
@@ -34,6 +36,9 @@ function build(config, health, running, currentTime) {
     bridge_version: snapshot ? snapshot.bridge_version : null,
     callback_display: config ? store.redactCallback(config.callback_url) : null,
     transport: config ? (config.transport || 'webhook') : null,
+    mqtt_enabled: Boolean(config && config.mqtt && config.transport !== 'webhook'),
+    mqtt_commands_enabled: Boolean(config && config.mqtt && config.transport !== 'webhook' &&
+      config.mqtt.commands_enabled),
     mqtt: snapshot ? snapshot.mqtt : null,
     hdmi_signal: snapshot ? snapshot.hdmi_signal : null,
     device_id: config ? config.device_id : null,

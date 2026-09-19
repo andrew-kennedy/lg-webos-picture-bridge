@@ -44,6 +44,7 @@ module.exports = function () {
   fake.start = function () { fake.emit('connect'); };
   fake.stop = function () {};
   var publisher = discovery.create(config, function () {}, {client: {create: function () { return fake; }}});
+  assert.strictEqual(publisher.refresh(), false, 'Before connection, republish must not claim submission');
   publisher.picture(picture); publisher.signal(signal); publisher.start();
   assert.strictEqual(sent.filter(function (s) { return s.topic.endsWith('/config') && s.payload; }).length, 6);
   assert.strictEqual(sent.filter(function (s) { return s.topic.endsWith('_picture_command/config') && !s.payload; }).length, 1);
@@ -54,11 +55,23 @@ module.exports = function () {
   var previous = sent.length;
   fake.emit('message', 'homeassistant/status', 'online');
   assert.strictEqual(sent.length, previous + 9, 'HA birth must republish discovery, command tombstone, state, availability');
+  assert.strictEqual(publisher.refresh(), true, 'Connected republish reports local submission');
+  var normalPublish = fake.publish;
+  ['_input/config', '/state', '/availability', '_picture_command/config'].forEach(function (suffix) {
+    fake.publish = function (topic, payload, retain) {
+      if (topic.endsWith(suffix)) return false;
+      return normalPublish(topic, payload, retain);
+    };
+    assert.strictEqual(publisher.refresh(), false, 'A failed ' + suffix + ' submission must not look successful');
+  });
+  fake.publish = normalPublish;
   fake.emit('disconnect');
+  assert.strictEqual(publisher.refresh(), false);
   previous = sent.length;
   publisher.signal(null);
   assert.strictEqual(sent.length, previous);
   publisher.stop();
+  assert.strictEqual(publisher.refresh(), false);
 
   config.mqtt.commands_enabled = true;
   messages = discovery.buildDiscovery(config);
@@ -84,6 +97,12 @@ module.exports = function () {
   fake.emit('subscribed', topic);
   var status = JSON.parse(sent[sent.length - 1].payload);
   assert.strictEqual(status.ready, true);
+  var commandPublish = fake.publish;
+  fake.publish = function (topic, payload, retain) {
+    return topic.endsWith('/command_status') ? false : commandPublish(topic, payload, retain);
+  };
+  assert.strictEqual(publisher.refresh(), false, 'A failed command-status publish must not look successful');
+  fake.publish = commandPublish;
   var request = {protocol: 1, session_id: status.session_id, request_id: 'ha-test', expires_at: Date.now()/1000+30,
     policy: {input:'hdmi3', scope:'active', dry_run:true, modes:{sdr:'expert1'}, presets:{expert1:{settings:{backlight:80}}}}};
   fake.emit('message', topic, JSON.stringify(request), {retain:false});

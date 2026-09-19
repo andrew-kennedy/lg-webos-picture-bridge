@@ -1,7 +1,8 @@
-alias: Pair LG Picture Bridge MQTT
+alias: Configure LG Picture Bridge MQTT
 description: >-
   MQTT discovery setup. Store credentials in secrets.yaml. This replaces the
   webhook transport and enables broker-authorized picture-policy commands.
+  Setup replaces saved configuration; preserve your existing device_id.
 sequence:
   - action: webostv.command
     data:

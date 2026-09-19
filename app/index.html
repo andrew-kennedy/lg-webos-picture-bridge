@@ -13,7 +13,7 @@
         <div>
           <p class="eyebrow">ROOTED WEBOS UTILITY</p>
           <h1>LG Picture Bridge</h1>
-          <p class="subtitle">Reports picture contexts and applies authenticated Home Assistant policies.</p>
+          <p class="subtitle">Home Assistant MQTT discovery, TV signal monitoring, and picture controls.</p>
         </div>
       </header>
 
@@ -26,29 +26,31 @@
           </div>
         </div>
         <dl>
-          <div><dt>Home Assistant</dt><dd id="callback-display">Not paired</dd></div>
+          <div><dt>Reporting transport</dt><dd id="callback-display">Not configured</dd></div>
           <div><dt>Background monitor</dt><dd id="process-display">Unknown</dd></div>
           <div><dt>Luna subscriptions</dt><dd id="luna-display">Unknown</dd></div>
-          <div><dt>Picture command API</dt><dd id="command-display">Unknown</dd></div>
-          <div><dt>Detected signal</dt><dd id="signal-display">None yet</dd></div>
+          <div><dt>Picture commands</dt><dd id="command-display">Unknown</dd></div>
+          <div><dt>Last observed signal</dt><dd id="signal-display">None yet</dd></div>
           <div><dt>Reporting</dt><dd id="delivery-display">None yet</dd></div>
           <div><dt>Last operation</dt><dd id="operation-display">Waiting</dd></div>
         </dl>
       </section>
 
       <section class="instructions">
-        <h2>Pair from Home Assistant</h2>
+        <h2>Configure from Home Assistant</h2>
         <p>
-          Run the pairing script supplied with this project. Home Assistant will relaunch this app
-          with MQTT broker settings or a local webhook URL; no TV keyboard entry is required.
+          Run “Configure LG Picture Bridge MQTT” in Home Assistant to send broker settings without
+          typing on the TV. Configuration is saved across app updates; no setup is needed again.
+          Monitoring continues after you close this app. Legacy webhooks remain supported.
         </p>
+        <p id="reporting-help">Status refreshes every 5 seconds while this screen is visible.</p>
       </section>
 
       <nav class="actions" aria-label="Bridge actions">
         <button id="refresh-button" type="button" autofocus>Refresh status</button>
         <button id="restart-button" type="button">Restart monitor</button>
-        <button id="test-button" type="button">Send test event</button>
-        <button id="clear-button" class="danger" type="button">Clear pairing</button>
+        <button id="test-button" type="button" disabled>Republish discovery</button>
+        <button id="clear-button" class="danger" type="button">Remove configuration</button>
       </nav>
 
       <pre id="details" class="details"></pre>

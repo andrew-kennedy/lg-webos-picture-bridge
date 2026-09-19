@@ -88,7 +88,7 @@ function create(config, onHealth, dependencies) {
     context: function () { return contextRevision; },
     pictureReady: function () { return Boolean(snapshot(picture, signal, config).dynamic_range); },
     publish: function (status) {
-      if (online && !stopped) client.publish(base + '/command_status', JSON.stringify(status), false);
+      return online && !stopped ? client.publish(base + '/command_status', JSON.stringify(status), false) : false;
     }
   }) : null;
 
@@ -107,24 +107,34 @@ function create(config, onHealth, dependencies) {
   }
 
   function publish() {
-    if (!online || stopped) return;
+    if (!online || stopped) return false;
     var state = snapshot(picture, signal, config);
+    var submitted = false;
     // Do not retain observations: HA must not replay stale no-signal states on restart.
     if (client.publish(base + '/state', JSON.stringify(state), false)) {
       lastPublished = state.observed_at;
       reportHealth('connected');
+      submitted = true;
     }
-    if (commands) commands.publish();
+    if (commands && commands.status().ready && !commands.publish()) submitted = false;
+    return submitted;
   }
   function announce() {
-    if (!online || stopped) return;
-    buildDiscovery(config).forEach(function (item) { client.publish(item.topic, JSON.stringify(item.payload), true); });
+    if (!online || stopped) return false;
+    var submitted = true;
+    buildDiscovery(config).forEach(function (item) {
+      if (!client.publish(item.topic, JSON.stringify(item.payload), true)) submitted = false;
+    });
     if (!commands) {
       // Remove the opt-in entity when commands are subsequently disabled.
-      client.publish(settings.discovery_prefix + '/sensor/' + id + '_picture_command/config', '', true);
+      if (!client.publish(settings.discovery_prefix + '/sensor/' + id + '_picture_command/config', '', true)) {
+        submitted = false;
+      }
     }
-    publish();
-    client.publish(base + '/availability', 'online', true);
+    if (!publish()) submitted = false;
+    if (!client.publish(base + '/availability', 'online', true)) submitted = false;
+    // QoS 0 only confirms submission to the local socket, not broker/HA receipt.
+    return submitted;
   }
   function update() {
     clearTimeout(timer);

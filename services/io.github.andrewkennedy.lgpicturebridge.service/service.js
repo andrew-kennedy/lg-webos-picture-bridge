@@ -107,11 +107,13 @@ service.register('configure', function (message) {
 
   function configured(error) {
     if (error) {
+      error.message = 'Configuration saved, but monitor setup failed: ' + error.message;
       respondError(message, error);
       return;
     }
     sendPairingTest(saved, function (testError, response) {
       if (testError) {
+        testError.message = 'Configuration saved, but webhook test failed: ' + testError.message;
         respondError(message, testError);
         return;
       }
@@ -129,33 +131,50 @@ service.register('configure', function (message) {
       controller = bridge.start(service, {config: saved});
       configured(null);
     } catch (error) {
-      respondError(message, error);
+      configured(error);
     }
   }
 });
 
-service.register('testWebhook', function (message) {
+function refreshReporting(message) {
   var config;
+  var mqttSubmitted = false;
   if (!appIsAuthorized(message)) return;
   try {
     config = loadConfig();
-    if (!config) throw new Error('LG Picture Bridge is not paired');
+    if (!config) throw new Error('LG Picture Bridge is not configured');
+    if (config.transport === 'mqtt' || config.transport === 'both') {
+      mqttSubmitted = Boolean(controller && controller.refreshMqtt());
+      if (!mqttSubmitted) {
+        throw new Error('MQTT republish could not be submitted. Check the broker connection; ' +
+          'discovery and state are republished automatically after reconnecting.');
+      }
+    }
   } catch (error) {
     respondError(message, error);
     return;
   }
-  sendPairingTest(config, function (error, response) {
+  function completed(error, response) {
     if (error) {
+      if (mqttSubmitted) error.message = 'MQTT republish submitted; webhook test failed: ' + error.message;
       respondError(message, error);
       return;
     }
     message.respond({
       returnValue: true,
-      delivery_status: deliveryStatus(config, response),
+      mqtt_submitted: mqttSubmitted,
+      webhook_status: response ? response.statusCode : null,
+      ha_receipt_confirmed: false,
       status: statusSnapshot()
     });
-  });
-});
+  }
+  if (config.transport === 'mqtt') completed(null, null);
+  else webhook.postJson(config.callback_url, pairingEvent(config), completed);
+}
+
+service.register('refreshReporting', refreshReporting);
+// Compatibility for older installed frontends; use the same truthful result/errors.
+service.register('testWebhook', refreshReporting);
 
 try {
   if (store.exists()) controller = bridge.start(service, {config: store.load()});

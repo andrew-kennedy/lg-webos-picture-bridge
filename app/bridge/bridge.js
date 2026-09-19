@@ -549,7 +549,7 @@ function start(service, dependencies) {
     health: health,
     handlePayload: handlePayload,
     reconfigure: reconfigure,
-    refreshMqtt: function () { if (mqttPublisher) mqttPublisher.refresh(); },
+    refreshMqtt: function () { return mqttPublisher ? mqttPublisher.refresh() : false; },
     stop: stop
   };
 }

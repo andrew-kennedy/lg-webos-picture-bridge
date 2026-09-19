@@ -25,7 +25,7 @@ is_running() {
 
 start_bridge() {
     if [ ! -f "$STATE_DIR/config.json" ]; then
-        echo "LG Picture Bridge is not paired; startup skipped"
+        echo "LG Picture Bridge is not configured; startup skipped"
         return 0
     fi
     if [ ! -x "$NODE_BIN" ]; then

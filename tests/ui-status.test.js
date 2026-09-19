@@ -31,6 +31,8 @@ module.exports = function () {
   var unpaired = status.build(null, null, false, now);
 
   assert.strictEqual(paired.paired, true);
+  assert.strictEqual(paired.configured, true);
+  assert.strictEqual(paired.mqtt_enabled, false);
   assert.strictEqual(paired.monitor_healthy, true);
   assert.strictEqual(paired.monitor_state, 'monitoring');
   assert.strictEqual(paired.callback_display,
@@ -39,5 +41,12 @@ module.exports = function () {
   assert.deepStrictEqual(paired.current_picture_context,
     {input: 'hdmi3', dynamic_range: 'dolby_vision'});
   assert.strictEqual(unpaired.paired, false);
+  assert.strictEqual(unpaired.configured, false);
   assert.strictEqual(unpaired.monitor_state, 'not_configured');
+  var mqtt = status.build({transport: 'mqtt', mqtt: {commands_enabled: true}}, null, false, now);
+  assert.strictEqual(mqtt.configured, true);
+  assert.strictEqual(mqtt.mqtt_enabled, true);
+  assert.strictEqual(mqtt.mqtt_commands_enabled, true, 'Configured commands are known even without health');
+  assert.strictEqual(mqtt.mqtt, null);
+  assert.strictEqual(mqtt.monitor_state, 'stopped');
 };

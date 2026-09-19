@@ -18,19 +18,19 @@ body {
   width: 86vw;
   max-width: 1500px;
   margin: 0 auto;
-  padding: 70px 0 48px;
+  padding: 48px 0 32px;
 }
 
 header {
   display: flex;
   align-items: center;
   gap: 34px;
-  margin-bottom: 44px;
+  margin-bottom: 32px;
 }
 
 .logo {
-  width: 150px;
-  height: 150px;
+  width: 130px;
+  height: 130px;
   border-radius: 32px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
 }
@@ -63,7 +63,7 @@ h1 {
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
 }
 
-.status-card { padding: 34px 40px; }
+.status-card { padding: 28px 40px; }
 
 .status-row {
   display: flex;
@@ -96,12 +96,14 @@ dl {
 
 dt { color: #8594ab; font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.08em; }
 dd { margin: 8px 0 0; overflow-wrap: anywhere; }
+dl > div:last-child { grid-column: 1 / -1; }
 
 .instructions { margin-top: 26px; padding: 26px 38px; }
 .instructions h2 { margin: 0 0 10px; font-size: 1rem; }
 .instructions p { margin: 0; color: #b9c5d8; line-height: 1.45; }
+.instructions p + p { margin-top: 12px; font-size: 0.8rem; }
 
-.actions { display: flex; gap: 18px; margin-top: 28px; }
+.actions { display: flex; gap: 18px; margin-top: 22px; }
 
 button {
   appearance: none;
@@ -125,6 +127,7 @@ button:focus, button:hover {
 
 button.danger { color: #ffe4e6; background: #5f1d2b; }
 button.danger:focus, button.danger:hover { background: #9f2942; }
+button:disabled { opacity: 0.5; transform: none; }
 
 .details {
   display: none;
