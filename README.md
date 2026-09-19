@@ -10,15 +10,11 @@ It is intended for automations that need to reapply the currently active picture
 Apple TV, Shield, game console, or PC changes between SDR, HDR10, HLG, and Dolby Vision. It does
 not capture video, drive LEDs, or require HyperHDR.
 
-> Version 0.5 MQTT commands are currently available in source on `main`. The Homebrew install feed
-> remains on the last tagged release until real-TV command verification and the 0.5 release.
-> The command path has passed Node 0.12.2 compatibility checks and a real HA/MQTT round-trip test
-> using a simulated picture writer; that is not a live C9 write test.
-
 > [!IMPORTANT]
-> Version 0.3.3 is live-tested on a rooted 2019 LG C9 running webOS 4.x. It receives
-> `dimension.dynamicRange`, delivers C9 webhook observations to Home Assistant, and silently writes
-> active and inactive picture banks through LG's firmware-specific synthetic categories. After an
+> Version 0.5.0 is live-tested on a rooted 2019 LG C9 running Node 0.12.2 with Home Assistant
+> 2026.9.3. MQTT discovery, request/reply picture writes, TV readback, and the existing movie
+> automation were verified without the HA REST package. The writer uses LG's firmware-specific
+> synthetic categories (active/inactive banks were first verified in 0.3). After an
 > active-bank write, it sends an explicit, non-storing `dimension` notification so the C9 reloads
 > the picture-processing pipeline immediately instead of waiting for a manual picture-mode cycle.
 

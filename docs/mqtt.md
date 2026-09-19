@@ -200,9 +200,27 @@ test under Node 0.12.2, and has been exercised against Home Assistant 2026.9.3 a
 broker with a **simulated, dry-run-only picture writer**. Those HA tests confirmed immediate replies,
 a 12-second delayed reply with a deduplicated retry, and rejection reported as an aborted script
 without an `ok` response. The temporary test discovery entity was removed afterward.
-The actual C9 was in standby: installing 0.5, confirming a real Luna write through MQTT, switching
-the live facade, and removing the HA REST package remain pending. No power/routing automation was
-changed by these command-transport tests.
+
+Version 0.5.0 was subsequently installed and verified on the actual rooted C9:
+
+- Existing pairing/device identity and credentials were preserved; only MQTT commands were enabled.
+- The seventh discovery entity, `sensor.lg_tv_picture_command`, reported ready with a new session.
+- A policy dry run completed through the real HA script and TV bridge with three planned operations.
+- During a Dolby Vision signal on HDMI 3, MQTT changed the current Cinema preset's OLED light from
+  100 to 99. A direct TV settings read confirmed 99. MQTT restored 100 and TV readback confirmed it.
+  The picture mode and physical input were unchanged.
+- The existing dispatcher → movie recipe → facade → MQTT script path completed four Luna writes
+  with a correlated success response. This was repeated after removing and reloading the dedicated
+  HA REST package; the old REST action was confirmed absent and the HA configuration check passed.
+- The five device-sync automations, picture-dispatcher definition and game/movie recipes were
+  preserved unchanged. Only the picture facade's transport action and success check were migrated.
+- A bridge-service-only restart created a new MQTT command session. Sensors recovered and the
+  unchanged picture dispatcher automatically completed another four-write movie policy through
+  MQTT, with the REST action still absent. The TV itself was not rebooted or power-cycled.
+
+This confirms real firmware writes/readback on the tested Dolby Vision context, not a new visual
+calibration or a fresh validation of every SDR/HDR setting on every model. The optional TV HTTP
+endpoint remains available for deliberate rollback, but HA no longer calls it.
 
 Version 0.4.0 was tested on a rooted C9 with Node 0.12.2 and Home Assistant MQTT discovery:
 
