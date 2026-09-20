@@ -1,6 +1,6 @@
 {
   "name": "lg-webos-picture-bridge",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "description": "A rooted LG webOS bridge that reports SDR, HDR, HLG, and Dolby Vision changes to Home Assistant",
   "license": "MIT",
@@ -13,10 +13,12 @@
     "manifest": "node scripts/generate-manifest.js",
     "site": "node scripts/generate-site.js",
     "test": "node tests/run.js",
+    "test:layout": "node tests/check-ui-layout.cjs",
     "validate": "node scripts/validate-project.js"
   },
   "devDependencies": {
-    "@webos-tools/cli": "3.2.5"
+    "@webos-tools/cli": "3.2.5",
+    "playwright": "1.63.0"
   },
   "engines": {
     "node": ">=20"

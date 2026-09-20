@@ -10,7 +10,8 @@ function setup(initial) {
   var ui = {status: initial, calls: [], confirmed: false, hold: false};
   var html = fs.readFileSync(path.join(__dirname, '../app/index.html'), 'utf8');
   html.replace(/id="([^"]+)"/g, function (unused, id) {
-    elements[id] = {textContent: '', className: '', disabled: false, events: {},
+    elements[id] = {textContent: '', className: '', disabled: false, events: {}, scrollTop: 0, clientHeight: 400,
+      focus: function () { document.activeElement = this; },
       addEventListener: function (name, handler) { this.events[name] = handler; }};
   });
   var document = {hidden: false, getElementById: function (id) {
@@ -41,6 +42,11 @@ function setup(initial) {
   ui.tick = function () { interval(); };
   ui.click = function (id) { elements[id].events.click({type: 'click'}); };
   ui.launch = function (params) { events.webOSLaunch({detail: params || {}}); };
+  ui.key = function (key) {
+    var prevented = false;
+    events.keydown({keyCode: key, preventDefault: function () { prevented = true; }});
+    return prevented;
+  };
   ui.launch();
   return ui;
 }
@@ -55,6 +61,18 @@ module.exports = function () {
   assert.strictEqual(el['test-button'].textContent, 'Republish discovery');
   assert.strictEqual(el['command-display'].textContent, 'MQTT listener ready · HTTP listening on port 49191');
   assert.ok(el['reporting-help'].textContent.includes('does not change picture settings'));
+  el['refresh-button'].focus();
+  assert.strictEqual(ui.key(39), true);
+  assert.strictEqual(ui.document.activeElement, el['restart-button']);
+  assert.strictEqual(ui.key(40), true);
+  assert.strictEqual(el.content.scrollTop, 240);
+  assert.strictEqual(ui.document.activeElement, el['restart-button'], 'Scrolling leaves actions focused');
+  assert.strictEqual(ui.key(38), true);
+  assert.strictEqual(el.content.scrollTop, 0);
+  assert.strictEqual(ui.key(37), true);
+  assert.strictEqual(ui.document.activeElement, el['refresh-button']);
+  assert.strictEqual(ui.key(13), false, 'Native OK/Enter still activates buttons');
+  assert.strictEqual(ui.key(461), false, 'Native webOS Back handling is untouched');
   status.mqtt.commands_ready = false; ui.tick();
   assert.ok(el['command-display'].textContent.includes('waiting for command subscription'));
   status.mqtt.commands_ready = true; ui.tick();
@@ -123,4 +141,6 @@ module.exports = function () {
 
   ui = setup({paired: false, running: false});
   assert.strictEqual(ui.elements['status-title'].textContent, 'Not configured', 'Old status schema remains readable');
+  ui.elements['restart-button'].focus(); ui.key(39);
+  assert.strictEqual(ui.document.activeElement, ui.elements['clear-button'], 'Skip disabled republish action');
 };

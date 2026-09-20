@@ -101,6 +101,14 @@ The screen refreshes every five seconds while visible. **Configured** means sett
 accepted the picture-command subscription, not that a picture command has run. If an optional HTTP
 endpoint is configured, its status is shown separately. No credentials are displayed.
 
+Version **0.5.2** fixes controls falling below the screen on older TVs. The C9's
+[webOS 4.x engine is Chromium 53](https://webostv.developer.lge.com/develop/specifications/web-api-and-web-engine),
+which predates CSS Grid. The status screen now uses compatible flex columns and spacing,
+keeps actions inside a five-percent screen-safe border, and scrolls long status/errors
+above the action bar. Use **Up/Down** to scroll, **Left/Right** to choose an action, and
+**OK** to select. Pointer/wheel and keyboard access also work. MQTT, picture policies,
+CEC settings, and saved configuration are unchanged; no reconfiguration is needed.
+
 - **Refresh status** reads the bridge's current status.
 - **Restart monitor** restarts the background service without changing saved settings.
 - **Republish discovery** submits MQTT discovery, the current state, availability and enabled
@@ -319,6 +327,8 @@ Requirements: Node.js 20+, npm, and the tools needed by `@webos-tools/cli`.
 ```sh
 npm ci
 npm test
+npx playwright install chromium
+npm run test:layout
 npm run validate
 npm run build
 npm run manifest
@@ -328,6 +338,11 @@ npm run site
 The IPK and release manifest are written to `dist/`. Tagged releases matching `v*` publish those
 artifacts and deploy `site/` to GitHub Pages. `app/appinfo.json` and `package.json` must have matching
 versions before tagging.
+
+Layout checks cover 1080p, 720p, and smaller viewports with normal/mixed transport,
+unconfigured state, long errors, larger text, and remote navigation. They use modern
+Chromium for geometry plus static checks for unsupported C9 CSS, not a webOS emulator.
+Set `LAYOUT_CHROMIUM_PATH` to reuse an existing Chromium executable if needed.
 
 ## Security model
 

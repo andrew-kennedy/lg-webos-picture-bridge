@@ -18,6 +18,10 @@
   var details = document.getElementById('details');
   var testButton = document.getElementById('test-button');
   var reportingHelp = document.getElementById('reporting-help');
+  var content = document.getElementById('content');
+  var actionButtons = ['refresh-button', 'restart-button', 'test-button', 'clear-button'].map(function (id) {
+    return document.getElementById(id);
+  });
   var bridges = [];
   var busy = false;
   var configurationGeneration = 0;
@@ -275,6 +279,24 @@
 
   document.addEventListener('webOSLaunch', handleLaunch, true);
   document.addEventListener('webOSRelaunch', handleLaunch, true);
+
+  // The remote can scroll long status/errors without moving the always-visible actions.
+  // Leave OK/Enter, Back, and pointer clicks to their native behavior.
+  document.addEventListener('keydown', function (event) {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    var key = event.keyCode || event.which;
+    if (key === 38 || key === 40) {
+      content.scrollTop += (key === 38 ? -1 : 1) * Math.max(120, content.clientHeight * 0.6);
+      event.preventDefault();
+    } else if (key === 37 || key === 39) {
+      var enabled = actionButtons.filter(function (button) { return !button.disabled; });
+      var index = enabled.indexOf(document.activeElement);
+      if (!enabled.length) return;
+      index = index === -1 ? 0 : (index + (key === 37 ? -1 : 1) + enabled.length) % enabled.length;
+      enabled[index].focus();
+      event.preventDefault();
+    }
+  });
 
   window.setTimeout(function () {
     if (statusTitle.textContent === 'Checking configuration…') refreshStatus();
