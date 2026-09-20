@@ -111,8 +111,10 @@ CEC settings, and saved configuration are unchanged; no reconfiguration is neede
 
 Live C9 verification: the original Chromium 53 page was 1141 px tall at a 1920×1080
 viewport, with buttons ending at 1107 px. With 0.5.2 installed, the page is exactly
-1080 px tall and buttons end at 990 px or above. Left/Right focus navigation worked
-on the TV; the saved configuration checksum was unchanged and MQTT reconnected.
+1080 px tall and buttons end at 990 px or above; the user confirmed it looks correct.
+The saved configuration checksum was unchanged and MQTT reconnected. Remote navigation
+passes the automated UI tests; rapid injected TV-debugger keys were not a reliable
+way to verify each individual focus transition.
 
 - **Refresh status** reads the bridge's current status.
 - **Restart monitor** restarts the background service without changing saved settings.
