@@ -20,6 +20,28 @@ The C9 Home ribbon alone did not deactivate the HDMI app, so Home → HDMI was n
 activation test; a full-screen app was needed. The original `SIMPLINK: setCecUniqueId` log occurs
 before the inserted guard, so that log alone does not establish that a request was sent.
 
+The supervised ten-minute trial ended at 20:39:43 PDT. At 20:40, SSH inspection confirmed the
+watchdog had removed the overlay, the original hash matched, and both `simplinkEnable` and
+`simplinkAutoPowerOn` were still `on`. The TV had entered Active Standby; it was not woken to
+restart its cached QML, whose guard had already expired. No AirPlay retest was observed during
+the initial HDMI-app log checks. Subsequent investigation of the user's failed AirPlay attempts
+found the startup/shutdown interaction below. No persistent bridge behavior or Home Assistant
+configuration was changed.
+
+### AirPlay test blocked by a Home Assistant shutdown rule
+
+The user reported AirPlay connection errors and a No Signal screen during the trial. Correlating
+application-manager logs with Home Assistant history/traces confirmed that the existing inferred
+Nintendo-session no-signal rule powered the TV off ten seconds after wake, while AirPlay was
+starting. For example (PDT): TV on at 20:39:18, AirPlay launch requested at 20:39:24, explicit
+HA `media_player.turn_off` at 20:39:28. Another retained trace confirms the same shutdown at
+20:38:55. The launch attempts did not become foreground AirPlay sessions in the observed history.
+
+This means the AirPlay → HDMI-return wake test is inconclusive, not a successful validation or
+proof of an AirPlay firmware regression. Before retesting, a no-signal shutdown automation must
+distinguish actual loss of a previously valid inferred-console signal from a TV starting up with
+no HDMI signal. Do not make the CEC modification persistent on the strength of this trial alone.
+
 The inspected C9 HDMI application's `Simplink.qml` selects a remembered CEC device using
 `setCECUniqueId` on activation. The trial skips only this call for an automatically selected
 Apple TV on HDMI 3. It requires a unique discovered entry matching Apple vendor 4346,
