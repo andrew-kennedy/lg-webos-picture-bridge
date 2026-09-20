@@ -105,6 +105,7 @@ service.register('setCecGuard', function (message) {
       throw new Error('Provide only enabled: true or false');
     }
     cecGuard.setEnabled(payload.enabled);
+    if (controller) controller.refreshMqtt();
     message.respond({returnValue: true, status: statusSnapshot()});
   } catch (error) { respondError(message, error); }
 });
@@ -143,7 +144,7 @@ service.register('configure', function (message) {
   if (controller) controller.reconfigure(saved, configured);
   else {
     try {
-      controller = bridge.start(service, {config: saved});
+      controller = bridge.start(service, {config: saved, cecGuard: cecGuard});
       configured(null);
     } catch (error) {
       configured(error);
@@ -192,8 +193,8 @@ service.register('refreshReporting', refreshReporting);
 service.register('testWebhook', refreshReporting);
 
 try {
-  if (store.exists()) controller = bridge.start(service, {config: store.load()});
   cecGuard.start(); // Independently fail-open: never prevents the MQTT bridge from starting.
+  if (store.exists()) controller = bridge.start(service, {config: store.load(), cecGuard: cecGuard});
 } catch (error) {
   process.stderr.write(new Date().toISOString() + ' Service startup failed: ' +
     (error.stack || error.message) + '\n');

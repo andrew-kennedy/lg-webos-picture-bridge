@@ -3,6 +3,7 @@
 var crypto = require('crypto');
 var mqtt = require('./mqtt-client');
 var mqttCommands = require('./mqtt-commands');
+var mqttCec = require('./mqtt-cec');
 var appInfo = require('../../appinfo.json');
 
 function identity(deviceId) {
@@ -91,6 +92,12 @@ function create(config, onHealth, dependencies) {
       return online && !stopped ? client.publish(base + '/command_status', JSON.stringify(status), false) : false;
     }
   }) : null;
+  var cec = settings.cec_commands_enabled && deps.cecGuard ? mqttCec.create({
+    topic: base + '/cec/command', guard: deps.cecGuard, service: deps.service,
+    publish: function (status) {
+      return online && !stopped ? client.publish(base + '/cec/state', JSON.stringify(status), false) : false;
+    }
+  }) : null;
 
   function observeContext() {
     // Mode notifications are caused by our own writes. Only routing/range/signal invalidate
@@ -103,7 +110,8 @@ function create(config, onHealth, dependencies) {
   function reportHealth(state, error) {
     onHealth({state: state, last_error: error || null, state_topic: base + '/state',
       last_published_at: lastPublished, commands_enabled: Boolean(commands),
-      commands_ready: Boolean(commands && commands.status().ready)});
+      commands_ready: Boolean(commands && commands.status().ready),
+      cec_commands_enabled: Boolean(cec), cec_commands_ready: Boolean(cec && cec.status().ready)});
   }
 
   function publish() {
@@ -117,6 +125,7 @@ function create(config, onHealth, dependencies) {
       submitted = true;
     }
     if (commands && commands.status().ready && !commands.publish()) submitted = false;
+    if (cec && !cec.publish()) submitted = false;
     return submitted;
   }
   function announce() {
@@ -125,6 +134,15 @@ function create(config, onHealth, dependencies) {
     buildDiscovery(config).forEach(function (item) {
       if (!client.publish(item.topic, JSON.stringify(item.payload), true)) submitted = false;
     });
+    if (cec) {
+      mqttCec.discovery(config, id, cec.status().session_id).forEach(function (item) {
+        if (!client.publish(item.topic, JSON.stringify(item.payload), true)) submitted = false;
+      });
+    } else if (deps.cecGuard) {
+      ['sensor', 'switch'].forEach(function (kind) {
+        if (!client.publish(settings.discovery_prefix + '/' + kind + '/' + id + '_cec_filter/config', '', true)) submitted = false;
+      });
+    }
     if (!commands) {
       // Remove the opt-in entity when commands are subsequently disabled.
       if (!client.publish(settings.discovery_prefix + '/sensor/' + id + '_picture_command/config', '', true)) {
@@ -146,21 +164,24 @@ function create(config, onHealth, dependencies) {
   client.on('connect', function () {
     online = true;
     if (commands) { commands.connect(); client.subscribe(base + '/command'); }
+    if (cec) { cec.connect(); client.subscribe(base + '/cec/command'); }
     client.subscribe(settings.discovery_prefix + '/status');
     announce();
   });
   client.on('subscribed', function (topic) {
     if (commands && topic === base + '/command') { commands.subscribed(); reportHealth('connected'); }
+    if (cec && topic === base + '/cec/command') { cec.subscribed(); reportHealth('connected'); }
   });
   client.on('disconnect', function () {
-    online = false; if (commands) commands.disconnect(); reportHealth('disconnected');
+    online = false; if (commands) commands.disconnect(); if (cec) cec.disconnect(); reportHealth('disconnected');
   });
   client.on('message', function (topic, message, metadata) {
     if (topic === settings.discovery_prefix + '/status' && message === 'online') announce();
     if (commands && topic === base + '/command') commands.receive(message, metadata);
+    if (cec && topic === base + '/cec/command') cec.receive(message, metadata);
   });
   return {
-    start: function () { client.start(); refreshTimer = setInterval(publish, 30000); },
+    start: function () { client.start(); if (cec) cec.start(); refreshTimer = setInterval(publish, 30000); },
     picture: function (value) { picture = value; observeContext(); update(); },
     signal: function (value) {
       signal = value;
@@ -172,6 +193,7 @@ function create(config, onHealth, dependencies) {
     refresh: announce,
     stop: function (callback) {
       stopped = true; if (commands) commands.disconnect();
+      if (cec) cec.stop();
       clearTimeout(timer); clearInterval(refreshTimer); client.stop(callback);
     }
   };

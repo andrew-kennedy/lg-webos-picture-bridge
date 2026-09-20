@@ -96,7 +96,7 @@ function start(service, dependencies) {
         if (epoch !== mqttGeneration) return;
         health.mqtt = state;
         saveHealth();
-      }, {applyPolicy: applyPolicy});
+      }, {applyPolicy: applyPolicy, cecGuard: injected.cecGuard, service: service});
       mqttPublisher.picture(currentPictureContext);
       mqttPublisher.signal(currentSignal);
       mqttPublisher.start();

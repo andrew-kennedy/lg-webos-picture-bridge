@@ -45,7 +45,8 @@ module.exports = function () {
     'com.webos.service.videooutput',
     'com.webos.settingsservice',
     'com.webos.service.acb',
-    'com.webos.service.tv.externaldevice'
+    'com.webos.service.tv.externaldevice',
+    'com.webos.service.eim'
   ]);
   assert.deepStrictEqual(role.permissions[0].inbound, ['*']);
 };

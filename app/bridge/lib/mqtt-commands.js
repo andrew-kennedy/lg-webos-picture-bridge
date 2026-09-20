@@ -1,7 +1,8 @@
 'use strict';
 
 // MQTT authenticates through broker credentials/ACLs, not the optional HTTP token.
-// This opt-in endpoint accepts ONLY the existing bounded picture-policy schema.
+// The default endpoint accepts only bounded picture policies. A separate opt-in
+// CEC endpoint injects its own strict validator, executor and result summary.
 var crypto = require('crypto');
 var picturePolicy = require('./picture-policy');
 
@@ -35,6 +36,8 @@ function create(options) {
       result.error = failure.code || 'command_failed';
       result.message = String(failure.message || 'Command failed').slice(0, 512);
       if (failure.operation_index !== undefined) result.operation_index = failure.operation_index;
+    } else if (options.summarizeResult) {
+      result.applied = options.summarizeResult(value);
     } else {
       result.dry_run = value.dry_run;
       result.input = value.input; result.scope = value.scope;
@@ -77,14 +80,14 @@ function create(options) {
       finish(id, error('command_rate_limit', 'Too many recent commands; wait before retrying')); return;
     }
     try {
-      policy = picturePolicy.normalize(envelope.policy);
-      policy.request_id = id;
+      policy = (options.normalize || picturePolicy.normalize)(envelope.policy);
+      if (!options.normalize) policy.request_id = id;
     } catch (failure) { finish(id, failure); return; }
-    context = options.context();
+    context = options.context ? options.context() : null;
     function guard() {
       if (!ready || session !== currentSession) throw error('stale_session', 'MQTT connection changed before completion');
       if (envelope.expires_at * 1000 <= clock()) throw error('expired_command', 'Command expired before completion');
-      if (options.context() !== context) throw error('stale_context', 'TV signal, input or dynamic range changed before completion');
+      if (options.context && options.context() !== context) throw error('stale_context', 'TV signal, input or dynamic range changed before completion');
       if (policy.scope === 'active' && !options.pictureReady()) throw error('signal_unavailable', 'No confirmed active HDMI picture');
     }
     entry = cache[id] = {digest: digest, result: null, forgetAt: clock() + 120000};

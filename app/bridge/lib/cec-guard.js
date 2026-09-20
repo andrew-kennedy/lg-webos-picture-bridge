@@ -1,9 +1,12 @@
 'use strict';
 
 var patch = require('./cec-patch');
+var policies = require('./cec-policy');
 var APP_ROOT = '/media/developer/apps/usr/palm/applications/io.github.andrewkennedy.lgpicturebridge';
 var STATE_DIR = '/var/lib/io.github.andrewkennedy.lgpicturebridge';
 var CONFIG = STATE_DIR + '/cec-guard.json';
+// Keep the 0.6 runtime path so cached QML and an owned old overlay can be revoked
+// during upgrade. There are no built-in device identities or default block rules.
 var ROOT = '/tmp/lgpb-apple-tv-cec';
 var STATE = ROOT + '/mount.json';
 var OVERLAY = ROOT + '/Simplink.qml';
@@ -51,12 +54,15 @@ function create(deps) {
     fs.renameSync(temporary, path);
   }
   function config() {
-    if (!fs.existsSync(STATE_DIR)) return {enabled: false};
+    if (!fs.existsSync(STATE_DIR)) return {schema: 2, policy: policies.empty()};
     directory(STATE_DIR, 448);
     var value = read(CONFIG);
-    if (!value) return {enabled: false};
-    if (value.schema !== 1 || typeof value.enabled !== 'boolean') throw new Error('Invalid saved CEC filter configuration');
-    return value;
+    if (!value) return {schema: 2, policy: policies.empty()};
+    if (value.schema === 1 && typeof value.enabled === 'boolean') {
+      return {schema: 2, policy: policies.empty(), migration_required: value.enabled};
+    }
+    if (value.schema !== 2) throw new Error('Invalid saved CEC filter configuration');
+    return {schema: 2, policy: policies.normalize(value.policy)};
   }
   function mounts() {
     return fs.readFileSync('/proc/mounts', 'utf8').split('\n').filter(function (line) {
@@ -78,7 +84,7 @@ function create(deps) {
   function revoke() {
     if (!fs.existsSync(ROOT)) return;
     directory(ROOT, 493);
-    write(LEASE, {schema: 1, enabled: false, issued_at: now(), expires_at: now()}, 420);
+    write(LEASE, {schema: 2, enabled: false, issued_at: now(), expires_at: now()}, 420);
   }
   function restore(expectedId) {
     rootOnly();
@@ -97,21 +103,25 @@ function create(deps) {
     if (list.length) model.checkOriginal(fs.readFileSync(model.TARGET));
     if (revokeError) throw revokeError;
   }
-  function renew(id) {
+  function renew(id, policy) {
     var issued = now();
-    write(LEASE, {schema: 1, owner: id, enabled: true, issued_at: issued, expires_at: issued + 90000}, 420);
+    write(LEASE, {schema: 2, owner: id, enabled: true, issued_at: issued, expires_at: issued + 90000, policy: policy}, 420);
   }
   function reloadHdmi() {
-    // Fixed target only. Do not launch/select an input, change power, or send CEC settings.
-    try {
-      var output = cp.execFileSync('/usr/bin/luna-send', ['-n', '1', '-w', '5000',
-        'luna://com.webos.applicationManager/closeByAppId', '{"id":"com.webos.app.hdmi3"}'],
-        {encoding: 'utf8', timeout: 6500});
-      var result = JSON.parse(output);
-      reloadStatus = result.returnValue ? 'requested' : 'next_launch';
-    } catch (error) { reloadStatus = 'next_launch'; }
+    // Reload cached copies once when INSTALLING the generic shared overlay, not
+    // when changing rules. Targets are a fixed allowlist, never an MQTT URI/app ID.
+    reloadStatus = {};
+    policies.capabilities().inputs.forEach(function (input) {
+      try {
+        var output = cp.execFileSync('/usr/bin/luna-send', ['-n', '1', '-w', '5000',
+          'luna://com.webos.applicationManager/closeByAppId', JSON.stringify({id: 'com.webos.app.' + input})],
+          {encoding: 'utf8', timeout: 6500});
+        var result = JSON.parse(output);
+        reloadStatus[input] = result.returnValue ? 'requested' : 'next_launch';
+      } catch (error) { reloadStatus[input] = 'next_launch'; }
+    });
   }
-  function ensure() {
+  function ensure(policy) {
     rootOnly();
     if (!fs.existsSync(APP_ROOT + '/appinfo.json') || !fs.existsSync(STATE_DIR + '/config.json')) {
       throw new Error('Configure the installed bridge before enabling the CEC filter');
@@ -122,7 +132,7 @@ function create(deps) {
     if (list.length) {
       if (list.length !== 1 || !owned(state)) throw new Error('Another QML overlay is installed; CEC filter not applied');
       if (state.revision === model.REVISION && state.active) {
-        renew(state.id);
+        renew(state.id, policy);
         return;
       }
       restore();
@@ -146,7 +156,7 @@ function create(deps) {
       });
       if (!child.pid) throw new Error('CEC rollback watchdog failed to start');
       child.unref();
-      renew(state.id);
+      renew(state.id, policy);
       reloadHdmi();
     } catch (error) {
       if (owned(state)) restore(state.id);
@@ -155,9 +165,14 @@ function create(deps) {
   }
   function snapshot() {
     var result = {enabled: false, supported: false, mounted: false, lease_active: false,
-      reload_status: reloadStatus, last_error: lastError};
+      policy: policies.empty(), policy_hash: null, migration_required: false,
+      capabilities: policies.capabilities(), reload_status: reloadStatus, last_error: lastError};
     try {
-      result.enabled = config().enabled;
+      var saved = config();
+      result.policy = saved.policy;
+      result.enabled = saved.policy.enabled;
+      result.migration_required = Boolean(saved.migration_required);
+      result.policy_hash = model.digest(JSON.stringify(saved.policy));
       var list = mounts(), state = mountState();
       result.mounted = list.length === 1 && owned(state);
       result.supported = result.mounted || (!list.length &&
@@ -165,11 +180,15 @@ function create(deps) {
       var lease = fs.existsSync(ROOT) ? read(LEASE) : null;
       result.lease_active = result.mounted && model.validLease(lease, now());
     } catch (error) { result.last_error = error.message; }
+    if (!result.supported) result.capabilities.supported_actions = [];
+    result.filter_state = result.last_error ? 'error' : result.migration_required ? 'needs_policy' :
+      !result.enabled ? 'off' : !result.policy.rules.length ? 'no_rules' : result.lease_active ? 'active' : 'inactive';
     return result;
   }
   function tick() {
     try {
-      if (config().enabled && !forcedOff) ensure();
+      var policy = config().policy;
+      if (policy.enabled && policy.rules.length && !forcedOff) ensure(policy);
       else if (fs.existsSync(ROOT)) restore();
       lastError = null;
     } catch (error) {
@@ -182,15 +201,15 @@ function create(deps) {
     if (!timer) timer = schedule(tick, 30000);
     if (timer && timer.unref) timer.unref();
   }
-  function setEnabled(enabled) {
+  function setPolicy(value) {
     rootOnly();
-    if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean');
+    var policy = policies.normalize(value);
     directory(STATE_DIR, 448);
     config(); // Validate existing opt-in metadata before any mount or HDMI restart.
-    if (enabled) {
+    if (policy.enabled && policy.rules.length) {
       try {
-        ensure();
-        write(CONFIG, {schema: 1, enabled: true}, 384);
+        ensure(policy);
+        write(CONFIG, {schema: 2, policy: policy}, 384);
         forcedOff = false;
         lastError = null;
       } catch (error) {
@@ -201,11 +220,21 @@ function create(deps) {
     } else {
       forcedOff = true;
       restore();
-      write(CONFIG, {schema: 1, enabled: false}, 384);
+      write(CONFIG, {schema: 2, policy: policy}, 384);
       lastError = null;
     }
     start();
     return snapshot();
+  }
+  function setEnabled(enabled) {
+    if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean');
+    var next = config().policy;
+    next.enabled = enabled;
+    return setPolicy(next);
+  }
+  function applyCommand(value) {
+    var command = policies.normalizeCommand(value);
+    return command.version === 1 ? setPolicy(command) : setEnabled(command.enabled);
   }
   function remove() {
     setEnabled(false);
@@ -241,7 +270,7 @@ function create(deps) {
       }
     }, 15000);
   }
-  return {start: start, tick: tick, snapshot: snapshot, setEnabled: setEnabled,
+  return {start: start, tick: tick, snapshot: snapshot, setEnabled: setEnabled, setPolicy: setPolicy, applyCommand: applyCommand,
     suspend: restore, remove: remove, watchdog: watchdog};
 }
 

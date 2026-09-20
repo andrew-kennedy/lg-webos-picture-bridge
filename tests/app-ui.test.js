@@ -36,7 +36,7 @@ function setup(initial) {
     document: document, PalmServiceBridge: PalmServiceBridge,
     window: {confirm: function (message) {
       assert.ok(message.includes('Home Assistant entities are not deleted') ||
-        message.includes('Apple TV wake') || message.includes('Apple TV wake filter')); return ui.confirmed;
+        message.includes('CEC filtering') || message.includes('rules configured by Home Assistant')); return ui.confirmed;
     }, setTimeout: function () {}, setInterval: function (handler, delay) {
       assert.strictEqual(delay, 5000); interval = handler;
     }}
@@ -70,7 +70,7 @@ module.exports = function () {
   assert.strictEqual(el['cec-button'].disabled, false);
   ui.confirmed = true; ui.click('cec-button');
   assert.strictEqual(ui.calls[ui.calls.length - 1].payload.enabled, true);
-  assert.strictEqual(el['cec-button'].textContent, 'Apple TV wake filter: On');
+  assert.strictEqual(el['cec-button'].textContent, 'CEC filtering: On');
   ui.click('cec-button'); assert.strictEqual(ui.calls[ui.calls.length - 1].payload.enabled, false);
   assert.ok(el['cec-display'].textContent.includes('LG default'));
   ui.confirmed = false;

@@ -13,11 +13,13 @@
   Homebrew Channel's generic shell-exec API.
 </p>
 <p>
-  Version 0.6 adds an optional Apple TV wake filter for the inspected rooted C9 firmware.
-  It suppresses LG's automatic Apple TV selection when returning to HDMI 3 after native AirPlay.
-  The filter is off by default, uses a removable runtime overlay rather than overwriting firmware,
-  and has an off switch in the app. SIMPLINK and Auto Power Sync stay unchanged. It does not fix
-  the separate first-attempt AirPlay connection timeout after standby.
+  Version 0.7 adds generic MQTT-configured CEC filtering for the inspected rooted C9 firmware.
+  Home Assistant supplies device/input rules; the app has no built-in device identities.
+  Supported rules block LG's automatic HDMI-device selection, not all CEC wake commands.
+  Standby blocking is not yet supported. Enable CEC commands separately, then configure rules
+  through HA; a 0.6 on/off preference needs an explicit policy when upgrading. The filter uses
+  a removable runtime overlay, with a master off switch in the app. SIMPLINK and Auto Power Sync
+  stay unchanged. The separate first-attempt AirPlay connection timeout is not fixed.
 </p>
 <h3>Requirements</h3>
 <ul>

@@ -82,6 +82,9 @@ function validateMqtt(value) {
   if (value.commands_enabled !== undefined && typeof value.commands_enabled !== 'boolean') {
     throw new Error('mqtt.commands_enabled must be a boolean');
   }
+  if (value.cec_commands_enabled !== undefined && typeof value.cec_commands_enabled !== 'boolean') {
+    throw new Error('mqtt.cec_commands_enabled must be a boolean');
+  }
   if (value.tls !== undefined && typeof value.tls !== 'boolean') throw new Error('mqtt.tls must be a boolean');
   var port = value.port === undefined ? (secure ? 8883 : 1883) : Number(value.port);
   if (!isFinite(port) || Math.floor(port) !== port || port < 1 || port > 65535) throw new Error('Invalid MQTT port');
@@ -101,6 +104,7 @@ function validateMqtt(value) {
   if (value.ca && (!secure || typeof value.ca !== 'string' || value.ca.length > 16384 || value.ca.indexOf('-----BEGIN CERTIFICATE-----') === -1)) throw new Error('Invalid MQTT CA certificate');
   return {host: value.host, port: port, tls: secure, ca: value.ca || null,
     commands_enabled: value.commands_enabled === true,
+    cec_commands_enabled: value.cec_commands_enabled === true,
     username: username, password: password,
     topic_prefix: prefix('topic_prefix', 'lg_picture_bridge'),
     discovery_prefix: prefix('discovery_prefix', 'homeassistant')};

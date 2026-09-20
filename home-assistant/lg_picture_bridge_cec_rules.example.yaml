@@ -1,0 +1,35 @@
+# This device-specific policy belongs in Home Assistant, not in the webOS app.
+# Replace matches with the inventory advertised by YOUR bridge. Rules are AND
+# matches, and this example leaves Nintendo, audio devices and standby untouched.
+lg_tv_configure_cec_filter:
+  alias: LG TV Configure CEC Filter
+  description: >-
+    Home Assistant is the source of device-specific CEC rules. Edit this script
+    and run it to replace the saved bridge policy. Normal restart does not require
+    replay: the bridge persists the last confirmed policy locally. Use the
+    discovered CEC filtering switch for master on/off without replacing rules.
+  mode: single
+  fields:
+    enabled:
+      name: Enable filtering
+      default: true
+      selector:
+        boolean: {}
+  sequence:
+    - action: script.lg_tv_mqtt_cec_policy
+      data:
+        policy:
+          version: 1
+          enabled: "{{ enabled | default(true) | bool }}"
+          rules:
+            - id: streaming_player_auto_selection
+              match:
+                input: hdmi3
+                vendor_id: 4346
+                osd_name: Apple TV
+                device_type: 4
+              block:
+                - automatic_selection
+      response_variable: result
+    - stop: Home Assistant CEC rules applied
+      response_variable: result

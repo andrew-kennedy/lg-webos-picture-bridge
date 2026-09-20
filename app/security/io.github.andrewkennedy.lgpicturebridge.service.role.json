@@ -14,7 +14,8 @@
         "com.webos.service.videooutput",
         "com.webos.settingsservice",
         "com.webos.service.acb",
-        "com.webos.service.tv.externaldevice"
+        "com.webos.service.tv.externaldevice",
+        "com.webos.service.eim"
       ]
     }
   ]

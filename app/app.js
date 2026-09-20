@@ -111,10 +111,11 @@
     var cec = status.cec_guard || {};
     cecEnabled = cec.enabled === true;
     cecButton.disabled = !cecEnabled && (!configured || !cec.supported);
-    cecButton.textContent = 'Apple TV wake filter: ' + (cecEnabled ? 'On' : 'Off');
+    cecButton.textContent = 'CEC filtering: ' + (cecEnabled ? 'On' : 'Off');
     cecDisplay.textContent = cec.last_error ? 'Needs attention: ' + cec.last_error :
-      (!cec.supported ? 'Unavailable on this firmware' : cecEnabled ?
-        (cec.lease_active ? 'On · temporary overlay; SIMPLINK unchanged' : 'On, but not currently active') :
+      (cec.migration_required ? 'Needs a policy from Home Assistant (legacy setting is not a rule)' :
+      !cec.supported ? 'Unavailable on this firmware' : cecEnabled ?
+        (cec.lease_active ? 'On · ' + ((cec.policy && cec.policy.rules.length) || 0) + ' HA-configured rules; SIMPLINK unchanged' : 'On, but no active filter · configure rules in HA') :
         'Off · LG default behavior');
     var mqttState = !status.running ? 'stopped' : (status.mqtt && status.mqtt.state) || 'starting';
     var mqttCommands = status.mqtt_commands_enabled === undefined ?
@@ -291,18 +292,18 @@
   cecButton.addEventListener('click', function () {
     if (busy || cecButton.disabled) return;
     if (!window.confirm(cecEnabled ?
-      'Turn off the Apple TV wake filter and restore LG’s normal automatic CEC selection?' :
-      'Prevent automatic Apple TV wake on HDMI 3? This enables a removable C9-specific overlay, ' +
-      'saved across reboots, and may briefly restart the HDMI app. SIMPLINK and Auto Power Sync stay enabled.')) return;
+      'Turn off CEC filtering and restore LG’s normal behavior? Your HA-configured rules will be kept.' :
+      'Enable the rules configured by Home Assistant? Installing the removable firmware-specific overlay ' +
+      'may briefly restart HDMI apps. No devices are blocked unless a rule matches. SIMPLINK stays enabled.')) return;
     busy = true;
-    setOperation(cecEnabled ? 'Restoring LG CEC behavior…' : 'Enabling Apple TV wake filter…');
+    setOperation(cecEnabled ? 'Restoring LG CEC behavior…' : 'Enabling configured CEC rules…');
     lunaCall(SERVICE_URI + 'setCecGuard', {enabled: !cecEnabled}, function (error, response) {
       busy = false;
       if (error) showError(error.message);
       else {
         if (response.status) renderStatus(response.status);
-        setOperation(cecEnabled ? 'Apple TV wake filter enabled · Nintendo/other CEC paths unchanged' :
-          'Apple TV wake filter off · LG default behavior restored');
+        setOperation(cecEnabled ? 'CEC filtering enabled · rules managed in Home Assistant' :
+          'CEC filtering off · LG default behavior restored');
       }
     });
   });

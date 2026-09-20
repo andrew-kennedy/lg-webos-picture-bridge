@@ -10,9 +10,10 @@ It is intended for automations that need to reapply the currently active picture
 Apple TV, Shield, game console, or PC changes between SDR, HDR10, HLG, and Dolby Vision. It does
 not capture video, drive LEDs, or require HyperHDR.
 
-Version 0.6 adds an optional, default-off [Apple TV wake filter](docs/cec-filter.md) for the
-inspected rooted C9 firmware. It uses a reversible overlay to suppress LG's automatic Apple TV
-selection after AirPlay, without disabling SIMPLINK. The earlier
+Version 0.7 adds [generic MQTT-configured CEC rules](docs/cec-filter.md) for the inspected
+rooted C9 firmware. Device names, vendors and input matches come from Home Assistant,
+not app defaults. A reversible overlay can suppress LG's automatic device selection,
+without disabling SIMPLINK. Per-device standby interception is not yet supported. The earlier
 [time-limited experiment](experiments/apple-tv-cec/README.md) remains a separate developer tool.
 
 > [!IMPORTANT]
@@ -351,19 +352,27 @@ unconfigured state, long errors, larger text, and remote navigation. They use mo
 Chromium for geometry plus static checks for unsupported C9 CSS, not a webOS emulator.
 Set `LAYOUT_CHROMIUM_PATH` to reuse an existing Chromium executable if needed.
 
-## Optional Apple TV wake filter (0.6.0)
+## Optional MQTT-controlled CEC filtering (0.7.0)
 
-For the inspected rooted C9, **Apple TV wake filter** in the TV app can suppress
-LG's automatic Apple TV CEC selection when HDMI 3 activates after AirPlay. It is
-off by default, survives reboots only when opted in, and uses a removable runtime
-overlay rather than firmware writes. Turning it off restores LG behavior without
-a reboot; a 90-second expiring local policy also fails open if the bridge stops.
-SIMPLINK, Nintendo's CEC chain, and Sonos settings are not turned off.
+Home Assistant supplies the complete device/input rule set over MQTT. The app has
+no built-in device identities or block rules. Opt in with `mqtt.cec_commands_enabled`,
+then use the discovered `switch.lg_tv_cec_filter`, `sensor.lg_tv_cec_filter` and the
+[request/reply script](home-assistant/lg_picture_bridge_mqtt_cec_policy.example.yaml).
+The status sensor exposes capabilities, confirmed policy, results and cached CEC
+inventory; the inventory is not the external HDMI switch's selected route.
+
+The supported action is `automatic_selection`, not all CEC wake commands. `standby`
+and any unsupported action are rejected before changing the existing policy.
+Rules can target HDMI 1–4 and/or device identity. Rule edits on an installed overlay
+do not restart HDMI. **CEC filtering** in the TV UI is a master override; device
+rules are managed in HA. A removable overlay and 90-second renewable local permission
+retain fail-open behavior. SIMPLINK and Auto Power Sync settings are unchanged.
 
 Read [scope, safeguards, testing status and emergency restore](docs/cec-filter.md)
-before enabling it. It is firmware-specific and does not fix the separate first
-AirPlay connection timeout. No Home Assistant script changes or reconfiguration
-are needed.
+before enabling it. Version 0.6's saved on/off setting cannot describe a generic
+rule: when upgrading, supply an explicit HA policy to restore that protection.
+Existing picture automations are unchanged. This does not fix the separate first
+AirPlay connection timeout.
 
 ## Security model
 

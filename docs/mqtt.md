@@ -23,7 +23,8 @@ Launch parameters can contain this `setup` object:
     "topic_prefix": "lg_picture_bridge",
     "discovery_prefix": "homeassistant",
     "tls": false,
-    "commands_enabled": true
+    "commands_enabled": true,
+    "cec_commands_enabled": false
   }
 }
 ```
@@ -52,6 +53,11 @@ settings, old configurations default to `webhook`. Always preserve the existing 
 `command_token` when keeping HTTP rollback, so entity identities and HTTP authorization stay stable.
 The token is optional for MQTT-only installations and is never sent in MQTT commands.
 Commands remain disabled unless `mqtt.commands_enabled` is explicitly `true`.
+CEC policy commands are a separate opt-in, `mqtt.cec_commands_enabled`, introduced
+in 0.7. They use `/cec/command` and `/cec/state` and do not require a current HDMI
+picture. See [generic CEC filtering](cec-filter.md) for capabilities, HA scripts,
+discovery entities, migration from 0.6, and safety limits. Extend broker ACLs for
+those two topics only when enabling that feature.
 
 TLS is supported with `tls: true` (default port 8883), certificate verification enabled, and an
 optional PEM `ca` string. The C9's old Node/OpenSSL runtime may not negotiate a modern broker's TLS
