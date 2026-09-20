@@ -155,6 +155,36 @@ documents the initial AirPlay fix, Nintendo/Sonos checks, immediate off and rest
 Version 0.7 has separate tests for generic identity/input matching, malformed and
 unsupported policies, dynamic cached-QML changes, lease expiry, safe mounts,
 legacy migration, MQTT sessions/retries/retained-message rejection and discovery.
-Live 0.7 validation is recorded here after installation, not inferred from 0.6.
+Live 0.7 validation on the rooted C9, 2026-09-20:
+
+- Installed the complete package and enabled the separate MQTT CEC endpoint while
+  preserving all existing broker credentials and other bridge configuration.
+- Confirmed the legacy enabled flag migrated to `needs_policy`, with the original
+  firmware file restored, until an explicit policy was sent from HA.
+- Installed both HA scripts, passed HA configuration validation, and applied the
+  central rules through MQTT. The discovered sensor reported the confirmed policy,
+  capabilities and read-only EIM inventory. Inventory was not treated as routing state.
+- Opened/returned from the bridge UI on HDMI 3; native QML logged the configured
+  `streaming_player_auto_selection` rule blocking automatic selection.
+- Changed only the rule ID over MQTT, then exercised the same path. QML logged the
+  new ID while the overlay generation and hash stayed unchanged. Restored the
+  central HA policy afterward. This verifies live policy changes without remounting.
+- Sent a policy containing `standby`. The correlated result was
+  `unsupported_cec_action`, and the existing active policy/hash remained unchanged.
+- Toggled the discovered HA switch off/on. Off removed the overlay and restored
+  original SHA-256 `ad7752a5211385a019dd3aa80a5333fc663481c94d3912c80884c0976d55584c`;
+  on reapplied the same saved rules.
+- Restarted the bridge; the persisted policy and MQTT discovery recovered. Repeated
+  HA switch off/on successfully with the new command session.
+- Confirmed SIMPLINK and Auto Power Sync remained enabled. The live 1920×1080 TV UI
+  showed generic HA-rule status, with every button within the viewport.
+- After restoring the HA-owned rule, the user repeated AirPlay directly to LG and
+  stopped playback: Apple TV stayed asleep.
+
+Automated checks: all 27 test files, project validation, build, 12 layout scenarios,
+and Node 0.12 syntax checks passed. HDMI 1/2/4 matching is unit-tested, not separately
+hardware-verified. A full power-loss reboot and native standby interception were
+not tested. Earlier Nintendo/Sonos user checks belong to the linked 0.6 record;
+they are not inferred to be fresh 0.7 tests.
 
 Filtering does not fix native AirPlay's separate first connection timeout after standby.
