@@ -10,6 +10,11 @@ It is intended for automations that need to reapply the currently active picture
 Apple TV, Shield, game console, or PC changes between SDR, HDR10, HLG, and Dolby Vision. It does
 not capture video, drive LEDs, or require HyperHDR.
 
+An [SSH-only, time-limited Apple TV CEC experiment](experiments/apple-tv-cec/README.md) is available
+for development on the inspected C9 firmware. It is **not** part of the installed app, not a
+general CEC filter, and never runs automatically. It uses a temporary overlay rather than
+overwriting firmware; successful behavior must be established before any bridge/UI integration.
+
 > [!IMPORTANT]
 > Version 0.5.0 is live-tested on a rooted 2019 LG C9 running Node 0.12.2 with Home Assistant
 > 2026.9.3. MQTT discovery, request/reply picture writes, TV readback, and the existing movie
