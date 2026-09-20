@@ -9,9 +9,16 @@ CEC packet filter and it is not yet a bridge/MQTT feature.
 On 2026-09-19, the C9 running Node 0.12.2 accepted a 30-second overlay trial. Its independent
 watchdog automatically unmounted the overlay and the original QML SHA-256 matched afterward.
 Explicit restore also succeeded. The application-manager `closeByAppId` call restarted the HDMI
-app, and HDMI 3 returned with a good signal. **Wake suppression itself is not yet confirmed**;
-an app restart alone is not proof that the new QML was loaded or that a CEC call was suppressed.
-The `LGPB_CEC_TRIAL` markers must be observed during an input activation before drawing conclusions.
+app, and HDMI 3 returned with a good signal. At 20:35:20 PDT, a full-screen bridge-UI → HDMI 3
+transition logged both `LGPB_CEC_TRIAL evaluating automatic selection: 4` and
+`LGPB_CEC_TRIAL suppressed Apple TV automatic selection`, with no corresponding
+`responseSetCecUniqueId`. This confirms the new QML loaded and skipped the intended call.
+**Preventing the actual unwanted wake after AirPlay is not yet confirmed.** Nintendo wake/sleep
+and Sonos control also need an end-to-end check before this becomes a persistent feature.
+
+The C9 Home ribbon alone did not deactivate the HDMI app, so Home → HDMI was not a useful
+activation test; a full-screen app was needed. The original `SIMPLINK: setCecUniqueId` log occurs
+before the inserted guard, so that log alone does not establish that a request was sent.
 
 The inspected C9 HDMI application's `Simplink.qml` selects a remembered CEC device using
 `setCECUniqueId` on activation. The trial skips only this call for an automatically selected
