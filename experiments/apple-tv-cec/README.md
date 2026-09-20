@@ -13,8 +13,9 @@ app, and HDMI 3 returned with a good signal. At 20:35:20 PDT, a full-screen brid
 transition logged both `LGPB_CEC_TRIAL evaluating automatic selection: 4` and
 `LGPB_CEC_TRIAL suppressed Apple TV automatic selection`, with no corresponding
 `responseSetCecUniqueId`. This confirms the new QML loaded and skipped the intended call.
-**Preventing the actual unwanted wake after AirPlay is not yet confirmed.** Nintendo wake/sleep
-and Sonos control also need an end-to-end check before this becomes a persistent feature.
+The initial trial did not establish wake prevention. **A later supervised AirPlay retest
+did prevent the unwanted Apple TV wake**, as described below. Nintendo wake/sleep and
+Sonos control still need an end-to-end check before this becomes a persistent feature.
 
 The C9 Home ribbon alone did not deactivate the HDMI app, so Home → HDMI was not a useful
 activation test; a full-screen app was needed. The original `SIMPLINK: setCecUniqueId` log occurs
@@ -41,6 +42,28 @@ This means the AirPlay → HDMI-return wake test is inconclusive, not a successf
 proof of an AirPlay firmware regression. Before retesting, a no-signal shutdown automation must
 distinguish actual loss of a previously valid inferred-console signal from a TV starting up with
 no HDMI signal. Do not make the CEC modification persistent on the strength of this trial alone.
+
+### Successful AirPlay return retest after fixing the HA startup rule
+
+After the Nintendo rule was changed to require a previously confirmed picture, the user
+successfully played native LG AirPlay from standby (the first connection attempt still
+timed out). With the CEC filter absent/expired, AirPlay closed at 21:13:02 PDT, LG selected
+Apple TV through `setCECUniqueId` at 21:13:04, and HA observed Apple TV off → idle at
+21:13:10. The Nintendo shutdown helper remained unarmed.
+
+A fresh ten-minute trial began at 21:15:17 PDT on 2026-09-19, expiring at 21:25:17.
+After reloading the HDMI app, the suppression marker appeared on return from the bridge
+UI at 21:15:47. Apple TV was put to sleep at 21:16:09. The TV woke for native AirPlay
+at 21:16:24; AirPlay became visible and subsequently returned to HDMI 3 twice.
+The filter logged suppression at 21:16:36 and 21:16:43, without the corresponding
+`responseSetCecUniqueId`. Apple TV remained off in HA afterward, and the user confirmed
+that it stayed asleep. This validates the narrow interception for these C9 transitions,
+not a generic CEC packet filter or compatibility with other firmware.
+
+The first-attempt AirPlay connection timeout is separate and remains unresolved. The
+trial is still temporary; it is not installed by version 0.5.2 or automatically enabled
+at boot. A persistent opt-in feature needs separate lifecycle/rollback handling and
+Nintendo/Sonos regression checks.
 
 The inspected C9 HDMI application's `Simplink.qml` selects a remembered CEC device using
 `setCECUniqueId` on activation. The trial skips only this call for an automatically selected
