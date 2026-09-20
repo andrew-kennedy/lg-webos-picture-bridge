@@ -65,10 +65,32 @@ Do not alter `config.json` to disable CEC; that file holds broker credentials.
 The earlier ten-minute trial prevented Apple TV wake after native AirPlay ended;
 the user also confirmed Nintendo wake/sleep and Sonos audio/volume. See the
 [experiment record](../experiments/apple-tv-cec/README.md).
-The persistent file-read/lease lifecycle requires its own live confirmation in
-addition to those trial results. Unit tests cover targeting, off/expiry/read errors,
-foreign/unsafe files, service restart, watchdog, uninstall and configuration-save
-failure. UI tests cover the fifth button without reintroducing screen overflow.
+
+Version 0.6.0 was separately installed and checked on that C9 on 2026-09-19
+(Node 0.12.2, Chromium 53):
+
+- Default-off startup left the original firmware hash unchanged and MQTT connected.
+- At 21:41:00 PDT, loaded QML read the local permission file and logged suppression
+  of the Apple selection. This verifies the actual Qt/QML file-read path, not a
+  browser simulation.
+- Disabling at 21:41:16 removed the overlay and restored the original hash. At
+  21:41:20 the same HDMI pipeline completed LG's normal `setCecUniqueId` call.
+  No HDMI close/restart was issued during that off test; cached QML honored revocation.
+- A bridge stop/start removed and then reapplied the overlay from the saved opt-in.
+  Suppression worked again at 21:42:32. The boot hook still points to this startup
+  script. A full power-loss reboot has not been separately exercised for 0.6.0.
+- The user then repeated standby → native LG AirPlay → stop and confirmed Apple TV
+  stayed asleep. The suppression log at 21:43:28 was after that generation's initial
+  lease expired at 21:43:27, confirming that loaded QML reads renewed permission.
+  The independent watchdog was also present as a separate Node process.
+- The broker-configuration hash was unchanged. SIMPLINK and Auto Power Sync both
+  remained on. All five UI buttons fit the actual 1920×1080 C9 screen (bottom edge
+  at or above 990 pixels).
+
+Unit tests additionally cover expiry/read errors, foreign/unsafe files, watchdog,
+uninstall and configuration-save failure. Those failure cases are simulated tests,
+not claims that the production TV was deliberately crashed or uninstalled. All
+24 test files and 12 browser layout scenarios passed.
 
 This feature does not fix native AirPlay's first connection attempt timing out
 after waking the TV from standby; that is a separate unresolved issue.
