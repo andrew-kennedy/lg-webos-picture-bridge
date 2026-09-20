@@ -12,6 +12,13 @@
   end-to-end on a 2019 LG C9. Configuration and status use the app's own registered service rather than
   Homebrew Channel's generic shell-exec API.
 </p>
+<p>
+  Version 0.6 adds an optional Apple TV wake filter for the inspected rooted C9 firmware.
+  It suppresses LG's automatic Apple TV selection when returning to HDMI 3 after native AirPlay.
+  The filter is off by default, uses a removable runtime overlay rather than overwriting firmware,
+  and has an off switch in the app. SIMPLINK and Auto Power Sync stay unchanged. It does not fix
+  the separate first-attempt AirPlay connection timeout after standby.
+</p>
 <h3>Requirements</h3>
 <ul>
   <li>A rooted LG webOS TV with an elevated Homebrew Channel installation</li>

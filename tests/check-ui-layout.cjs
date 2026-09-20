@@ -16,7 +16,8 @@ const status = {
     externaldevice: {state: 'subscribed'}, acb: {state: 'subscribed'}},
   command_api_enabled: true, command_api_port: 49191, command_api: {state: 'listening'},
   last_dynamic_range: 'dolby_vision', last_source: 'settingsservice',
-  hdmi_signal: {signal_present: true}
+  hdmi_signal: {signal_present: true},
+  cec_guard: {enabled: false, supported: true}
 };
 
 (async function () {
@@ -27,7 +28,7 @@ const status = {
     for (const viewport of [{width: 1920, height: 1080}, {width: 1280, height: 720}, {width: 960, height: 540}]) {
       for (const variant of ['mqtt', 'both', 'error', 'unconfigured']) {
         const fixture = JSON.parse(JSON.stringify(status));
-        if (variant === 'both') fixture.transport = 'both';
+        if (variant === 'both') {fixture.transport = 'both'; fixture.cec_guard = {enabled: true, supported: true, lease_active: true};}
         if (variant === 'error') {
           fixture.last_error = 'Long diagnostic: ' + 'retry-details-'.repeat(240);
           fixture.mqtt.state = 'disconnected';

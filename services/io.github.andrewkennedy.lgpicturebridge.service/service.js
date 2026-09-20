@@ -16,6 +16,7 @@ var store = require(APP_ROOT + '/bridge/lib/config-store');
 var healthStore = require(APP_ROOT + '/bridge/lib/health-store');
 var uiStatus = require(APP_ROOT + '/bridge/lib/ui-status');
 var webhook = require(APP_ROOT + '/bridge/lib/webhook');
+var cecGuard = require(APP_ROOT + '/bridge/lib/cec-guard').create();
 var service = new Service(SERVICE_ID);
 var controller = null;
 
@@ -24,8 +25,10 @@ function loadConfig() {
 }
 
 function statusSnapshot() {
-  return uiStatus.build(loadConfig(), controller ? controller.health : healthStore.load(),
+  var status = uiStatus.build(loadConfig(), controller ? controller.health : healthStore.load(),
     Boolean(controller));
+  status.cec_guard = cecGuard.snapshot();
+  return status;
 }
 
 function respondError(message, error) {
@@ -92,6 +95,18 @@ function deliveryStatus(config, response) {
 service.register('uiStatus', function (message) {
   if (!appIsAuthorized(message)) return;
   message.respond({returnValue: true, status: statusSnapshot()});
+});
+
+service.register('setCecGuard', function (message) {
+  if (!appIsAuthorized(message)) return;
+  try {
+    var payload = message.payload || {};
+    if (Object.keys(payload).length !== 1 || typeof payload.enabled !== 'boolean') {
+      throw new Error('Provide only enabled: true or false');
+    }
+    cecGuard.setEnabled(payload.enabled);
+    message.respond({returnValue: true, status: statusSnapshot()});
+  } catch (error) { respondError(message, error); }
 });
 
 service.register('configure', function (message) {
@@ -178,6 +193,7 @@ service.register('testWebhook', refreshReporting);
 
 try {
   if (store.exists()) controller = bridge.start(service, {config: store.load()});
+  cecGuard.start(); // Independently fail-open: never prevents the MQTT bridge from starting.
 } catch (error) {
   process.stderr.write(new Date().toISOString() + ' Service startup failed: ' +
     (error.stack || error.message) + '\n');

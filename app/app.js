@@ -19,7 +19,10 @@
   var testButton = document.getElementById('test-button');
   var reportingHelp = document.getElementById('reporting-help');
   var content = document.getElementById('content');
-  var actionButtons = ['refresh-button', 'restart-button', 'test-button', 'clear-button'].map(function (id) {
+  var cecButton = document.getElementById('cec-button');
+  var cecDisplay = document.getElementById('cec-display');
+  var cecEnabled = false;
+  var actionButtons = ['refresh-button', 'restart-button', 'test-button', 'cec-button', 'clear-button'].map(function (id) {
     return document.getElementById(id);
   });
   var bridges = [];
@@ -105,6 +108,14 @@
     var configured = status.configured === undefined ? status.paired : status.configured;
     var usesMqtt = status.transport === 'mqtt' || status.transport === 'both';
     var usesWebhook = status.transport === 'webhook' || status.transport === 'both';
+    var cec = status.cec_guard || {};
+    cecEnabled = cec.enabled === true;
+    cecButton.disabled = !cecEnabled && (!configured || !cec.supported);
+    cecButton.textContent = 'Apple TV wake filter: ' + (cecEnabled ? 'On' : 'Off');
+    cecDisplay.textContent = cec.last_error ? 'Needs attention: ' + cec.last_error :
+      (!cec.supported ? 'Unavailable on this firmware' : cecEnabled ?
+        (cec.lease_active ? 'On · temporary overlay; SIMPLINK unchanged' : 'On, but not currently active') :
+        'Off · LG default behavior');
     var mqttState = !status.running ? 'stopped' : (status.mqtt && status.mqtt.state) || 'starting';
     var mqttCommands = status.mqtt_commands_enabled === undefined ?
       status.mqtt && status.mqtt.commands_enabled : status.mqtt_commands_enabled;
@@ -273,6 +284,25 @@
         // Clearing also removes Luna permissions; do not call the now-disabled service.
         renderStatus({configured: false, running: false});
         setOperation('Configuration removed · monitoring stopped');
+      }
+    });
+  });
+
+  cecButton.addEventListener('click', function () {
+    if (busy || cecButton.disabled) return;
+    if (!window.confirm(cecEnabled ?
+      'Turn off the Apple TV wake filter and restore LG’s normal automatic CEC selection?' :
+      'Prevent automatic Apple TV wake on HDMI 3? This enables a removable C9-specific overlay, ' +
+      'saved across reboots, and may briefly restart the HDMI app. SIMPLINK and Auto Power Sync stay enabled.')) return;
+    busy = true;
+    setOperation(cecEnabled ? 'Restoring LG CEC behavior…' : 'Enabling Apple TV wake filter…');
+    lunaCall(SERVICE_URI + 'setCecGuard', {enabled: !cecEnabled}, function (error, response) {
+      busy = false;
+      if (error) showError(error.message);
+      else {
+        if (response.status) renderStatus(response.status);
+        setOperation(cecEnabled ? 'Apple TV wake filter enabled · Nintendo/other CEC paths unchanged' :
+          'Apple TV wake filter off · LG default behavior restored');
       }
     });
   });

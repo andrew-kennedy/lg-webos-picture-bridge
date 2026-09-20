@@ -168,7 +168,7 @@ button:disabled { opacity: 0.5; transform: none; }
 @media (max-width: 1100px) {
   :root { font-size: 20px; }
   dl > div { flex-basis: 50%; }
-  .actions button { flex: 1 1 40%; }
+  .actions button { flex: 1 1 28%; }
 }
 
 @media (max-height: 800px) {

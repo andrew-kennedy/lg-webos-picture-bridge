@@ -21,6 +21,8 @@ case "${1:-}" in
         "$APP_ROOT/scripts/startup.sh" restart
         ;;
     clear)
+        # Restore the optional CEC overlay before deleting configuration/startup hooks.
+        "$NODE_BIN" "$APP_ROOT/bridge/cec-guard-cli.js" remove
         "$APP_ROOT/scripts/startup.sh" stop
         "$NODE_BIN" "$APP_ROOT/bridge/configure.js" clear
         rm -f "$STATE_DIR/health.json"

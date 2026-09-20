@@ -56,6 +56,8 @@ start_bridge() {
 }
 
 stop_bridge() {
+    # Revoke even cached QML immediately; preserve the opt-in for the next start.
+    "$NODE_BIN" "$APP_ROOT/bridge/cec-guard-cli.js" suspend || true
     if ! is_running; then
         rm -f "$PID_FILE"
         echo "LG Picture Bridge is not running"

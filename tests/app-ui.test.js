@@ -25,14 +25,18 @@ function setup(initial) {
     }};
     ui.calls.push(call);
     if (ui.hold) return;
-    if (uri.endsWith('/refreshReporting')) {
+    if (uri.endsWith('/setCecGuard')) {
+      ui.status.cec_guard = {enabled: call.payload.enabled, supported: true, lease_active: call.payload.enabled};
+      call.respond({returnValue: true, status: ui.status});
+    } else if (uri.endsWith('/refreshReporting')) {
       call.respond(ui.reportingResult || {returnValue: true, mqtt_submitted: true, status: ui.status});
     } else call.respond({returnValue: true, status: ui.status});
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../app/app.js'), 'utf8'), {
     document: document, PalmServiceBridge: PalmServiceBridge,
     window: {confirm: function (message) {
-      assert.ok(message.includes('Home Assistant entities are not deleted')); return ui.confirmed;
+      assert.ok(message.includes('Home Assistant entities are not deleted') ||
+        message.includes('Apple TV wake') || message.includes('Apple TV wake filter')); return ui.confirmed;
     }, setTimeout: function () {}, setInterval: function (handler, delay) {
       assert.strictEqual(delay, 5000); interval = handler;
     }}
@@ -61,6 +65,15 @@ module.exports = function () {
   assert.strictEqual(el['test-button'].textContent, 'Republish discovery');
   assert.strictEqual(el['command-display'].textContent, 'MQTT listener ready · HTTP listening on port 49191');
   assert.ok(el['reporting-help'].textContent.includes('does not change picture settings'));
+  assert.strictEqual(el['cec-button'].disabled, true, 'Older service without guard cannot enable it');
+  status.cec_guard = {enabled: false, supported: true}; ui.tick();
+  assert.strictEqual(el['cec-button'].disabled, false);
+  ui.confirmed = true; ui.click('cec-button');
+  assert.strictEqual(ui.calls[ui.calls.length - 1].payload.enabled, true);
+  assert.strictEqual(el['cec-button'].textContent, 'Apple TV wake filter: On');
+  ui.click('cec-button'); assert.strictEqual(ui.calls[ui.calls.length - 1].payload.enabled, false);
+  assert.ok(el['cec-display'].textContent.includes('LG default'));
+  ui.confirmed = false;
   el['refresh-button'].focus();
   assert.strictEqual(ui.key(39), true);
   assert.strictEqual(ui.document.activeElement, el['restart-button']);

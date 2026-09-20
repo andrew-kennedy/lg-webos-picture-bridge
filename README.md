@@ -10,10 +10,10 @@ It is intended for automations that need to reapply the currently active picture
 Apple TV, Shield, game console, or PC changes between SDR, HDR10, HLG, and Dolby Vision. It does
 not capture video, drive LEDs, or require HyperHDR.
 
-An [SSH-only, time-limited Apple TV CEC experiment](experiments/apple-tv-cec/README.md) is available
-for development on the inspected C9 firmware. It is **not** part of the installed app, not a
-general CEC filter, and never runs automatically. It uses a temporary overlay rather than
-overwriting firmware; successful behavior must be established before any bridge/UI integration.
+Version 0.6 adds an optional, default-off [Apple TV wake filter](docs/cec-filter.md) for the
+inspected rooted C9 firmware. It uses a reversible overlay to suppress LG's automatic Apple TV
+selection after AirPlay, without disabling SIMPLINK. The earlier
+[time-limited experiment](experiments/apple-tv-cec/README.md) remains a separate developer tool.
 
 > [!IMPORTANT]
 > Version 0.5.0 is live-tested on a rooted 2019 LG C9 running Node 0.12.2 with Home Assistant
@@ -350,6 +350,20 @@ Layout checks cover 1080p, 720p, and smaller viewports with normal/mixed transpo
 unconfigured state, long errors, larger text, and remote navigation. They use modern
 Chromium for geometry plus static checks for unsupported C9 CSS, not a webOS emulator.
 Set `LAYOUT_CHROMIUM_PATH` to reuse an existing Chromium executable if needed.
+
+## Optional Apple TV wake filter (0.6.0)
+
+For the inspected rooted C9, **Apple TV wake filter** in the TV app can suppress
+LG's automatic Apple TV CEC selection when HDMI 3 activates after AirPlay. It is
+off by default, survives reboots only when opted in, and uses a removable runtime
+overlay rather than firmware writes. Turning it off restores LG behavior without
+a reboot; a 90-second expiring local policy also fails open if the bridge stops.
+SIMPLINK, Nintendo's CEC chain, and Sonos settings are not turned off.
+
+Read [scope, safeguards, testing status and emergency restore](docs/cec-filter.md)
+before enabling it. It is firmware-specific and does not fix the separate first
+AirPlay connection timeout. No Home Assistant script changes or reconfiguration
+are needed.
 
 ## Security model
 

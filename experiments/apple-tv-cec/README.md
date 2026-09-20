@@ -2,7 +2,8 @@
 
 **Experimental, SSH-only, not installed by the app, and not enabled at boot.** This tests a
 possible cause of Apple TV waking when native LG AirPlay exits to HDMI 3. It is not a generic
-CEC packet filter and it is not yet a bridge/MQTT feature.
+CEC packet filter. Version 0.6 adds a separate, opt-in bridge feature with a renewable
+local permission file; see [the feature documentation](../../docs/cec-filter.md).
 
 ## Validation status
 
@@ -14,8 +15,8 @@ transition logged both `LGPB_CEC_TRIAL evaluating automatic selection: 4` and
 `LGPB_CEC_TRIAL suppressed Apple TV automatic selection`, with no corresponding
 `responseSetCecUniqueId`. This confirms the new QML loaded and skipped the intended call.
 The initial trial did not establish wake prevention. **A later supervised AirPlay retest
-did prevent the unwanted Apple TV wake**, as described below. Nintendo wake/sleep and
-Sonos control still need an end-to-end check before this becomes a persistent feature.
+did prevent the unwanted Apple TV wake**, as described below. The user subsequently
+confirmed Nintendo wake/sleep and Sonos audio/volume still worked during that trial.
 
 The C9 Home ribbon alone did not deactivate the HDMI app, so Home → HDMI was not a useful
 activation test; a full-screen app was needed. The original `SIMPLINK: setCecUniqueId` log occurs
@@ -62,8 +63,9 @@ not a generic CEC packet filter or compatibility with other firmware.
 
 The first-attempt AirPlay connection timeout is separate and remains unresolved. The
 trial is still temporary; it is not installed by version 0.5.2 or automatically enabled
-at boot. A persistent opt-in feature needs separate lifecycle/rollback handling and
-Nintendo/Sonos regression checks.
+at boot. The user also confirmed Nintendo wake/sleep and Sonos audio/volume before
+approving the separate persistent, reversible option. Its lifecycle and rollback
+validation are recorded in the feature documentation, not inferred from this trial.
 
 The inspected C9 HDMI application's `Simplink.qml` selects a remembered CEC device using
 `setCECUniqueId` on activation. The trial skips only this call for an automatically selected

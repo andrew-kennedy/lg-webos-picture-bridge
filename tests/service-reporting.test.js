@@ -7,7 +7,7 @@ var vm = require('vm');
 
 function setup(config) {
   var methods = {};
-  var state = {config: config, submitted: true, mqttCalls: 0, webhookCalls: 0, webhookError: null};
+  var state = {config: config, submitted: true, mqttCalls: 0, webhookCalls: 0, webhookError: null, cecCalls: 0};
   var controller = {health: {mqtt: {state: 'connecting'}},
     refreshMqtt: function () { state.mqttCalls++; return state.submitted; },
     reconfigure: function (unused, callback) { callback(null); }};
@@ -21,6 +21,9 @@ function setup(config) {
     '/bridge/lib/config-store': {exists: function () { return Boolean(state.config); },
       load: function () { return state.config; }, save: function (value) { state.config = value; return value; }},
     '/bridge/lib/health-store': {load: function () { return {}; }},
+    '/bridge/lib/cec-guard': {create: function () { return {start: function () {},
+      snapshot: function () { return {enabled: false}; },
+      setEnabled: function () { state.cecCalls++; }}; }},
     '/bridge/lib/ui-status': {build: function (value) { return {configured: Boolean(value)}; }},
     '/bridge/lib/webhook': {postJson: function (url, payload, callback) {
       state.webhookCalls++; assert.strictEqual(payload.event, 'pairing_test');
@@ -60,6 +63,13 @@ module.exports = function () {
   var before = service.mqttCalls;
   assert.strictEqual(service.call('refreshReporting', 'untrusted.app').returnValue, false);
   assert.strictEqual(service.mqttCalls, before, 'Authorization is checked before publishing');
+  assert.strictEqual(service.call('setCecGuard', 'untrusted.app', {enabled: true}).returnValue, false);
+  assert.strictEqual(service.cecCalls, 0, 'Root changes require the authorized TV app');
+  assert.strictEqual(service.call('setCecGuard', undefined, {enabled: 'true'}).returnValue, false);
+  assert.strictEqual(service.call('setCecGuard', undefined, {enabled: true, command: 'anything'}).returnValue, false);
+  assert.strictEqual(service.cecCalls, 0);
+  assert.strictEqual(service.call('setCecGuard', undefined, {enabled: true}).returnValue, true);
+  assert.strictEqual(service.cecCalls, 1);
 
   service = setup({transport: 'both', callback_url: 'http://ha/test'});
   result = service.call('refreshReporting');
