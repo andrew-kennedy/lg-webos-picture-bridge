@@ -10,21 +10,21 @@
       "id": "io.github.andrewkennedy.lgpicturebridge",
       "title": "LG Picture Bridge",
       "iconUri": "https://raw.githubusercontent.com/andrew-kennedy/lg-webos-picture-bridge/main/site/icon160.png",
-      "manifestUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/download/v0.6.0/io.github.andrewkennedy.lgpicturebridge.manifest.json",
+      "manifestUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/download/v0.7.0/io.github.andrewkennedy.lgpicturebridge.manifest.json",
       "manifest": {
         "id": "io.github.andrewkennedy.lgpicturebridge",
-        "version": "0.6.0",
+        "version": "0.7.0",
         "type": "web",
         "title": "LG Picture Bridge",
         "appDescription": "Reports TV dynamic-range changes to Home Assistant",
         "iconUri": "https://raw.githubusercontent.com/andrew-kennedy/lg-webos-picture-bridge/main/app/assets/icon160.png",
         "sourceUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge",
         "rootRequired": true,
-        "ipkUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/download/v0.6.0/io.github.andrewkennedy.lgpicturebridge_0.6.0_all.ipk",
+        "ipkUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/download/v0.7.0/io.github.andrewkennedy.lgpicturebridge_0.7.0_all.ipk",
         "ipkHash": {
-          "sha256": "1c753ffb1f5351a54d9e06202e993ca23d10a35c227f450f54a98ddbc7d42bab"
+          "sha256": "d0254e65168abd0ea6f6fb24935c758153e83e550370af2b6668c62f06517d66"
         },
-        "ipkSize": 76728
+        "ipkSize": 79864
       },
       "pool": "main",
       "requirements": {
