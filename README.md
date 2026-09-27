@@ -16,6 +16,14 @@ not app defaults. A reversible overlay can suppress LG's automatic device select
 without disabling SIMPLINK. Per-device standby interception is not yet supported. The earlier
 [time-limited experiment](experiments/apple-tv-cec/README.md) remains a separate developer tool.
 
+Version **0.7.1** fixes a delayed HDMI blank after Quick Start standby: a late
+CEC watchdog gives the bridge a bounded chance to renew its expired lease before
+removing the overlay. The QML filter still fails open immediately at expiry.
+Both resume timer orderings are regression-tested; a dead bridge is still cleaned up.
+Upgrading the detached watchdog preserves the existing HDMI apps and saved rules.
+No Home Assistant script changes or re-pairing are needed. See
+[standby recovery and validation limits](docs/cec-filter.md#standby-recovery-071).
+
 > [!IMPORTANT]
 > Version 0.5.0 is live-tested on a rooted 2019 LG C9 running Node 0.12.2 with Home Assistant
 > 2026.9.3. MQTT discovery, request/reply picture writes, TV readback, and the existing movie

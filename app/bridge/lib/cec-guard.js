@@ -11,6 +11,11 @@ var ROOT = '/tmp/lgpb-apple-tv-cec';
 var STATE = ROOT + '/mount.json';
 var OVERLAY = ROOT + '/Simplink.qml';
 var LEASE = ROOT + '/lease.json';
+var WATCHDOG_REVISION = 1;
+var WATCHDOG_INTERVAL = 15000;
+// A late watchdog tick can be the first callback after Quick Start standby.
+// Let the 30-second renewal loop run, but never extend the QML permission lease.
+var RESUME_GRACE = 45000;
 
 function create(deps) {
   deps = deps || {};
@@ -107,6 +112,16 @@ function create(deps) {
     var issued = now();
     write(LEASE, {schema: 2, owner: id, enabled: true, issued_at: issued, expires_at: issued + 90000, policy: policy}, 420);
   }
+  function startWatchdog(state) {
+    var child = cp.spawn(proc.execPath, [APP_ROOT + '/bridge/cec-guard-cli.js', 'watchdog', state.id],
+      {detached: true, stdio: 'ignore'});
+    child.on('error', function (error) {
+      lastError = error.message;
+      try { restore(state.id); } catch (rollbackError) { lastError += '; ' + rollbackError.message; }
+    });
+    if (!child.pid) throw new Error('CEC rollback watchdog failed to start');
+    child.unref();
+  }
   function reloadHdmi() {
     // Reload cached copies once when INSTALLING the generic shared overlay, not
     // when changing rules. Targets are a fixed allowlist, never an MQTT URI/app ID.
@@ -132,6 +147,14 @@ function create(deps) {
     if (list.length) {
       if (list.length !== 1 || !owned(state)) throw new Error('Another QML overlay is installed; CEC filter not applied');
       if (state.revision === model.REVISION && state.active) {
+        if (state.watchdog_revision !== WATCHDOG_REVISION) {
+          // Retire a pre-fix detached watchdog by generation. Its next tick sees
+          // a different owner and exits; QML and the owned mount stay unchanged.
+          state.id = crypto.randomBytes(16).toString('hex');
+          state.watchdog_revision = WATCHDOG_REVISION;
+          write(STATE, state, 384);
+          startWatchdog(state);
+        }
         renew(state.id, policy);
         return;
       }
@@ -143,19 +166,12 @@ function create(deps) {
     fileSafe(OVERLAY);
     fs.writeFileSync(OVERLAY, generated, {mode: 420});
     state = {id: crypto.randomBytes(16).toString('hex'), revision: model.REVISION,
-      patched_sha256: model.digest(generated), active: true};
+      patched_sha256: model.digest(generated), active: true, watchdog_revision: WATCHDOG_REVISION};
     write(STATE, state, 384);
     try {
       cp.execFileSync('/bin/mount', ['--bind', OVERLAY, model.TARGET]);
       if (!owned(state)) throw new Error('CEC overlay verification failed');
-      var child = cp.spawn(proc.execPath, [APP_ROOT + '/bridge/cec-guard-cli.js', 'watchdog', state.id],
-        {detached: true, stdio: 'ignore'});
-      child.on('error', function (error) {
-        lastError = error.message;
-        try { restore(state.id); } catch (rollbackError) { lastError += '; ' + rollbackError.message; }
-      });
-      if (!child.pid) throw new Error('CEC rollback watchdog failed to start');
-      child.unref();
+      startWatchdog(state);
       renew(state.id, policy);
       reloadHdmi();
     } catch (error) {
@@ -252,23 +268,41 @@ function create(deps) {
   }
   function watchdog(id) {
     rootOnly();
+    var lastCheck = now(), resumeGraceUntil = null;
     var watchdogTimer = schedule(function () {
       try {
+        var checkedAt = now(), previousCheck = lastCheck;
+        lastCheck = checkedAt;
         var state = mountState();
         if (!state || state.id !== id || !state.active) { cancel(watchdogTimer); return; }
         var lease = read(LEASE);
-        if (!model.validLease(lease, now()) || !fs.existsSync(APP_ROOT + '/appinfo.json') ||
-            !fs.existsSync(STATE_DIR + '/config.json')) {
+        if (!fs.existsSync(APP_ROOT + '/appinfo.json') || !fs.existsSync(STATE_DIR + '/config.json')) {
           restore(id);
           cancel(watchdogTimer);
+          return;
         }
+        if (model.validLease(lease, checkedAt)) {
+          resumeGraceUntil = null;
+          return;
+        }
+        // Grace applies only to genuine time expiry after missed watchdog ticks,
+        // not revoked/malformed leases, backwards clocks, or a missing install.
+        // A renewal since the previous watchdog tick may have a newer issued_at.
+        var expired = lease && model.validLease(lease, lease.issued_at) && checkedAt >= lease.expires_at;
+        if (resumeGraceUntil === null && expired && lease.expires_at > previousCheck &&
+            checkedAt - previousCheck > WATCHDOG_INTERVAL * 2) {
+          resumeGraceUntil = checkedAt + RESUME_GRACE;
+        }
+        if (expired && resumeGraceUntil !== null && checkedAt >= previousCheck && checkedAt < resumeGraceUntil) return;
+        restore(id);
+        cancel(watchdogTimer);
       } catch (error) {
         // QML also independently checks the lease, so stale policy cannot block forever.
         try { restore(id); } catch (rollbackError) { error.message += '; ' + rollbackError.message; }
         proc.stderr.write('CEC watchdog: ' + error.message + '\n');
         cancel(watchdogTimer);
       }
-    }, 15000);
+    }, WATCHDOG_INTERVAL);
   }
   return {start: start, tick: tick, snapshot: snapshot, setEnabled: setEnabled, setPolicy: setPolicy, applyCommand: applyCommand,
     suspend: restore, remove: remove, watchdog: watchdog};

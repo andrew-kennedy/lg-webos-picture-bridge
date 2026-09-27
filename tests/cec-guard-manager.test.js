@@ -8,7 +8,7 @@ function configuredPolicy() { return {version: 1, enabled: true,
 function environment(options) {
   options = options || {};
   var files = {}, sequence = 0, mounted = options.foreign ? 'foreign' : false, clock = 10000;
-  var commands = [], writes = [], intervals = [];
+  var commands = [], writes = [], intervals = [], spawns = [];
   function entry(value, mode) { return {value: value, mode: mode || (value === null ? 493 : 420),
     uid: 0, ino: ++sequence, nlink: 1, link: false}; }
   files[guard.APP_ROOT + '/appinfo.json'] = entry('{}');
@@ -42,7 +42,10 @@ function environment(options) {
       else if (bin === '/usr/bin/luna-send') return '{"returnValue":true}';
       else throw Error('Unexpected command ' + bin);
     },
-    spawn: function () { return {pid: options.spawnFailure ? undefined : 22, on: function () {}, unref: function () {}}; }
+    spawn: function (bin, args) {
+      spawns.push([bin].concat(args));
+      return {pid: options.spawnFailure ? undefined : 22, on: function () {}, unref: function () {}};
+    }
   };
   var deps = {fs: fs, cp: cp, now: function () { return clock; },
     process: {pid: 10, execPath: '/usr/bin/node', getuid: function () { return options.nonroot ? 1000 : 0; },
@@ -54,7 +57,7 @@ function environment(options) {
     setInterval: function (callback, ms) { var timer = {callback: callback, ms: ms, canceled: false}; intervals.push(timer); return timer; },
     clearInterval: function (timer) { timer.canceled = true; }};
   return {manager: guard.create(deps), newManager: function () { return guard.create(deps); }, files: files,
-    writes: writes, commands: commands, intervals: intervals, options: options,
+    writes: writes, commands: commands, intervals: intervals, spawns: spawns, options: options,
     advance: function (ms) { clock += ms; }, mounted: function () { return mounted; },
     addUnsafe: function (p, kind) { files[p] = entry(p === guard.ROOT ? null : 'unsafe'); files[p][kind] = kind === 'uid' ? 1000 : true; }};
 }
@@ -99,9 +102,86 @@ module.exports = function () {
 
   var expiry = environment(); expiry.manager.setPolicy(configuredPolicy());
   var id = JSON.parse(expiry.files[guard.STATE].value).id;
-  expiry.manager.watchdog(id); expiry.advance(90001);
-  expiry.intervals[expiry.intervals.length - 1].callback();
-  assert(!expiry.mounted(), 'Independent watchdog restores after missed heartbeat');
+  expiry.manager.watchdog(id);
+  for (var tick = 0; tick < 6; tick++) {
+    expiry.advance(15000); expiry.intervals[expiry.intervals.length - 1].callback();
+  }
+  assert(!expiry.mounted(), 'Regular watchdog restores at 90 seconds after a dead manager; no grace');
+
+  function paused() {
+    var env = environment(); env.manager.setPolicy(configuredPolicy());
+    env.manager.watchdog(JSON.parse(env.files[guard.STATE].value).id);
+    env.watchdogTimer = env.intervals[env.intervals.length - 1];
+    env.beforePauseCommands = env.commands.length;
+    return env;
+  }
+  ['watchdog-first', 'renewal-first'].forEach(function (order) {
+    var resumed = paused();
+    resumed.advance(22 * 60 * 60 * 1000);
+    assert(!resumed.manager.snapshot().lease_active, 'Expired QML policy fails open on wake');
+    if (order === 'watchdog-first') {
+      resumed.watchdogTimer.callback();
+      assert(resumed.mounted() && !resumed.manager.snapshot().lease_active, 'Grace never renews permission');
+      resumed.advance(30000);
+      resumed.manager.tick();
+    } else {
+      resumed.manager.tick();
+    }
+    resumed.watchdogTimer.callback();
+    assert(resumed.manager.snapshot().lease_active, 'Manager restored a fresh lease: ' + order);
+    assert.strictEqual(resumed.commands.length, resumed.beforePauseCommands,
+      'No unmount, remount or HDMI close on long standby resume: ' + order);
+    // Repeated sleep cycles are allowed after a healthy renewal was observed.
+    resumed.advance(120000); resumed.watchdogTimer.callback(); resumed.manager.tick();
+    resumed.watchdogTimer.callback();
+    assert.strictEqual(resumed.commands.length, resumed.beforePauseCommands, 'Repeated resume remains silent');
+  });
+  var newerLease = paused();
+  newerLease.advance(5000); newerLease.manager.tick();
+  newerLease.advance(120000); newerLease.watchdogTimer.callback(); newerLease.manager.tick();
+  assert.strictEqual(newerLease.commands.length, newerLease.beforePauseCommands,
+    'A lease issued after the previous watchdog check also gets resume grace');
+  var deadAfterSleep = paused();
+  deadAfterSleep.advance(120000); deadAfterSleep.watchdogTimer.callback();
+  deadAfterSleep.advance(15000); deadAfterSleep.watchdogTimer.callback();
+  deadAfterSleep.advance(29999); deadAfterSleep.watchdogTimer.callback();
+  assert(deadAfterSleep.mounted() && !deadAfterSleep.manager.snapshot().lease_active);
+  deadAfterSleep.advance(1); deadAfterSleep.watchdogTimer.callback();
+  assert(!deadAfterSleep.mounted() && deadAfterSleep.watchdogTimer.canceled,
+    'Dead bridge after sleep is removed at the fixed 45-second grace deadline');
+  var delayedAgain = paused();
+  delayedAgain.advance(120000); delayedAgain.watchdogTimer.callback();
+  delayedAgain.advance(120000); delayedAgain.watchdogTimer.callback();
+  assert(!delayedAgain.mounted(), 'Another missed tick cannot extend the same expired lease grace');
+  ['revoked', 'malformed', 'app-removed', 'config-removed', 'backwards'].forEach(function (cause) {
+    var invalid = paused(); invalid.advance(120000); invalid.watchdogTimer.callback();
+    if (cause === 'revoked') invalid.files[guard.LEASE].value = '{"schema":2,"enabled":false}';
+    if (cause === 'malformed') invalid.files[guard.LEASE].value = 'not json';
+    if (cause === 'app-removed') delete invalid.files[guard.APP_ROOT + '/appinfo.json'];
+    if (cause === 'config-removed') delete invalid.files[guard.STATE_DIR + '/config.json'];
+    invalid.advance(cause === 'backwards' ? -1000 : 1000);
+    invalid.watchdogTimer.callback();
+    assert(!invalid.mounted(), 'Grace never delays safety removal: ' + cause);
+  });
+  var upgrade = paused();
+  var preUpgrade = JSON.parse(upgrade.files[guard.STATE].value);
+  delete preUpgrade.watchdog_revision;
+  upgrade.files[guard.STATE].value = JSON.stringify(preUpgrade);
+  upgrade.newManager().start();
+  var postUpgrade = JSON.parse(upgrade.files[guard.STATE].value);
+  assert.notStrictEqual(postUpgrade.id, preUpgrade.id, 'Upgrade retires the old detached watchdog generation');
+  assert.strictEqual(postUpgrade.watchdog_revision, 1);
+  assert.strictEqual(upgrade.spawns.length, 2, 'Exactly one replacement watchdog starts');
+  assert.strictEqual(upgrade.commands.length, upgrade.beforePauseCommands, 'Watchdog upgrade does not reload HDMI');
+  upgrade.advance(120000); upgrade.watchdogTimer.callback();
+  assert(upgrade.mounted() && upgrade.watchdogTimer.canceled, 'Retired watchdog cannot remove the new generation');
+  upgrade.newManager().start();
+  assert.strictEqual(upgrade.spawns.length, 2, 'Current watchdog is adopted on ordinary service restart');
+  var failedUpgrade = paused();
+  var oldState = JSON.parse(failedUpgrade.files[guard.STATE].value); delete oldState.watchdog_revision;
+  failedUpgrade.files[guard.STATE].value = JSON.stringify(oldState);
+  failedUpgrade.options.spawnFailure = true; failedUpgrade.newManager().start();
+  assert(!failedUpgrade.mounted(), 'Failed watchdog upgrade revokes and restores the owned overlay');
   var old = environment(); old.manager.setPolicy(configuredPolicy()); old.manager.watchdog('old-generation');
   old.intervals[old.intervals.length - 1].callback(); assert(old.mounted(), 'Stale watchdog cannot unmount a newer generation');
   var uninstall = environment(); uninstall.manager.setPolicy(configuredPolicy());

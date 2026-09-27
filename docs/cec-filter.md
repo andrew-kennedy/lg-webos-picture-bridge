@@ -1,4 +1,4 @@
-# Generic MQTT-configured CEC filtering (0.7.0)
+# Generic MQTT-configured CEC filtering (0.7.1)
 
 Home Assistant owns the device/input policy. The webOS app contains **no device
 names, vendor IDs or default block rules**. It provides a firmware-specific,
@@ -121,8 +121,57 @@ or foreign overlays are refused. A generated copy is bind-mounted; firmware is
 never overwritten or remounted writable. Root refreshes a non-secret permission
 file every 30 seconds; it expires after 90 seconds. Missing, unreadable, invalid or
 expired permission leaves normal LG behavior intact. A separate watchdog removes
-the owned overlay after expiry. Broker disconnection alone does not erase a saved
+the owned overlay after expiry, with the bounded late-tick grace described below.
+Broker disconnection alone does not erase a saved
 policy: the running local bridge continues enforcing it independently of MQTT.
+
+## Standby recovery (0.7.1)
+
+On the C9, long Quick Start standby can pause both the bridge and its detached
+watchdog. The saved lease expires while asleep. Previously, if the watchdog ran
+before renewal after wake, it removed the overlay; the next manager tick installed
+it again and closed the HDMI apps to load it. That caused a second picture blank
+after normal source wake and picture-profile setup, even for a device not matched
+by any CEC rule.
+
+The 2026-09-27 incident's HA history showed an expired-but-mounted filter at wake,
+a successful SDR Game write, then HDMI 3's `reload_status` changing from
+`next_launch` to `requested` alongside lost input/signal telemetry. Signal recovered
+and HA reapplied the game profile. No input-selection or external-switch IR script
+ran. Both watchdog-first and renewal-first orderings were reproduced locally.
+The exact on-TV timer ordering was inferred from this evidence, not captured by SSH.
+
+The fix changes only watchdog recovery:
+
+- If the gap between watchdog checks exceeds two 15-second intervals, and
+  a structurally valid lease expired after the preceding check, allow one fixed
+  **45-second recovery window** for the 30-second renewal loop to run.
+- The expired lease is **not extended or honored by QML**. Filtering remains
+  fail-open until the live bridge writes a fresh valid lease. `lease_active`
+  remains false during that window.
+- Once renewed, the existing owned overlay is reused without closing any HDMI app.
+- If the bridge does not recover, the watchdog removes the overlay on its first
+  check at/after the fixed deadline. Additional late ticks do not extend it.
+- A normally ticking watchdog still removes an expired overlay without grace.
+  Revoked/invalid permissions, missing application/configuration, and errors do not
+  get the recovery window. A backwards clock during recovery cancels the window.
+- Old detached watchdogs are retired by changing their owner generation once on
+  upgrade. The replacement adopts the existing overlay without an HDMI reload.
+
+This is bounded recovery after a delayed callback, not a claim to detect sleep
+perfectly: a long process stall or forward wall-clock jump can also qualify.
+The QML permission's original 90-second safety limit is unchanged. A genuinely
+new overlay, an overlay revision change or re-enable after removal can still
+require the existing one-time HDMI reload; the fix does not suppress those.
+
+Validation: all automated tests include both long-standby timer orderings,
+repeated sleep, a newer lease issued between watchdog ticks, dead-manager cleanup,
+fixed grace expiry, revocation/corruption/uninstall/backwards-clock handling, and
+old-watchdog replacement/failure. The watchdog regression suite also passes on
+Node 0.12.2, and all bridge/service runtime files pass that parser. The complete
+27-file suite, 12 browser layout scenarios, metadata validation and IPK build pass
+on the development runtime. These are mocked tests, not a new hardware
+sleep/wake verification. The 0.7.0 live checks below remain historical.
 
 ## Upgrade from 0.6 / restore
 
