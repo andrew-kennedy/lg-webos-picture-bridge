@@ -1,7 +1,7 @@
 'use strict';
 
-// Browser geometry checks complement the Chromium-53 compatibility assertions in
-// ui-css.test.js. Modern Chromium is NOT an emulator of the C9's actual engine.
+// Check the G6's 1080p view plus smaller viewports and scrollable diagnostics.
+// Verify the native LG font separately on the TV before releasing layout changes.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -12,12 +12,12 @@ const status = {
   configured: true, running: true, monitor_healthy: true, transport: 'mqtt',
   mqtt_commands_enabled: true, mqtt: {state: 'connected', commands_ready: true,
     last_published_at: '2026-09-20T04:00:00.000Z'},
-  subscription_states: {settings: {state: 'subscribed'}, videooutput: {state: 'subscribed'},
-    externaldevice: {state: 'subscribed'}, acb: {state: 'subscribed'}},
-  command_api_enabled: true, command_api_port: 49191, command_api: {state: 'listening'},
+  subscription_states: {hdmi_signal: {state: 'not_hdmi'}, videooutput: {state: 'subscribed'},
+    picture: {state: 'subscribed'}},
+  command_api_enabled: false, command_api_port: 49191, command_api: {state: 'listening'},
   last_dynamic_range: 'dolby_vision', last_source: 'settingsservice',
   hdmi_signal: {signal_present: true},
-  cec_guard: {enabled: false, supported: true}
+  cec_guard: {enabled: true, supported: true, lease_active: true, policy: {rules: [{}]}}
 };
 
 (async function () {
@@ -26,14 +26,14 @@ const status = {
   let scenarios = 0;
   try {
     for (const viewport of [{width: 1920, height: 1080}, {width: 1280, height: 720}, {width: 960, height: 540}]) {
-      for (const variant of ['mqtt', 'both', 'error', 'unconfigured']) {
+      for (const variant of ['mqtt', 'both', 'republished', 'both-republished', 'error', 'unconfigured']) {
         const fixture = JSON.parse(JSON.stringify(status));
-        if (variant === 'both') {fixture.transport = 'both'; fixture.cec_guard = {enabled: true, supported: true, lease_active: true};}
+        if (variant.startsWith('both')) {fixture.transport = 'both'; fixture.command_api_enabled = true;}
         if (variant === 'error') {
           fixture.last_error = 'Long diagnostic: ' + 'retry-details-'.repeat(240);
           fixture.mqtt.state = 'disconnected';
         }
-        if (variant === 'unconfigured') {fixture.configured = false; fixture.running = false;}
+        if (variant === 'unconfigured') {fixture.configured = false; fixture.running = false; fixture.cec_guard.enabled = false;}
         const page = await browser.newPage({viewport});
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
@@ -50,12 +50,18 @@ const status = {
           window.PalmServiceBridge = function () {};
           window.PalmServiceBridge.prototype.call = function (uri) {
             window.lunaCalls.push(uri);
-            this.onservicecallback(JSON.stringify({returnValue: true, status: window.fixture}));
+            const response = {returnValue: true, status: window.fixture};
+            if (uri.endsWith('/refreshReporting')) {
+              response.mqtt_submitted = true;
+              if (window.fixture.transport === 'both') response.webhook_status = 200;
+            }
+            this.onservicecallback(JSON.stringify(response));
           };
         }, fixture);
         await page.goto('http://bridge.test/');
         await page.evaluate(() => document.dispatchEvent(new CustomEvent('webOSLaunch', {detail: {}})));
         await page.waitForFunction(() => document.getElementById('status-title').textContent !== 'Checking configuration…');
+        if (variant.endsWith('republished')) await page.click('#test-button');
         // Include font scaling/long labels in the overflow case without hiding content.
         if (variant === 'error') await page.addStyleTag({content: ':root {font-size: 30px;}'});
         const dimensions = await page.evaluate(() => {
@@ -66,9 +72,10 @@ const status = {
           const content = document.getElementById('content');
           return {buttons: Array.from(document.querySelectorAll('button')).map(bounds),
             footer: bounds(document.querySelector('footer')), content: bounds(content),
+            instructions: bounds(document.querySelector('.instructions')),
             bodyWidth: document.documentElement.scrollWidth, contentWidth: content.clientWidth,
             scrollWidth: content.scrollWidth, scrollHeight: content.scrollHeight,
-            height: content.clientHeight, columns: Array.from(document.querySelectorAll('dl > div')).slice(0, 3).map(bounds)};
+            height: content.clientHeight, fields: Array.from(document.querySelectorAll('dl > div')).map(bounds)};
         });
         const label = `${viewport.width}x${viewport.height}/${variant}`;
         for (const rect of dimensions.buttons) {
@@ -79,8 +86,14 @@ const status = {
         assert(dimensions.height > 60, label + ': no room to scroll details');
         assert(dimensions.bodyWidth <= viewport.width, label + ': page horizontal overflow');
         assert(dimensions.scrollWidth <= dimensions.contentWidth + 1, label + ': text horizontal overflow');
-        if (viewport.width >= 1280) assert.equal(dimensions.columns[0].top, dimensions.columns[2].top,
-          label + ': status should use three columns');
+        if (viewport.width === 1920 && variant !== 'error') {
+          assert(dimensions.scrollHeight <= dimensions.height + 1,
+            label + ': normal G6 view must fit without vertical scrolling');
+          for (const rect of dimensions.fields.concat(dimensions.instructions)) {
+            assert(rect.top >= dimensions.content.top && rect.bottom <= dimensions.content.bottom,
+              label + ': normal status/setup text is outside the visible content area');
+          }
+        }
         if (variant === 'error') {
           assert(dimensions.scrollHeight > dimensions.height, label + ': expected long diagnostic overflow');
           await page.focus('#refresh-button');

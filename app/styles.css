@@ -64,8 +64,8 @@ h1 {
   font-size: 0.96rem;
 }
 
-/* C9/webOS 4.x uses Chromium 53: no CSS Grid, flex gap, or overflow-wrap:anywhere.
-   Keep the action bar outside the only scrolling region and leave TV-safe margins. */
+/* Normal status fits the G6's 1080p viewport. Long diagnostics can still scroll
+   without moving the action bar or losing the TV-safe margins. */
 .content {
   flex: 1 1 0%;
   min-height: 0;
@@ -90,7 +90,7 @@ footer { flex: 0 0 auto; }
 .status-row {
   display: flex;
   align-items: center;
-  padding-bottom: 20px;
+  padding-bottom: 16px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.18);
 }
 
@@ -115,12 +115,11 @@ dl {
   margin: 4px -12px 0;
 }
 
-dl > div { flex: 0 0 33.333%; min-width: 0; padding: 20px 12px 0; }
+dl > div { flex: 0 0 25%; min-width: 0; padding: 16px 12px 0; }
 dt { color: #8594ab; font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.08em; }
-dd { margin: 8px 0 0; word-wrap: break-word; overflow-wrap: break-word; }
-dl > div:last-child { flex-basis: 100%; }
+dd { margin: 6px 0 0; word-wrap: break-word; overflow-wrap: break-word; }
 
-.instructions { margin-top: 26px; padding: 26px 38px; }
+.instructions { margin-top: 20px; padding: 22px 32px; }
 .instructions h2 { margin: 0 0 10px; font-size: 1rem; }
 .instructions p { margin: 0; color: #b9c5d8; line-height: 1.45; }
 .instructions p + p { margin-top: 12px; font-size: 0.8rem; }
@@ -164,6 +163,10 @@ button:disabled { opacity: 0.5; transform: none; }
 }
 
 .details.visible { display: block; }
+
+@media (max-width: 1500px) {
+  dl > div { flex-basis: 33.333%; }
+}
 
 @media (max-width: 1100px) {
   :root { font-size: 20px; }
