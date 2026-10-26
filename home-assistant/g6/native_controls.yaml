@@ -1,0 +1,22 @@
+# Install as /config/packages/lg_g6_native_controls.yaml, then reload templates.
+# Uses Home Assistant's paired webOS connection; no bridge or root required.
+template:
+  - select:
+      - name: LG TV sound output
+        default_entity_id: select.lg_tv_sound_output
+        unique_id: lg_g6_native_sound_output
+        icon: mdi:speaker
+        availability: >-
+          {{ states('media_player.living_room_lg_webos_tv') not in ['off', 'unknown', 'unavailable']
+             and state_attr('media_player.living_room_lg_webos_tv', 'sound_output') is not none }}
+        options: >-
+          {% set common = ['external_arc', 'tv_speaker', 'external_optical', 'bt_soundbar', 'bt_audio'] %}
+          {% set current = state_attr('media_player.living_room_lg_webos_tv', 'sound_output') %}
+          {{ common + ([current] if current and current not in common else []) }}
+        state: "{{ state_attr('media_player.living_room_lg_webos_tv', 'sound_output') }}"
+        select_option:
+          - action: webostv.select_sound_output
+            target:
+              entity_id: media_player.living_room_lg_webos_tv
+            data:
+              sound_output: "{{ option }}"

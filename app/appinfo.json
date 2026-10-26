@@ -1,6 +1,6 @@
 {
   "id": "io.github.andrewkennedy.lgpicturebridge",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "vendor": "Andrew Kennedy",
   "title": "LG Picture Bridge",
   "main": "index.html",
@@ -10,5 +10,5 @@
   "type": "web",
   "handlesRelaunch": true,
   "resolution": "1920x1080",
-  "appDescription": "Reports TV dynamic-range changes to Home Assistant"
+  "appDescription": "TV settings and signal monitoring for Home Assistant"
 }

@@ -13,6 +13,7 @@ module.exports = function () {
   var webhookCalls = 0;
   var stopped = false;
   var mqttApply;
+  var enqueueSetting;
   var sourcePath = path.resolve(__dirname, '../app/bridge/bridge.js');
   var holder = {exports: {}};
   vm.runInNewContext(fs.readFileSync(sourcePath, 'utf8'), {
@@ -41,6 +42,7 @@ module.exports = function () {
     }},
     mqttDiscovery: {create: function (unused, onHealth, dependencies) {
       mqttApply = dependencies.applyPolicy;
+      enqueueSetting = dependencies.enqueueSetting;
       var publisher = {pictures:[], signals:[], status:onHealth,
         picture: function (value) { this.pictures.push(value); },
         signal: function (value) { this.signals.push(value); },
@@ -66,6 +68,13 @@ module.exports = function () {
   function (error, result) { assert.ifError(error); dryRun = result; }, function () {});
   assert.strictEqual(dryRun.dry_run, true);
   assert.strictEqual(dryRun.operation_count, 3);
+  var releaseSetting, queuedPolicy = false;
+  enqueueSetting(function (done) { releaseSetting = done; }, function (error) { assert.ifError(error); });
+  mqttApply({input:'hdmi3',scope:'active',dry_run:true,modes:{sdr:'expert1'},presets:{expert1:{settings:{backlight:80}}}},
+    function (error) { assert.ifError(error); queuedPolicy = true; });
+  assert.strictEqual(queuedPolicy,false,'Profiles must wait for manual setting writes');
+  releaseSetting(null,{});
+  assert.strictEqual(queuedPolicy,true);
   assert.strictEqual(publishers[0].pictures[publishers[0].pictures.length - 1].picture_mode, 'expert2');
   assert.strictEqual(webhookCalls, 0, 'MQTT-only must not call webhook');
   signalCallback({input:'hdmi3', signal_present:false});

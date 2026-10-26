@@ -1,0 +1,676 @@
+{
+  "tested_at": "2026-10-26",
+  "model": "OLED77G6WUA",
+  "firmware": "43.11.73",
+  "webos": "11.1.0-4407",
+  "pairing": "Existing Home Assistant pairing with current aiowebostv registration permissions",
+  "readable_public_settings": 31,
+  "candidates": 95,
+  "settings": [
+    {
+      "category": "picture",
+      "key": "pictureMode",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "backlight",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "contrast",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "brightness",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "color",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "tint",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "sharpness",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "colorTemperature",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "colorGamut",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "gamma",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "gammaLevel",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( gammaLevel )"
+    },
+    {
+      "category": "picture",
+      "key": "peakBrightness",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "hdrDynamicToneMapping",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "expressionEnhancer",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( expressionEnhancer )"
+    },
+    {
+      "category": "picture",
+      "key": "dynamicContrast",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "dynamicColor",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "superResolution",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "noiseReduction",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "mpegNoiseReduction",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "smoothGradation",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "realCinema",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "truMotionMode",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "There is no matched result from DB"
+    },
+    {
+      "category": "picture",
+      "key": "truMotionJudder",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( truMotionJudder )"
+    },
+    {
+      "category": "picture",
+      "key": "truMotionBlur",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( truMotionBlur )"
+    },
+    {
+      "category": "picture",
+      "key": "motionPro",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( motionPro )"
+    },
+    {
+      "category": "picture",
+      "key": "motionEyeCare",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "aiPicture",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( aiPicture )"
+    },
+    {
+      "category": "picture",
+      "key": "aiHdrRemastering",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( aiHdrRemastering )"
+    },
+    {
+      "category": "picture",
+      "key": "filmmakerAmbientLight",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( filmmakerAmbientLight )"
+    },
+    {
+      "category": "picture",
+      "key": "filmMakerMode",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( filmMakerMode )"
+    },
+    {
+      "category": "picture",
+      "key": "nearBlackDetail",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( nearBlackDetail )"
+    },
+    {
+      "category": "picture",
+      "key": "skinColor",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( skinColor )"
+    },
+    {
+      "category": "picture",
+      "key": "grassColor",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( grassColor )"
+    },
+    {
+      "category": "picture",
+      "key": "skyColor",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( skyColor )"
+    },
+    {
+      "category": "picture",
+      "key": "aspectRatio",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( aspectRatio )"
+    },
+    {
+      "category": "picture",
+      "key": "justScan",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( justScan )"
+    },
+    {
+      "category": "picture",
+      "key": "energySaving",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "energySavingAutoMin",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( energySavingAutoMin )"
+    },
+    {
+      "category": "picture",
+      "key": "eyeComfortMode",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "picture",
+      "key": "screenShift",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( screenShift )"
+    },
+    {
+      "category": "picture",
+      "key": "logoLuminanceAdjust",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( logoLuminanceAdjust )"
+    },
+    {
+      "category": "sound",
+      "key": "soundMode",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "sound",
+      "key": "audioBalance",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( audioBalance )"
+    },
+    {
+      "category": "sound",
+      "key": "autoVolume",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( autoVolume )"
+    },
+    {
+      "category": "sound",
+      "key": "clearVoice",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( clearVoice )"
+    },
+    {
+      "category": "sound",
+      "key": "aiSound",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( aiSound )"
+    },
+    {
+      "category": "sound",
+      "key": "aigamesound",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( aigamesound )"
+    },
+    {
+      "category": "sound",
+      "key": "soundOptimizer",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( soundOptimizer )"
+    },
+    {
+      "category": "sound",
+      "key": "soundOutputDigital",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "sound",
+      "key": "eArcSupport",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "sound",
+      "key": "inputAudioFormatHDMI1",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( inputAudioFormatHDMI1 )"
+    },
+    {
+      "category": "sound",
+      "key": "inputAudioFormatHDMI2",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( inputAudioFormatHDMI2 )"
+    },
+    {
+      "category": "sound",
+      "key": "inputAudioFormatHDMI3",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( inputAudioFormatHDMI3 )"
+    },
+    {
+      "category": "sound",
+      "key": "inputAudioFormatHDMI4",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( inputAudioFormatHDMI4 )"
+    },
+    {
+      "category": "sound",
+      "key": "avSync",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "sound",
+      "key": "avSyncBypass",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( avSyncBypass )"
+    },
+    {
+      "category": "sound",
+      "key": "avSyncBypassInput",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "sound",
+      "key": "avSyncSpdif",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "sound",
+      "key": "avSyncSpeaker",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( avSyncSpeaker )"
+    },
+    {
+      "category": "sound",
+      "key": "avSyncBtSoundbar",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( avSyncBtSoundbar )"
+    },
+    {
+      "category": "sound",
+      "key": "avSyncBtSurround",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( avSyncBtSurround )"
+    },
+    {
+      "category": "sound",
+      "key": "avSyncWisa",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( avSyncWisa )"
+    },
+    {
+      "category": "sound",
+      "key": "lgSoundSync",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "sound",
+      "key": "soundModeSync",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( soundModeSync )"
+    },
+    {
+      "category": "sound",
+      "key": "virtualSurround",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( virtualSurround )"
+    },
+    {
+      "category": "sound",
+      "key": "supportATMOS",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( supportATMOS )"
+    },
+    {
+      "category": "sound",
+      "key": "volumeControl",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( volumeControl )"
+    },
+    {
+      "category": "other",
+      "key": "enableALLM",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( enableALLM )"
+    },
+    {
+      "category": "other",
+      "key": "gameOptimization",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( gameOptimization )"
+    },
+    {
+      "category": "other",
+      "key": "freesync",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( freesync )"
+    },
+    {
+      "category": "other",
+      "key": "qmsVrr",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( qmsVrr )"
+    },
+    {
+      "category": "other",
+      "key": "uhdDeepColor",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "other",
+      "key": "gameGenre",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( gameGenre )"
+    },
+    {
+      "category": "other",
+      "key": "blackStabilizer",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( blackStabilizer )"
+    },
+    {
+      "category": "other",
+      "key": "whiteStabilizer",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( whiteStabilizer )"
+    },
+    {
+      "category": "other",
+      "key": "gameAdjustContrast",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( gameAdjustContrast )"
+    },
+    {
+      "category": "other",
+      "key": "gameBlackLevel",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( gameBlackLevel )"
+    },
+    {
+      "category": "other",
+      "key": "gameColorDepth",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( gameColorDepth )"
+    },
+    {
+      "category": "other",
+      "key": "gameSharpness",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( gameSharpness )"
+    },
+    {
+      "category": "other",
+      "key": "blueLight",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( blueLight )"
+    },
+    {
+      "category": "other",
+      "key": "darkMode",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( darkMode )"
+    },
+    {
+      "category": "other",
+      "key": "inputOptimization",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( inputOptimization )"
+    },
+    {
+      "category": "other",
+      "key": "preventInputDelay",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( preventInputDelay )"
+    },
+    {
+      "category": "other",
+      "key": "enable144HzBooster",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( enable144HzBooster )"
+    },
+    {
+      "category": "other",
+      "key": "enableMotionBooster",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( enableMotionBooster )"
+    },
+    {
+      "category": "other",
+      "key": "enableQFT",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( enableQFT )"
+    },
+    {
+      "category": "other",
+      "key": "enableDolbyVisionPC",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( enableDolbyVisionPC )"
+    },
+    {
+      "category": "other",
+      "key": "crosshair",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( crosshair )"
+    },
+    {
+      "category": "other",
+      "key": "fpsCounter",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( fpsCounter )"
+    },
+    {
+      "category": "other",
+      "key": "gameUIColor",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( gameUIColor )"
+    },
+    {
+      "category": "other",
+      "key": "gameScreenRatio",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( gameScreenRatio )"
+    },
+    {
+      "category": "other",
+      "key": "gameScreenSize",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( gameScreenSize )"
+    },
+    {
+      "category": "other",
+      "key": "gameScreenPosition",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( gameScreenPosition )"
+    },
+    {
+      "category": "other",
+      "key": "simplinkEnable",
+      "read": true,
+      "error": null,
+      "detail": null
+    },
+    {
+      "category": "other",
+      "key": "simplinkAutoPowerOn",
+      "read": false,
+      "error": "500 Application error",
+      "detail": "Some keys are not allowed for the request. ( simplinkAutoPowerOn )"
+    }
+  ]
+}

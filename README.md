@@ -74,8 +74,14 @@ Discovered entities use these default IDs:
 | `sensor.lg_tv_screensaver_type` | LG screensaver reason |
 | `sensor.lg_tv_picture_command` | Correlated command results; enabled with picture commands |
 | `sensor.lg_tv_cec_filter` / `switch.lg_tv_cec_filter` | CEC policy status and master toggle |
+| `number.lg_tv_picture_*` / `select.lg_tv_picture_*` | Active picture settings, with live TV ranges and options |
+| `number.lg_tv_sound_*` / `select.lg_tv_sound_*` | Audio settings available with the current sound output |
+| `number.lg_tv_other_*` / `select.lg_tv_other_*` | Gaming and HDMI settings |
+| `sensor.lg_tv_settings_command` | Setting write/readback results and active context |
 
 A stopped source or lost subscription must not be confused with confirmed no signal. Unknown states stay unknown. Observations are not retained, availability uses a last will, and discovery/state refresh after Home Assistant or broker restarts.
+
+Version 0.9 adds individual settings controls when MQTT commands are enabled. See the [G6 public API audit and control guide](docs/g6-api-capabilities.md) for entity examples, unavailable-mode behavior, and the native sound-output select. Volume, mute, source selection, screen control and sound routing use Home Assistant's non-root webOS integration. This G6 rejects public picture-setting writes, so picture profiles and advanced settings continue through the root bridge. Manual edits may be reapplied by the existing source/day/night profile automations.
 
 ## G6 picture profiles and HDMI icons
 

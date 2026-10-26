@@ -4,6 +4,7 @@ var crypto = require('crypto');
 var mqtt = require('./mqtt-client');
 var mqttCommands = require('./mqtt-commands');
 var mqttCec = require('./mqtt-cec');
+var mqttSettings = require('./mqtt-settings');
 var appInfo = require('../../appinfo.json');
 
 function identity(deviceId) {
@@ -103,6 +104,14 @@ function create(config, onHealth, dependencies) {
       return online && !stopped ? client.publish(base + '/cec/state', JSON.stringify(status), false) : false;
     }
   }) : null;
+  var controls = settings.commands_enabled && deps.service ? mqttSettings.create({
+    config: config, id: id, service: deps.service, enqueue: deps.enqueueSetting,
+    publish: function (topic, payload, retain) { return online && !stopped && client.publish(topic, payload, retain); },
+    context: function () {
+      return {input: picture && picture.input, mode: picture && picture.picture_mode,
+        range: picture && picture.raw_dynamic_range, ready: Boolean(snapshot(picture, signal, config).dynamic_range)};
+    }
+  }) : null;
 
   function observeContext() {
     // Mode notifications are caused by our own writes. Only routing/range/signal invalidate
@@ -110,6 +119,7 @@ function create(config, onHealth, dependencies) {
     var next = JSON.stringify([picture && picture.input, picture && picture.raw_dynamic_range,
       signal && signal.input, signal && signal.signal_present, signal && signal.dynamic_range]);
     if (next !== contextKey) { contextKey = next; contextRevision += 1; }
+    if (controls) controls.contextChanged();
   }
 
   function reportHealth(state, error) {
@@ -131,6 +141,7 @@ function create(config, onHealth, dependencies) {
     }
     if (commands && commands.status().ready && !commands.publish()) submitted = false;
     if (cec && !cec.publish()) submitted = false;
+    if (controls && !controls.publish()) submitted = false;
     return submitted;
   }
   function announce() {
@@ -154,6 +165,8 @@ function create(config, onHealth, dependencies) {
         submitted = false;
       }
     }
+    if (controls) controls.refresh();
+    else if (deps.service) mqttSettings.tombstones(config, id).forEach(function (topic) { client.publish(topic, '', true); });
     if (!publish()) submitted = false;
     if (!client.publish(base + '/availability', 'online', true)) submitted = false;
     // QoS 0 only confirms submission to the local socket, not broker/HA receipt.
@@ -170,23 +183,27 @@ function create(config, onHealth, dependencies) {
     online = true;
     if (commands) { commands.connect(); client.subscribe(base + '/command'); }
     if (cec) { cec.connect(); client.subscribe(base + '/cec/command'); }
+    if (controls) { controls.connect(); client.subscribe(base + '/settings/command'); }
     client.subscribe(settings.discovery_prefix + '/status');
     announce();
   });
   client.on('subscribed', function (topic) {
     if (commands && topic === base + '/command') { commands.subscribed(); reportHealth('connected'); }
     if (cec && topic === base + '/cec/command') { cec.subscribed(); reportHealth('connected'); }
+    if (controls && topic === base + '/settings/command') controls.subscribed();
   });
   client.on('disconnect', function () {
     online = false; if (commands) commands.disconnect(); if (cec) cec.disconnect(); reportHealth('disconnected');
+    if (controls) controls.disconnect();
   });
   client.on('message', function (topic, message, metadata) {
     if (topic === settings.discovery_prefix + '/status' && message === 'online') announce();
     if (commands && topic === base + '/command') commands.receive(message, metadata);
     if (cec && topic === base + '/cec/command') cec.receive(message, metadata);
+    if (controls && topic === base + '/settings/command') controls.receive(message, metadata);
   });
   return {
-    start: function () { client.start(); if (cec) cec.start(); refreshTimer = setInterval(publish, 30000); },
+    start: function () { client.start(); if (cec) cec.start(); if (controls) controls.start(); refreshTimer = setInterval(publish, 30000); },
     picture: function (value) { picture = value; observeContext(); update(); },
     signal: function (value) {
       signal = value;
@@ -199,6 +216,7 @@ function create(config, onHealth, dependencies) {
     stop: function (callback) {
       stopped = true; if (commands) commands.disconnect();
       if (cec) cec.stop();
+      if (controls) controls.stop();
       clearTimeout(timer); clearInterval(refreshTimer); client.stop(callback);
     }
   };
