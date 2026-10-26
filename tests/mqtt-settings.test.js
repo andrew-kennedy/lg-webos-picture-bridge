@@ -34,6 +34,12 @@ module.exports = function () {
         s.payload==='' && s.retain; }), 'Upgrade removes retained discovery for '+key);
     });
   });
+  ['picture_eyeComfortMode','picture_screenShift','other_blueLight'].forEach(function (id) {
+    ['number','select'].forEach(function (kind) {
+      assert.ok(sent.some(function(s) { return s.topic==='homeassistant/'+kind+'/test_setting_'+id+'/config' &&
+        s.payload==='' && s.retain; }), 'Upgrade removes retained discovery for '+id);
+    });
+  });
   state.controls={};changed(state);
   assert.strictEqual(JSON.parse(observations().at(-1).payload).available,false,'A setting omitted by the next mode must become unavailable');
   controller.stop();

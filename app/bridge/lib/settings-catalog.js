@@ -9,12 +9,12 @@ var groups = {
     'realCinema truMotionMode truMotionJudder truMotionBlur motionPro motionEyeCare ' +
     'aiPicture aiHdrRemastering filmmakerAmbientLight filmMakerMode nearBlackDetail ' +
     'skinColor grassColor skyColor aspectRatio justScan energySaving energySavingAutoMin ' +
-    'eyeComfortMode screenShift logoLuminanceAdjust').split(' '),
+    'logoLuminanceAdjust').split(' '),
   sound: ('autoVolume soundOutputDigital inputAudioFormatHDMI1 inputAudioFormatHDMI2 ' +
     'inputAudioFormatHDMI3 inputAudioFormatHDMI4 volumeControl').split(' '),
   other: ('enableALLM gameOptimization freesync qmsVrr uhdDeepColor gameGenre ' +
     'blackStabilizer whiteStabilizer gameAdjustContrast gameBlackLevel gameColorDepth gameSharpness ' +
-    'blueLight darkMode inputOptimization preventInputDelay enable144HzBooster enableMotionBooster ' +
+    'darkMode inputOptimization preventInputDelay enable144HzBooster enableMotionBooster ' +
     'enableQFT enableDolbyVisionPC crosshair fpsCounter gameUIColor gameScreenRatio gameScreenSize gameScreenPosition ' +
     'simplinkEnable simplinkAutoPowerOn').split(' ')
 };
@@ -38,10 +38,11 @@ Object.keys(groups).forEach(function (category) {
 });
 // Remove retained discovery for controls retired from earlier versions.
 var retired = {
+  picture: 'eyeComfortMode screenShift',
   general: 'homeAutoLaunch homePromotion powerOnScreen noSignalScreenSaver screenSaverAd screenSaverEnabled personalRecommend aiSettingsNudge aiNudge sportsAlarm remotePointer',
   option: 'audioGuidance audioGuidanceSpeed audioGuidancePitch audioGuidanceVolume highContrast greyscale colorInversion focusEmphasis focusedItemEnlarged menuTransparency helpOnSettings pointerSize pointerSpeed pointerAlignment standByLight powerOnLight quickStartMode hddEcoMode enableToastPopup longPressInterval repeatInterval remoteSlowInput subtitleMode closedCaption signLanguageGuidance signLanguageGuidanceSize signLanguageGuidanceSpeed screenSaverTimer',
   sound: 'volumeStep audioDescription audioDescriptionVolume tvPowerSound tvSetupConfiguration audioBalance avSync avSyncBypass avSyncBypassInput avSyncSpdif avSyncSpeaker avSyncBtSoundbar avSyncBtSurround avSyncWisa soundMode clearVoice aiSound aigamesound soundOptimizer eArcSupport lgSoundSync soundModeSync virtualSurround supportATMOS',
-  other: 'contentRecommendation screenRemoteAutoShow'
+  other: 'contentRecommendation screenRemoteAutoShow blueLight'
 };
 var retiredIds = [];
 Object.keys(retired).forEach(function (category) {
