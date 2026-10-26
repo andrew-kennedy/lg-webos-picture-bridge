@@ -23,6 +23,19 @@ luna-send-pub -i luna://com.webos.appInstallService/dev/install \
 
 Wait for `state: installed`, then interrupt the subscription. Homebrew Channel must already be elevated. No system partition flashing is involved.
 
+### Homebrew 0.8.0-rc1 on G6 / Node 20
+
+The tested Homebrew beta can exit while waiting for LG's installer, leaving the UI at **Installing…** or reporting that its service is not running. Its pending LS2 subscription does not keep Node 20 alive. Its idle cleanup also calls an `unregister` method missing from this TV's `webos-service` module.
+
+[The one-time compatibility repair](scripts/fix-homebrew-node20.js) keeps Node alive until Homebrew's existing idle timeout and guards that optional cleanup method. It accepts only the exact tested beta service SHA-256, saves the original under `/home/root`, and refuses unknown or subsequently modified versions. Copy the script to `/home/root/fix-homebrew-node20.js`, close Homebrew Channel, allow its service to idle for 30 seconds, and run over root SSH:
+
+```sh
+node /home/root/fix-homebrew-node20.js check
+node /home/root/fix-homebrew-node20.js apply
+```
+
+Reopen Homebrew Channel. Use `restore` instead of `apply` to undo the repair while the service is stopped. Updating Homebrew itself replaces this local repair; check whether the new version fixes the issue before applying anything else. The repair leaves firmware and root startup unchanged. Installation of the published bridge IPK through the repaired Homebrew service was verified on the G6.
+
 ## Pair with Home Assistant
 
 Use [the MQTT pairing script](home-assistant/lg_picture_bridge_mqtt_pairing_script.example.yaml) to send the broker configuration as app launch parameters. Enable picture commands and CEC commands explicitly if you want them. Broker credentials belong in Home Assistant secrets, never in this repository.
