@@ -6,9 +6,9 @@ var groups = {
   picture: ('pictureMode backlight contrast brightness color tint sharpness colorTemperature ' +
     'colorGamut gamma gammaLevel peakBrightness hdrDynamicToneMapping expressionEnhancer ' +
     'dynamicContrast dynamicColor superResolution noiseReduction mpegNoiseReduction smoothGradation ' +
-    'realCinema truMotionMode truMotionJudder truMotionBlur motionPro motionEyeCare ' +
+    'realCinema truMotionMode truMotionJudder truMotionBlur motionPro ' +
     'aiPicture aiHdrRemastering filmmakerAmbientLight filmMakerMode nearBlackDetail ' +
-    'skinColor grassColor skyColor aspectRatio justScan energySaving energySavingAutoMin ' +
+    'skinColor grassColor skyColor aspectRatio justScan ' +
     'logoLuminanceAdjust').split(' '),
   sound: ('autoVolume soundOutputDigital inputAudioFormatHDMI1 inputAudioFormatHDMI2 ' +
     'inputAudioFormatHDMI3 inputAudioFormatHDMI4 volumeControl').split(' '),
@@ -38,7 +38,7 @@ Object.keys(groups).forEach(function (category) {
 });
 // Remove retained discovery for controls retired from earlier versions.
 var retired = {
-  picture: 'eyeComfortMode screenShift',
+  picture: 'eyeComfortMode screenShift energySaving energySavingAutoMin motionEyeCare',
   general: 'homeAutoLaunch homePromotion powerOnScreen noSignalScreenSaver screenSaverAd screenSaverEnabled personalRecommend aiSettingsNudge aiNudge sportsAlarm remotePointer',
   option: 'audioGuidance audioGuidanceSpeed audioGuidancePitch audioGuidanceVolume highContrast greyscale colorInversion focusEmphasis focusedItemEnlarged menuTransparency helpOnSettings pointerSize pointerSpeed pointerAlignment standByLight powerOnLight quickStartMode hddEcoMode enableToastPopup longPressInterval repeatInterval remoteSlowInput subtitleMode closedCaption signLanguageGuidance signLanguageGuidanceSize signLanguageGuidanceSpeed screenSaverTimer',
   sound: 'volumeStep audioDescription audioDescriptionVolume tvPowerSound tvSetupConfiguration audioBalance avSync avSyncBypass avSyncBypassInput avSyncSpdif avSyncSpeaker avSyncBtSoundbar avSyncBtSurround avSyncWisa soundMode clearVoice aiSound aigamesound soundOptimizer eArcSupport lgSoundSync soundModeSync virtualSurround supportATMOS',

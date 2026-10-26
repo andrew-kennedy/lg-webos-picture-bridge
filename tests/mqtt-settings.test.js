@@ -34,7 +34,8 @@ module.exports = function () {
         s.payload==='' && s.retain; }), 'Upgrade removes retained discovery for '+key);
     });
   });
-  ['picture_eyeComfortMode','picture_screenShift','other_blueLight'].forEach(function (id) {
+  ['picture_eyeComfortMode','picture_screenShift','other_blueLight',
+    'picture_energySaving','picture_energySavingAutoMin','picture_motionEyeCare'].forEach(function (id) {
     ['number','select'].forEach(function (kind) {
       assert.ok(sent.some(function(s) { return s.topic==='homeassistant/'+kind+'/test_setting_'+id+'/config' &&
         s.payload==='' && s.retain; }), 'Upgrade removes retained discovery for '+id);

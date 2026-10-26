@@ -2,7 +2,7 @@
 
 LG Picture Bridge connects a **rooted 2026 LG G6 (webOS 11)** to Home Assistant. It reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision through MQTT discovery, and applies picture profiles without notification dialogs.
 
-Version **0.9.4** removes the Eye Comfort, Game Optimizer blue-light and Screen Shift controls. Numeric MQTT settings remain sliders with the TV's live limits. It supports the inspected G6 CEC files from firmware **43.11.73** and **43.21.69**, and fits the normal status view on screen without vertical scrolling. Older C9 firmware is no longer supported. The live verification target is an OLED77G6WUA on **43.21.69 / webOS 11.2.0**, with Homebrew Channel 0.8.0-rc1 and Node 20.12.2. Installing the bridge does not update TV firmware.
+Version **0.9.5** removes the Energy Saving Step, Minimum Brightness and Motion Eye Care controls. The included movie and game profiles keep picture energy saving off. Numeric MQTT settings remain sliders with the TV's live limits. It supports the inspected G6 CEC files from firmware **43.11.73** and **43.21.69**, and fits the normal status view on screen without vertical scrolling. Older C9 firmware is no longer supported. The live verification target is an OLED77G6WUA on **43.21.69 / webOS 11.2.0**, with Homebrew Channel 0.8.0-rc1 and Node 20.12.2. Installing the bridge does not update TV firmware.
 
 ## Install and receive updates
 
@@ -18,7 +18,7 @@ For manual installation, download the IPK from [Releases](https://github.com/and
 
 ```sh
 luna-send-pub -i luna://com.webos.appInstallService/dev/install \
-  '{"id":"com.ares.defaultName","ipkUrl":"/home/root/io.github.andrewkennedy.lgpicturebridge_0.9.4_all.ipk","subscribe":true}'
+  '{"id":"com.ares.defaultName","ipkUrl":"/home/root/io.github.andrewkennedy.lgpicturebridge_0.9.5_all.ipk","subscribe":true}'
 ```
 
 Wait for `state: installed`, then interrupt the subscription. Homebrew Channel must already be elevated. No system partition flashing is involved.
