@@ -74,6 +74,9 @@ function create(deps) {
       return line.split(' ')[1] === model.TARGET;
     });
   }
+  function supportsOriginal(source) {
+    try { model.checkOriginal(source); return true; } catch (error) { return false; }
+  }
   function mountState() {
     if (!fs.existsSync(ROOT)) return null;
     directory(ROOT, 493);
@@ -192,7 +195,7 @@ function create(deps) {
       var list = mounts(), state = mountState();
       result.mounted = list.length === 1 && owned(state);
       result.supported = result.mounted || (!list.length &&
-        model.digest(fs.readFileSync(model.TARGET)) === model.ORIGINAL_SHA256);
+        supportsOriginal(fs.readFileSync(model.TARGET)));
       var lease = fs.existsSync(ROOT) ? read(LEASE) : null;
       result.lease_active = result.mounted && model.validLease(lease, now());
     } catch (error) { result.last_error = error.message; }

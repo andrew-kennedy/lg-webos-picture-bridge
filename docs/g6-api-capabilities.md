@@ -1,6 +1,8 @@
 # LG G6 API audit and Home Assistant controls
 
-Tested on an OLED77G6WUA, firmware **43.11.73**, webOS **11.1.0-4407**, on 2026-10-26, using the existing Home Assistant pairing and the current aiowebostv registration permissions. Firmware was not changed. Results describe this pairing and firmware; they are not a model-wide guarantee.
+The full audit ran on an OLED77G6WUA, firmware **43.11.73**, webOS **11.1.0-4407**, on 2026-10-26, using the existing Home Assistant pairing and the current aiowebostv registration permissions. Results describe this pairing and firmware; they are not a model-wide guarantee.
+
+After the same TV's USB upgrade to **43.21.69 / webOS 11.2.0**, spot checks confirmed that native audio status/output and public picture-mode reads still work. A same-value public picture-mode write still returned **401 insufficient permissions**, so picture profiles continue using the root bridge. The full 95-setting audit below remains the original 43.11.73 measurement.
 
 ## Public API results
 

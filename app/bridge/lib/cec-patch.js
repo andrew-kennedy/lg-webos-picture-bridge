@@ -3,8 +3,11 @@
 var crypto = require('crypto');
 var policy = require('./cec-policy');
 var TARGET = '/usr/palm/applications/com.webos.app.inputcommon/qml/Interfaces/ExternalDeviceControlInterfaces/SimplinkController.qml';
-// OLED77G6WUA, webOS 11.1.0, firmware 43.11.73. Unknown firmware fails open.
-var ORIGINAL_SHA256 = 'bca78199aadfb7e216123246d04cc6be46e2cc895a6b620633a64dd83e462340';
+// Inspected OLED77G6WUA originals. Unknown firmware still fails open.
+var ORIGINAL_SHA256S = [
+  'bca78199aadfb7e216123246d04cc6be46e2cc895a6b620633a64dd83e462340', // 43.11.73
+  'fd83da3f644de97d634620f8f7d1dda1c66ed756297c90df6a0902760cbb7b66' // 43.21.69
+];
 var POLICY_URL = 'file:///tmp/lgpb-apple-tv-cec/lease.json';
 var CALL = '        setCECUniqueId(cecUniqueId, portId);';
 
@@ -19,7 +22,7 @@ function validLease(lease, now) {
 
 function digest(source) { return crypto.createHash('sha256').update(source).digest('hex'); }
 function checkOriginal(source) {
-  if (digest(source) !== ORIGINAL_SHA256) throw new Error('Unsupported or modified SimplinkController.qml; CEC filter not applied');
+  if (ORIGINAL_SHA256S.indexOf(digest(source)) === -1) throw new Error('Unsupported or modified SimplinkController.qml; CEC filter not applied');
 }
 
 function inject(source) {
@@ -58,7 +61,7 @@ function inject(source) {
   return text.replace(CALL, condition).replace(anchor, helpers + '\n' + anchor);
 }
 
-module.exports = {TARGET: TARGET, ORIGINAL_SHA256: ORIGINAL_SHA256, POLICY_URL: POLICY_URL,
+module.exports = {TARGET: TARGET, ORIGINAL_SHA256S: ORIGINAL_SHA256S, POLICY_URL: POLICY_URL,
   REVISION: 3, digest: digest, checkOriginal: checkOriginal,
   validLease: validLease, injectForTest: inject,
   build: function (source) { checkOriginal(source); return inject(source); }};

@@ -116,7 +116,10 @@ HTTP bearer token do not enable or authorize this separate MQTT endpoint. Discov
 and availability are retained; state and command messages are not. HA switch state
 is not optimistic. Status refreshes every 30 seconds and expires after 90 seconds.
 
-The exact inspected original `Simplink.qml` SHA-256 is required. Unknown firmware
+The exact inspected original `SimplinkController.qml` SHA-256 is required. The G6
+allowlist covers firmware **43.11.73** and **43.21.69**. The latter adds logging and
+only marks CEC selection complete when the unique ID is valid; the intercepted
+automatic-selection call and explicit-selection bypass are unchanged. Unknown firmware
 or foreign overlays are refused. A generated copy is bind-mounted; firmware is
 never overwritten or remounted writable. Root refreshes a non-secret permission
 file every 30 seconds; it expires after 90 seconds. Missing, unreadable, invalid or

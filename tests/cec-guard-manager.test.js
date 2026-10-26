@@ -14,7 +14,7 @@ function environment(options) {
   files[guard.APP_ROOT + '/appinfo.json'] = entry('{}');
   files[guard.STATE_DIR] = entry(null, 448);
   files[guard.STATE_DIR + '/config.json'] = entry('existing broker configuration', 384);
-  files[patch.TARGET] = entry(options.unsupported ? 'unknown' : 'original');
+  files[patch.TARGET] = entry(options.unsupported ? 'unknown' : options.updatedFirmware ? 'updated-original' : 'original');
   var fs = {
     existsSync: function (p) { return Object.prototype.hasOwnProperty.call(files, p); },
     mkdirSync: function (p, mode) { files[p] = entry(null, mode); },
@@ -50,9 +50,9 @@ function environment(options) {
   var deps = {fs: fs, cp: cp, now: function () { return clock; },
     process: {pid: 10, execPath: '/usr/bin/node', getuid: function () { return options.nonroot ? 1000 : 0; },
       stderr: {write: function () {}}},
-    patch: {TARGET: patch.TARGET, REVISION: 2, ORIGINAL_SHA256: 'original',
+    patch: {TARGET: patch.TARGET, REVISION: 2,
       digest: function (value) { return value; }, validLease: patch.validLease,
-      checkOriginal: function (value) { if (value !== 'original') throw Error('Unsupported'); },
+      checkOriginal: function (value) { if (value !== 'original' && value !== 'updated-original') throw Error('Unsupported'); },
       build: function () { return 'patched'; }},
     setInterval: function (callback, ms) { var timer = {callback: callback, ms: ms, canceled: false}; intervals.push(timer); return timer; },
     clearInterval: function (timer) { timer.canceled = true; }};
@@ -84,6 +84,14 @@ module.exports = function () {
   e.newManager().start(); assert.strictEqual(e.mounted(), true, 'Saved opt-in restores after restart');
   e.manager.remove(); assert(!e.files[guard.CONFIG] && !e.mounted());
   assert(!e.files[guard.ROOT], 'Removing the option also cleans its runtime files');
+
+  var updated = environment({updatedFirmware: true});
+  assert(updated.manager.snapshot().supported, 'Status recognizes every inspected firmware before installing an overlay');
+  assert.strictEqual(updated.writes.length, 0, 'Firmware recognition is read-only');
+  assert(updated.manager.setPolicy(configuredPolicy()).lease_active, 'An inspected firmware update can restore saved filtering');
+  updated.manager.suspend();
+  assert(updated.manager.snapshot().supported && !updated.mounted(), 'Restored updated firmware remains supported');
+  assert(!environment({unsupported: true}).manager.snapshot().supported, 'Unknown firmware remains unsupported');
 
   ['nonroot', 'unsupported', 'foreign', 'spawnFailure'].forEach(function (flag) {
     var options = {}; options[flag] = true;
