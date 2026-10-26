@@ -81,9 +81,9 @@ A stopped source or lost subscription must not be confused with confirmed no sig
 
 Install [the correlated MQTT command script](home-assistant/lg_picture_bridge_mqtt_command.example.yaml), then merge [the G6 profile scripts](home-assistant/g6/picture_profiles.yaml) into `scripts.yaml`. Change their TV entity default to your installation. Create the three OLED-light number helpers used by the profiles: `lg_movie_bright_sdr_oled_light`, `lg_movie_dark_sdr_oled_light`, and `lg_game_sdr_oled_light`. The dispatcher expects `input_select.lg_tv_picture_write_backend` to be `rooted_bridge`.
 
-The profiles preserve separate bright/dark movie slots and Game Optimizer slots, with SDR, HDR, ALLM, and Dolby Vision mappings. G6 controls include Warm 40 (`colorTemperature: "-40"`), `gamma: mediumHavingLevel` plus `gammaLevel: 0`, and the structured HDMI range value. HLG shares LG's HDR picture bank. The source's RGB range must agree with the TV's range selection; HDR games use HGiG by default.
+Movies use Filmmaker Mode (`filmMaker` / `hdrFilmMaker`) for SDR and HDR10/HLG. The room profile updates those banks for daytime or nighttime viewing; Dolby Vision uses Cinema Home by day and Cinema at night. Games use Game Optimizer with SDR, HDR, ALLM, and Dolby Vision mappings. G6 controls include Warm 40 (`colorTemperature: "-40"`), gamma 2.2 (`mediumHavingLevel` with `gammaLevel: 0`), and structured HDMI range values. The source's RGB range must agree with the TV's range selection; HDR games use HGiG by default.
 
-The G6 starting values are informed by [RTINGS' G6 measurements](https://www.rtings.com/tv/reviews/lg/g6-oled/settings) and checked against the TV's own setting descriptions. These are editable profiles, not an individual panel calibration. Existing brightness helpers and the optional bright-room HDR boost remain user preferences. No copied white-balance calibration offsets are applied.
+The G6 starting values are informed by [RTINGS' G6 measurements](https://www.rtings.com/tv/reviews/lg/g6-oled/settings) and checked against the TV's own setting descriptions. SDR movies use contrast 95 and black level 50; the brightness helpers remain editable, with fallbacks of 100 by day and 3 for a reference dark room. SDR Peak Brightness is High by day and Off at night. HDR retains OLED brightness/contrast 100 and Peak Brightness High. Its daytime boost uses Dynamic Tone Mapping On and Expression Enhancer Brightness (`highlight`); both are Off at night. Dynamic Contrast stays Off. The game brightness helper is independent and defaults to 80. Unit-specific white-balance offsets and color-management calibration values are never copied from the review unit.
 
 The input-mode script uses the same acknowledged MQTT transport to set a physical port's PC, Game Console, or Home Theater icon and label. It does not open a notification or press Enter on the TV. Apply an icon change separately from a picture profile, because the icon may change the picture input dimension to an `_pc` bank.
 
@@ -93,10 +93,10 @@ A picture policy looks like:
 {
   "input": "hdmi3",
   "scope": "all",
-  "modes": {"sdr": "expert2", "hdr": "hdrCinema"},
+  "modes": {"sdr": "filmMaker", "hdr": "hdrFilmMaker"},
   "presets": {
-    "expert2": {"settings": {"backlight": "35", "colorTemperature": "-40"}},
-    "hdrCinema": {"settings": {"backlight": "100", "hdrDynamicToneMapping": "off"}}
+    "filmMaker": {"settings": {"backlight": "3", "colorTemperature": "-40"}},
+    "hdrFilmMaker": {"settings": {"backlight": "100", "hdrDynamicToneMapping": "off"}}
   }
 }
 ```

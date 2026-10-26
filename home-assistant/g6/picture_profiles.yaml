@@ -159,9 +159,9 @@ apply_lg_tv_picture_context_matrix:
       error: true
 set_lg_tv_rtings_movie_profile:
   alias: Set LG TV RTINGS Movie Profile
-  description: Apply a G6 movie profile derived from RTINGS' accuracy recommendations, using separate
-    bright-room and dark-room picture-mode slots. SDR OLED Light comes from the corresponding Home Assistant
-    input_number helper.
+  description: Apply RTINGS-based G6 Filmmaker SDR/HDR settings with daylight and dark-room brightness.
+    Dolby Vision uses Cinema Home by day and Cinema at night. SDR OLED Light comes from the corresponding
+    Home Assistant input_number helper.
   mode: queued
   max: 10
   fields:
@@ -200,8 +200,8 @@ set_lg_tv_rtings_movie_profile:
       selector:
         boolean: {}
       name: Boost Bright-room HDR
-      description: Use Dynamic Contrast Medium and Dynamic Tone Mapping On for HDR10. This preserves the
-        existing bright-room preference; disable for more accurate HDR.
+      description: Use Dynamic Tone Mapping On and Expression Enhancer Brightness for daytime HDR10. Disable
+        for the accuracy-first HDR profile.
       required: true
       default: true
     apply_scope:
@@ -241,16 +241,15 @@ set_lg_tv_rtings_movie_profile:
       allowed_room_profiles:
       - bright
       - dark
-      selected_sdr_picture_mode: '{{ ''expert1'' if room_profile == ''bright'' else ''expert2'' }}'
-      selected_hdr_picture_mode: '{{ ''hdrCinemaBright'' if room_profile == ''bright'' else ''hdrCinema''
-        }}'
+      selected_sdr_picture_mode: filmMaker
+      selected_hdr_picture_mode: hdrFilmMaker
       selected_dolby_vision_picture_mode: "{{ 'dolbyHdrCinemaBright'\n   if room_profile == 'bright' else\
         \ 'dolbyHdrCinema' }}"
       selected_sdr_oled_light: "{% set helper = 'input_number.lg_movie_bright_sdr_oled_light'\n   if room_profile\
-        \ == 'bright'\n   else 'input_number.lg_movie_dark_sdr_oled_light' %}\n{% set fallback = 80 if\
-        \ room_profile == 'bright' else 35 %} {{ states(helper) | int(fallback) }}"
+        \ == 'bright'\n   else 'input_number.lg_movie_dark_sdr_oled_light' %}\n{% set fallback = 100 if\
+        \ room_profile == 'bright' else 3 %} {{ states(helper) | int(fallback) }}"
       selected_sdr_peak_brightness: '{{ ''high'' if room_profile == ''bright'' else ''off'' }}'
-      selected_hdr_dynamic_contrast: "{{ 'medium' if room_profile == 'bright'\n   and boost_bright_room_hdr\
+      selected_hdr_expression_enhancer: "{{ 'highlight' if room_profile == 'bright'\n   and boost_bright_room_hdr\
         \ else 'off' }}"
       selected_hdr_dynamic_tone_mapping: "{{ 'on' if room_profile == 'bright'\n   and boost_bright_room_hdr\
         \ else 'off' }}"
@@ -263,6 +262,7 @@ set_lg_tv_rtings_movie_profile:
         tint: '0'
         sharpness: '0'
         dynamicContrast: 'off'
+        expressionEnhancer: 'off'
         dynamicColor: 'off'
         superResolution: 'off'
         colorGamut: auto
@@ -295,7 +295,8 @@ set_lg_tv_rtings_movie_profile:
         color: '50'
         tint: '0'
         sharpness: '0'
-        dynamicContrast: '{{ selected_hdr_dynamic_contrast }}'
+        dynamicContrast: 'off'
+        expressionEnhancer: '{{ selected_hdr_expression_enhancer }}'
         hdrDynamicToneMapping: '{{ selected_hdr_dynamic_tone_mapping }}'
         dynamicColor: 'off'
         superResolution: 'off'
@@ -328,6 +329,7 @@ set_lg_tv_rtings_movie_profile:
         tint: '0'
         sharpness: '0'
         dynamicContrast: 'off'
+        expressionEnhancer: 'off'
         dynamicColor: 'off'
         superResolution: 'off'
         colorGamut: auto
@@ -481,6 +483,7 @@ set_lg_tv_rtings_game_profile:
         tint: '0'
         sharpness: '0'
         dynamicContrast: 'off'
+        expressionEnhancer: 'off'
         dynamicColor: 'off'
         superResolution: 'off'
         colorGamut: auto
@@ -508,6 +511,7 @@ set_lg_tv_rtings_game_profile:
         tint: '0'
         sharpness: '0'
         dynamicContrast: 'off'
+        expressionEnhancer: 'off'
         hdrDynamicToneMapping: '{{ hdr_tone_mapping }}'
         dynamicColor: 'off'
         superResolution: 'off'
