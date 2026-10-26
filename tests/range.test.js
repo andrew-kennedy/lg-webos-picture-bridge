@@ -4,6 +4,7 @@ var assert = require('assert');
 var range = require('../app/bridge/lib/range');
 
 module.exports = function () {
+  assert.strictEqual(range.classify('sdrALLM'), 'sdr');
   assert.strictEqual(range.classify('sdr'), 'sdr');
   assert.strictEqual(range.classify('none'), 'sdr');
   assert.strictEqual(range.classify('hdr10'), 'hdr10');

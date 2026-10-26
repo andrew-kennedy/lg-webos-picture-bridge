@@ -1,0 +1,615 @@
+# Merge these entries into scripts.yaml. Install lg_tv_mqtt_picture_policy first.
+apply_lg_tv_picture_context_matrix:
+  alias: Apply LG TV Picture Context Matrix
+  description: Stable backend-neutral picture-policy interface. rooted_bridge sends one MQTT policy and
+    requires an explicit applied result. Unsupported or unavailable backend selections fail without sending
+    TV commands.
+  mode: queued
+  max: 10
+  fields:
+    lg_tv_media_player_entity:
+      selector:
+        entity: {}
+      name: LG TV Media Player Entity
+      required: true
+      default: media_player.living_room_lg_webos_tv
+    picture_input_dimension:
+      selector:
+        select:
+          options:
+          - hdmi1
+          - hdmi1_pc
+          - hdmi2
+          - hdmi2_pc
+          - hdmi3
+          - hdmi3_pc
+          - hdmi4
+          - hdmi4_pc
+      name: Picture Input Dimension
+      required: true
+      default: hdmi1
+    sdr_picture_mode:
+      selector:
+        text: {}
+      name: SDR Picture Mode
+      required: true
+      default: game
+    hdr_picture_mode:
+      selector:
+        text: {}
+      name: HDR Picture Mode
+      required: true
+      default: hdrGame
+    dolby_vision_picture_mode:
+      selector:
+        text: {}
+      name: Dolby Vision Picture Mode
+      required: true
+      default: dolbyHdrGame
+    sdr_settings:
+      selector:
+        object: {}
+      name: SDR Settings
+      required: true
+      default: {}
+    hdr_settings:
+      selector:
+        object: {}
+      name: HDR Settings
+      required: true
+      default: {}
+    dolby_vision_settings:
+      selector:
+        object: {}
+      name: Dolby Vision Settings
+      required: true
+      default: {}
+    current_app_settings:
+      selector:
+        object: {}
+      name: Current-app Settings
+      description: Settings such as truMotionMode that require current_app.
+      required: true
+      default: {}
+    include_dolby_vision_contexts:
+      selector:
+        boolean: {}
+      name: Include Dolby Vision
+      required: true
+      default: true
+    apply_scope:
+      selector:
+        select:
+          options:
+          - all
+          - active
+      name: Apply Scope
+      description: Use all on source/room changes and active on signal transitions.
+      required: true
+      default: all
+    active_dynamic_range:
+      selector:
+        select:
+          options:
+          - auto
+          - sdr
+          - hdr10
+          - hlg
+          - dolby_vision
+      name: Active Dynamic Range
+      description: Compatibility input; MQTT uses the range observed by the TV bridge.
+      required: true
+      default: auto
+    settings_current_app:
+      selector:
+        boolean: {}
+      name: Compatibility Current App Flag
+      description: Ignored by MQTT; use current_app_settings for current-app writes.
+      required: true
+      default: false
+    inter_write_delay_ms:
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 25
+          unit_of_measurement: ms
+          mode: box
+      name: Compatibility Inter-write Delay
+      description: Ignored by MQTT; retained for existing callers.
+      required: true
+      default: 75
+  sequence:
+  - variables:
+      selected_backend: '{{ states(''input_select.lg_tv_picture_write_backend'') }}'
+      selected_scope: '{{ apply_scope | default(''all'') }}'
+      use_dolby_vision_contexts: '{{ include_dolby_vision_contexts | default(true) | bool }}'
+      selected_current_app_settings: '{{ current_app_settings | default({}) }}'
+  - choose:
+    - alias: Rooted LG Picture Bridge backend
+      conditions:
+      - condition: template
+        value_template: '{{ selected_backend == ''rooted_bridge'' }}'
+      sequence:
+      - variables:
+          bridge_policy_json: "{% set modes = {\n  'sdr': sdr_picture_mode | trim,\n  'sdrALLM': sdr_picture_mode\
+            \ | trim,\n  'hdr': hdr_picture_mode | trim,\n  'hdrALLM': hdr_picture_mode | trim\n} %} {%\
+            \ if use_dolby_vision_contexts | bool %}\n  {% set modes = modes | combine({\n    'dolbyHdr':\
+            \ dolby_vision_picture_mode | trim,\n    'dolbyHdrALLM': dolby_vision_picture_mode | trim\n\
+            \  }) %}\n{% endif %} {% set presets = dict([\n  (sdr_picture_mode | trim, {\n    'settings':\
+            \ sdr_settings,\n    'current_app_settings': selected_current_app_settings\n  }),\n  (hdr_picture_mode\
+            \ | trim, {\n    'settings': hdr_settings,\n    'current_app_settings': selected_current_app_settings\n\
+            \  })\n]) %} {% if use_dolby_vision_contexts | bool %}\n  {% set presets = presets | combine(dict([(\n\
+            \    dolby_vision_picture_mode | trim, {\n      'settings': dolby_vision_settings,\n     \
+            \ 'current_app_settings': selected_current_app_settings\n    }\n  )])) %}\n{% endif %} {{\
+            \ {\n  'request_id': 'ha-' ~ now().timestamp(),\n  'input': picture_input_dimension,\n  'scope':\
+            \ selected_scope,\n  'modes': modes,\n  'presets': presets\n} | to_json }}"
+      - action: script.lg_tv_mqtt_picture_policy
+        data:
+          policy: '{{ bridge_policy_json }}'
+        response_variable: picture_bridge_response
+      - if: '{{ picture_bridge_response is not mapping or picture_bridge_response.get(''ok'') != true
+          }}'
+        then:
+        - stop: MQTT picture policy was not confirmed; inspect the command script trace
+          error: true
+    default:
+    - stop: 'Unsupported or unavailable LG picture backend: {{ selected_backend }}. Select rooted_bridge.
+        No TV commands were sent; automatic fallback is disabled.'
+      error: true
+set_lg_tv_rtings_movie_profile:
+  alias: Set LG TV RTINGS Movie Profile
+  description: Apply a G6 movie profile derived from RTINGS' accuracy recommendations, using separate
+    bright-room and dark-room picture-mode slots. SDR OLED Light comes from the corresponding Home Assistant
+    input_number helper.
+  mode: queued
+  max: 10
+  fields:
+    lg_tv_media_player_entity:
+      selector:
+        entity: {}
+      name: LG TV Media Player Entity
+      required: true
+      default: media_player.living_room_lg_webos_tv
+    picture_input_dimension:
+      selector:
+        select:
+          options:
+          - hdmi1
+          - hdmi1_pc
+          - hdmi2
+          - hdmi2_pc
+          - hdmi3
+          - hdmi3_pc
+          - hdmi4
+          - hdmi4_pc
+      name: Picture Input Dimension
+      description: Use the _pc variant only when the LG input has the PC icon.
+      required: true
+      default: hdmi3
+    room_profile:
+      selector:
+        select:
+          options:
+          - bright
+          - dark
+      name: Room Profile
+      required: true
+      default: dark
+    boost_bright_room_hdr:
+      selector:
+        boolean: {}
+      name: Boost Bright-room HDR
+      description: Use Dynamic Contrast Medium and Dynamic Tone Mapping On for HDR10. This preserves the
+        existing bright-room preference; disable for more accurate HDR.
+      required: true
+      default: true
+    apply_scope:
+      selector:
+        select:
+          options:
+          - all
+          - active
+      name: Apply Scope
+      required: true
+      default: all
+    active_dynamic_range:
+      selector:
+        select:
+          options:
+          - auto
+          - sdr
+          - hdr10
+          - hlg
+          - dolby_vision
+      name: Active Dynamic Range
+      required: true
+      default: auto
+    inter_write_delay_ms:
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 25
+          unit_of_measurement: ms
+          mode: box
+      name: Inter-write Delay
+      required: true
+      default: 75
+  sequence:
+  - variables:
+      allowed_room_profiles:
+      - bright
+      - dark
+      selected_sdr_picture_mode: '{{ ''expert1'' if room_profile == ''bright'' else ''expert2'' }}'
+      selected_hdr_picture_mode: '{{ ''hdrCinemaBright'' if room_profile == ''bright'' else ''hdrCinema''
+        }}'
+      selected_dolby_vision_picture_mode: "{{ 'dolbyHdrCinemaBright'\n   if room_profile == 'bright' else\
+        \ 'dolbyHdrCinema' }}"
+      selected_sdr_oled_light: "{% set helper = 'input_number.lg_movie_bright_sdr_oled_light'\n   if room_profile\
+        \ == 'bright'\n   else 'input_number.lg_movie_dark_sdr_oled_light' %}\n{% set fallback = 80 if\
+        \ room_profile == 'bright' else 35 %} {{ states(helper) | int(fallback) }}"
+      selected_sdr_peak_brightness: '{{ ''high'' if room_profile == ''bright'' else ''off'' }}'
+      selected_hdr_dynamic_contrast: "{{ 'medium' if room_profile == 'bright'\n   and boost_bright_room_hdr\
+        \ else 'off' }}"
+      selected_hdr_dynamic_tone_mapping: "{{ 'on' if room_profile == 'bright'\n   and boost_bright_room_hdr\
+        \ else 'off' }}"
+  - variables:
+      rtings_sdr_settings:
+        backlight: '{{ selected_sdr_oled_light }}'
+        contrast: '95'
+        brightness: '50'
+        color: '50'
+        tint: '0'
+        sharpness: '0'
+        dynamicContrast: 'off'
+        dynamicColor: 'off'
+        superResolution: 'off'
+        colorGamut: auto
+        gamma: mediumHavingLevel
+        gammaLevel: 0
+        peakBrightness: '{{ selected_sdr_peak_brightness }}'
+        whiteBalanceColorTemperature: warm2
+        colorTemperature: '-40'
+        noiseReduction: 'off'
+        mpegNoiseReduction: 'off'
+        smoothGradation: 'off'
+        blackLevel:
+          secam: auto
+          ntsc: auto
+          pal60: auto
+          ntsc443: auto
+          pal: auto
+          unknown: auto
+          paln: auto
+          palm: auto
+        realCinema: 'on'
+        motionEyeCare: 'off'
+        motionProOLED: 'off'
+        energySaving: 'off'
+        eyeComfortMode: 'off'
+      rtings_hdr_settings:
+        backlight: '100'
+        contrast: '100'
+        brightness: '50'
+        color: '50'
+        tint: '0'
+        sharpness: '0'
+        dynamicContrast: '{{ selected_hdr_dynamic_contrast }}'
+        hdrDynamicToneMapping: '{{ selected_hdr_dynamic_tone_mapping }}'
+        dynamicColor: 'off'
+        superResolution: 'off'
+        colorGamut: auto
+        peakBrightness: high
+        whiteBalanceColorTemperature: warm2
+        colorTemperature: '-40'
+        noiseReduction: 'off'
+        mpegNoiseReduction: 'off'
+        smoothGradation: 'off'
+        blackLevel:
+          secam: auto
+          ntsc: auto
+          pal60: auto
+          ntsc443: auto
+          pal: auto
+          unknown: auto
+          paln: auto
+          palm: auto
+        realCinema: 'on'
+        motionEyeCare: 'off'
+        motionProOLED: 'off'
+        energySaving: 'off'
+        eyeComfortMode: 'off'
+      rtings_dolby_vision_settings:
+        backlight: '100'
+        contrast: '100'
+        brightness: '50'
+        color: '50'
+        tint: '0'
+        sharpness: '0'
+        dynamicContrast: 'off'
+        dynamicColor: 'off'
+        superResolution: 'off'
+        colorGamut: auto
+        peakBrightness: high
+        whiteBalanceColorTemperature: warm2
+        colorTemperature: '-40'
+        noiseReduction: 'off'
+        mpegNoiseReduction: 'off'
+        smoothGradation: 'off'
+        blackLevel:
+          secam: auto
+          ntsc: auto
+          pal60: auto
+          ntsc443: auto
+          pal: auto
+          unknown: auto
+          paln: auto
+          palm: auto
+        realCinema: 'on'
+        motionEyeCare: 'off'
+        motionProOLED: 'off'
+        energySaving: 'off'
+        eyeComfortMode: 'off'
+  - condition: template
+    value_template: '{{ room_profile in allowed_room_profiles }}'
+  - action: script.apply_lg_tv_picture_context_matrix
+    data:
+      lg_tv_media_player_entity: '{{ lg_tv_media_player_entity }}'
+      picture_input_dimension: '{{ picture_input_dimension }}'
+      sdr_picture_mode: '{{ selected_sdr_picture_mode | trim }}'
+      hdr_picture_mode: '{{ selected_hdr_picture_mode | trim }}'
+      dolby_vision_picture_mode: '{{ selected_dolby_vision_picture_mode | trim }}'
+      sdr_settings: '{{ rtings_sdr_settings }}'
+      hdr_settings: '{{ rtings_hdr_settings }}'
+      dolby_vision_settings: '{{ rtings_dolby_vision_settings }}'
+      current_app_settings:
+        truMotionMode: 'off'
+      include_dolby_vision_contexts: true
+      apply_scope: '{{ apply_scope | default(''all'') }}'
+      active_dynamic_range: '{{ active_dynamic_range | default(''auto'') }}'
+      settings_current_app: false
+      inter_write_delay_ms: '{{ inter_write_delay_ms }}'
+set_lg_tv_rtings_game_profile:
+  alias: Set LG TV RTINGS Game Profile
+  description: Apply an accuracy-first G6 SDR/HDR Game profile. HDR uses HGiG by default; calibrate HDR
+    at the source after selecting HGiG. RGB Full maps to LG Black Level High, Limited maps to Low, and
+    Auto leaves range matching to HDMI. SDR OLED Light comes from input_number.lg_game_sdr_oled_light.
+  mode: queued
+  max: 10
+  fields:
+    lg_tv_media_player_entity:
+      selector:
+        entity: {}
+      name: LG TV Media Player Entity
+      required: true
+      default: media_player.living_room_lg_webos_tv
+    picture_input_dimension:
+      selector:
+        select:
+          options:
+          - hdmi1
+          - hdmi1_pc
+          - hdmi2
+          - hdmi2_pc
+          - hdmi3
+          - hdmi3_pc
+          - hdmi4
+          - hdmi4_pc
+      name: Picture Input Dimension
+      description: Use the _pc variant only when the LG input has the PC icon.
+      required: true
+      default: hdmi1_pc
+    rgb_range:
+      selector:
+        select:
+          options:
+          - auto
+          - full
+          - limited
+      name: Source RGB Range
+      description: PC with NVIDIA RGB Full should use full. Consoles set to Automatic should use auto.
+        Never mix Full/High with Limited/Low.
+      required: true
+      default: auto
+    hdr_tone_mapping:
+      selector:
+        select:
+          options:
+          - HGIG
+          - 'off'
+          - 'on'
+      name: HDR Tone Mapping
+      description: Use HGiG after source HDR calibration. Off is the fallback for games without useful
+        calibration; On makes the TV remap each scene.
+      required: true
+      default: HGIG
+    apply_scope:
+      selector:
+        select:
+          options:
+          - all
+          - active
+      name: Apply Scope
+      required: true
+      default: all
+    active_dynamic_range:
+      selector:
+        select:
+          options:
+          - auto
+          - sdr
+          - hdr10
+          - hlg
+          - dolby_vision
+      name: Active Dynamic Range
+      required: true
+      default: auto
+    inter_write_delay_ms:
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 25
+          unit_of_measurement: ms
+          mode: box
+      name: Inter-write Delay
+      required: true
+      default: 75
+  sequence:
+  - variables:
+      allowed_rgb_ranges:
+      - auto
+      - full
+      - limited
+      allowed_hdr_tone_mapping:
+      - HGIG
+      - 'off'
+      - 'on'
+      selected_sdr_oled_light: '{{ states(''input_number.lg_game_sdr_oled_light'') | int(80) }}'
+      selected_black_level: "{% if rgb_range == 'full' %}\n  high\n{% elif rgb_range == 'limited' %}\n\
+        \  low\n{% else %}\n  auto\n{% endif %}"
+  - condition: template
+    value_template: "{{ rgb_range in allowed_rgb_ranges\n   and hdr_tone_mapping in allowed_hdr_tone_mapping\
+      \ }}"
+  - variables:
+      rtings_game_sdr_settings:
+        backlight: '{{ selected_sdr_oled_light }}'
+        contrast: '95'
+        brightness: '50'
+        color: '50'
+        tint: '0'
+        sharpness: '0'
+        dynamicContrast: 'off'
+        dynamicColor: 'off'
+        superResolution: 'off'
+        colorGamut: auto
+        gamma: mediumHavingLevel
+        gammaLevel: 0
+        peakBrightness: 'off'
+        whiteBalanceColorTemperature: warm2
+        colorTemperature: '-40'
+        noiseReduction: 'off'
+        mpegNoiseReduction: 'off'
+        smoothGradation: 'off'
+        blackLevel: "{{ dict(secam=selected_black_level | trim, ntsc=selected_black_level | trim,\n  pal60=selected_black_level\
+          \ | trim, ntsc443=selected_black_level | trim,\n  pal=selected_black_level | trim, unknown=selected_black_level\
+          \ | trim,\n  paln=selected_black_level | trim, palm=selected_black_level | trim) }}"
+        realCinema: 'off'
+        motionEyeCare: 'off'
+        motionProOLED: 'off'
+        energySaving: 'off'
+        eyeComfortMode: 'off'
+      rtings_game_hdr_settings:
+        backlight: '100'
+        contrast: '100'
+        brightness: '50'
+        color: '50'
+        tint: '0'
+        sharpness: '0'
+        dynamicContrast: 'off'
+        hdrDynamicToneMapping: '{{ hdr_tone_mapping }}'
+        dynamicColor: 'off'
+        superResolution: 'off'
+        colorGamut: auto
+        peakBrightness: high
+        whiteBalanceColorTemperature: warm2
+        colorTemperature: '-40'
+        noiseReduction: 'off'
+        mpegNoiseReduction: 'off'
+        smoothGradation: 'off'
+        blackLevel: "{{ dict(secam=selected_black_level | trim, ntsc=selected_black_level | trim,\n  pal60=selected_black_level\
+          \ | trim, ntsc443=selected_black_level | trim,\n  pal=selected_black_level | trim, unknown=selected_black_level\
+          \ | trim,\n  paln=selected_black_level | trim, palm=selected_black_level | trim) }}"
+        realCinema: 'off'
+        motionEyeCare: 'off'
+        motionProOLED: 'off'
+        energySaving: 'off'
+        eyeComfortMode: 'off'
+  - action: script.apply_lg_tv_picture_context_matrix
+    data:
+      lg_tv_media_player_entity: '{{ lg_tv_media_player_entity }}'
+      picture_input_dimension: '{{ picture_input_dimension }}'
+      sdr_picture_mode: game
+      hdr_picture_mode: hdrGame
+      dolby_vision_picture_mode: dolbyHdrGame
+      sdr_settings: '{{ rtings_game_sdr_settings }}'
+      hdr_settings: '{{ rtings_game_hdr_settings }}'
+      dolby_vision_settings: '{{ dict(rtings_game_hdr_settings.items() | rejectattr(''0'', ''eq'', ''hdrDynamicToneMapping''))
+        }}'
+      current_app_settings:
+        truMotionMode: 'off'
+      include_dolby_vision_contexts: true
+      apply_scope: '{{ apply_scope | default(''all'') }}'
+      active_dynamic_range: '{{ active_dynamic_range | default(''auto'') }}'
+      settings_current_app: false
+      inter_write_delay_ms: '{{ inter_write_delay_ms }}'
+set_lg_tv_hdmi_port_input_mode:
+  alias: Set LG TV HDMI Port Input Mode
+  description: Change an HDMI input icon between PC, Home Theater, and Game Console while optionally preserving
+    its current label. Uses the rooted bridge MQTT command endpoint.
+  mode: queued
+  max: 10
+  fields:
+    hdmi_input_mode:
+      selector:
+        select:
+          options:
+          - pc
+          - hometheater
+          - gameconsole
+      description: PC, Home Theater, or Game Console input mode.
+      required: true
+      name: HDMI Input Mode
+      default: pc
+    hdmi_port:
+      selector:
+        select:
+          options:
+          - HDMI_1
+          - HDMI_2
+          - HDMI_3
+          - HDMI_4
+      name: HDMI Port
+      description: Which physical HDMI port to update.
+      default: HDMI_1
+      required: true
+    lg_tv_media_player_entity:
+      selector:
+        entity: {}
+      name: LG TV Media Player Entity
+      description: Which TV to update.
+      required: true
+      default: media_player.living_room_lg_webos_tv
+    keep_existing_port_name:
+      selector:
+        boolean: {}
+      name: Keep Existing Port Name?
+      default: true
+      required: true
+      description: Preserve the existing label. Otherwise PC uses "PC", Game Console uses "Game Console",
+        and Home Theater retains the previous script's "Ambilight" fallback.
+  sequence:
+  - action: webostv.command
+    data:
+      entity_id: '{{ lg_tv_media_player_entity }}'
+      command: tv/getExternalInputList
+    response_variable: device_inputs
+  - variables:
+      existing_port_label: "{% set response = device_inputs.get(lg_tv_media_player_entity, {}) %} {% set\
+        \ labels = response.get('devices', [])\n  | selectattr('id', 'eq', hdmi_port)\n  | map(attribute='label')\n\
+        \  | list %}\n{{ labels[0] if labels | count > 0 else hdmi_port }}"
+      selected_port_label: "{% if keep_existing_port_name %}\n  {{ existing_port_label }}\n{% elif hdmi_input_mode\
+        \ == 'pc' %}\n  PC\n{% elif hdmi_input_mode == 'gameconsole' %}\n  Game Console\n{% else %}\n\
+        \  Ambilight\n{% endif %}"
+  - action: script.lg_tv_mqtt_picture_policy
+    data:
+      policy:
+        input: '{{ hdmi_port | lower | replace(''_'', '''') }}'
+        scope: all
+        input_mode:
+          icon: '{{ hdmi_input_mode }}'
+          label: '{{ selected_port_label | trim }}'
+    response_variable: input_mode_result
+  - stop: HDMI input mode confirmed by LG bridge
+    response_variable: input_mode_result

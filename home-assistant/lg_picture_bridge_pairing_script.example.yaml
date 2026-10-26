@@ -43,7 +43,7 @@ lg_picture_bridge_pair:
                 {{ home_assistant_base_url | trim | trim('/')
                    }}/api/webhook/{{ webhook_id | trim }}
               device_id: living-room-lg-c9
-              device_name: Living Room LG C9
+              device_name: Living Room LG G6
               debounce_ms: 500
               command_token: >-
                 {{ command_token | default(webhook_id, true) | trim }}

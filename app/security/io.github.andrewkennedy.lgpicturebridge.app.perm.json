@@ -1,5 +1,6 @@
 {
   "io.github.andrewkennedy.lgpicturebridge-*": [
+    "io.github.andrewkennedy.lgpicturebridge.control",
     "private",
     "public"
   ]

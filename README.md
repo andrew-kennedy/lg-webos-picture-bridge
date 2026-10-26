@@ -1,349 +1,128 @@
 # LG Picture Bridge
 
-LG Picture Bridge is a small Homebrew app for rooted LG webOS TVs. It watches the TV's private
-picture-dimension Luna service, reports context transitions to Home Assistant, and accepts narrowly
-scoped picture-policy commands from the local network. Version 0.5 uses Home Assistant MQTT
-discovery for both observations and confirmed picture commands: no webhook or HA REST package is
-required. Event-driven HDMI signal presence is independent of the selected TV input.
+LG Picture Bridge connects a **rooted 2026 LG G6 (webOS 11)** to Home Assistant. It reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision through MQTT discovery, and applies picture profiles without notification dialogs.
 
-It is intended for automations that need to reapply the currently active picture preset when an
-Apple TV, Shield, game console, or PC changes between SDR, HDR10, HLG, and Dolby Vision. It does
-not capture video, drive LEDs, or require HyperHDR.
+Version **0.8.0** targets the G6. Older C9 firmware is no longer supported. The live verification target is an OLED77G6WUA on **43.11.73**, with Homebrew Channel 0.8.0 and Node 20.12.2. Installing the bridge does not update TV firmware.
 
-Version 0.7 adds [generic MQTT-configured CEC rules](docs/cec-filter.md) for the inspected
-rooted C9 firmware. Device names, vendors and input matches come from Home Assistant,
-not app defaults. A reversible overlay can suppress LG's automatic device selection,
-without disabling SIMPLINK. Per-device standby interception is not yet supported. The earlier
-[time-limited experiment](experiments/apple-tv-cec/README.md) remains a separate developer tool.
+## Install and receive updates
 
-Version **0.7.1** fixes a delayed HDMI blank after Quick Start standby: a late
-CEC watchdog gives the bridge a bounded chance to renew its expired lease before
-removing the overlay. The QML filter still fails open immediately at expiry.
-Both resume timer orderings are regression-tested; a dead bridge is still cleaned up.
-Upgrading the detached watchdog preserves the existing HDMI apps and saved rules.
-No Home Assistant script changes or re-pairing are needed. See
-[standby recovery and validation limits](docs/cec-filter.md#standby-recovery-071).
-
-> [!IMPORTANT]
-> Version 0.5.0 is live-tested on a rooted 2019 LG C9 running Node 0.12.2 with Home Assistant
-> 2026.9.3. MQTT discovery, request/reply picture writes, TV readback, and the existing movie
-> automation were verified without the HA REST package. The writer uses LG's firmware-specific
-> synthetic categories (active/inactive banks were first verified in 0.3). After an
-> active-bank write, it sends an explicit, non-storing `dimension` notification so the C9 reloads
-> the picture-processing pipeline immediately instead of waiting for a manual picture-mode cycle.
-
-## Install from Homebrew Channel
-
-Open **Homebrew Channel → Settings → Add repository** and enter this exact URL:
+Add this repository in **Homebrew Channel → Settings → Repositories**:
 
 ```text
 https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/latest/download/apps.json
 ```
 
-Return to the app browser, install **LG Picture Bridge**, and launch it once. Homebrew Channel must
-show **Root status: ok** because the monitor needs private Luna access and a startup hook.
+Install **LG Picture Bridge** from that repository. Future GitHub releases appear as Homebrew Channel updates. Configuration, MQTT identity, and CEC policy live outside the package and survive app updates. Home Assistant YAML is maintained separately; updating the app does not overwrite your automations.
 
-When upgrading, existing configuration remains outside the application directory. MQTT commands
-are opt-in: enable `mqtt.commands_enabled: true` using the MQTT pairing script or protected SSH
-configuration. Existing HTTP commands and webhook-only configurations remain supported.
+For manual installation, download the IPK from [Releases](https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases), copy it to the TV, and use the ordinary webOS package installer:
 
-The release workflow also deploys a browsable GitHub Pages site. The release URL above always
-selects the latest tagged feed and remains independent of account-level Pages custom-domain
-redirects and branch-content cache delays.
-
-## Configure Home Assistant
-
-### MQTT discovery (recommended for new setups)
-
-Use [Configure LG Picture Bridge MQTT](home-assistant/lg_picture_bridge_mqtt_pairing_script.example.yaml)
-to send broker settings from Home Assistant to the TV app. Keep the username/password in HA secrets.
-No webhook URL or Home Assistant access token is required. The bridge saves configuration and runs
-in the background after the app closes. **Already configured? An app update does not require setup
-again.** Setup replaces saved configuration; do not run the old webhook-only script over an MQTT
-installation. Preserve the existing `device_id` when changing settings to keep entity identities.
-
-See [MQTT setup and migration](docs/mqtt.md). The bridge publishes one MQTT device with:
-
-| Default entity ID | Meaning |
-| --- | --- |
-| `binary_sensor.lg_tv_hdmi_signal` | Current HDMI session has valid video; unknown is not off |
-| `sensor.lg_tv_input` | Active physical HDMI input (`hdmi1`…`hdmi4`) |
-| `sensor.lg_tv_dynamic_range` | SDR/HDR10/HLG/Dolby Vision; unknown without valid signal |
-| `sensor.lg_tv_picture_mode` | Selected picture preset, including while the input has no signal |
-| `sensor.lg_tv_signal_state` | Diagnostic firmware value, e.g. `good` or `bad` |
-| `sensor.lg_tv_screensaver_type` | Diagnostic firmware value, e.g. `NO_SIGNAL` |
-| `sensor.lg_tv_picture_command` | Opt-in command readiness and correlated success/error results |
-
-All entities share bridge availability. With MQTT commands enabled, install the
-[`lg_tv_mqtt_picture_policy` script](home-assistant/lg_picture_bridge_mqtt_command.example.yaml)
-and send the same policy object through it. It discovers the command topic/session from the status
-sensor and waits for the matching application-level result. A broker publish alone is not success.
-Keep source routing, game/movie recipes, and the backend-selection helper unchanged; only replace
-the HTTP action inside the picture-policy facade:
-
-```yaml
-- action: script.lg_tv_mqtt_picture_policy
-  data:
-    policy: "{{ bridge_policy_json }}"
-  response_variable: picture_bridge_response
-- if: >-
-    {{ picture_bridge_response is not mapping
-       or picture_bridge_response.get('ok') != true }}
-  then:
-    - stop: MQTT picture policy was not confirmed; inspect the command script trace
-      error: true
+```sh
+luna-send-pub -i luna://com.webos.appInstallService/dev/install \
+  '{"id":"com.ares.defaultName","ipkUrl":"/home/root/io.github.andrewkennedy.lgpicturebridge_0.8.0_all.ipk","subscribe":true}'
 ```
 
-After a successful dry run and live test, remove the old `rest_command` entry (or its dedicated HA
-package) and reload REST commands. Keep unrelated package contents. The optional HTTP endpoint on
-the TV can remain as a rollback path; it is not used by this script. There is no automatic fallback
-after an MQTT timeout because some writes may already have applied.
+Wait for `state: installed`, then interrupt the subscription. Homebrew Channel must already be elevated. No system partition flashing is involved.
 
-These are batched recipe commands, not separate sliders for every LG setting. The result sensor
-reports Luna completion/error, not a calibrated measurement of the panel. See
-[the MQTT command protocol](docs/mqtt.md#picture-policy-commands) for limits and security.
+## Pair with Home Assistant
 
-### TV status screen (0.5.1+)
+Use [the MQTT pairing script](home-assistant/lg_picture_bridge_mqtt_pairing_script.example.yaml) to send the broker configuration as app launch parameters. Enable picture commands and CEC commands explicitly if you want them. Broker credentials belong in Home Assistant secrets, never in this repository.
 
-The screen refreshes every five seconds while visible. **Configured** means settings were saved;
-**broker connected** means the MQTT connection is up; **MQTT listener ready** means the broker
-accepted the picture-command subscription, not that a picture command has run. If an optional HTTP
-endpoint is configured, its status is shown separately. No credentials are displayed.
-
-Version **0.5.2** fixes controls falling below the screen on older TVs. The C9's
-[webOS 4.x engine is Chromium 53](https://webostv.developer.lge.com/develop/specifications/web-api-and-web-engine),
-which predates CSS Grid. The status screen now uses compatible flex columns and spacing,
-keeps actions inside a five-percent screen-safe border, and scrolls long status/errors
-above the action bar. Use **Up/Down** to scroll, **Left/Right** to choose an action, and
-**OK** to select. Pointer/wheel and keyboard access also work. MQTT, picture policies,
-CEC settings, and saved configuration are unchanged; no reconfiguration is needed.
-
-Live C9 verification: the original Chromium 53 page was 1141 px tall at a 1920×1080
-viewport, with buttons ending at 1107 px. With 0.5.2 installed, the page is exactly
-1080 px tall and buttons end at 990 px or above; the user confirmed it looks correct.
-The saved configuration checksum was unchanged and MQTT reconnected. Remote navigation
-passes the automated UI tests; rapid injected TV-debugger keys were not a reliable
-way to verify each individual focus transition.
-
-- **Refresh status** reads the bridge's current status.
-- **Restart monitor** restarts the background service without changing saved settings.
-- **Republish discovery** submits MQTT discovery, the current state, availability and enabled
-  command status again. It does not change picture settings. Disconnected/failed submissions report
-  an error; QoS 0 submission does **not** confirm broker or HA receipt. Check entities in HA for that.
-- Webhook-only setups show **Send webhook test**; mixed setups show **Republish + test webhook**.
-  An HTTP response is reported separately and does not prove an HA automation ran.
-- **Remove configuration** asks for confirmation, stops monitoring, removes saved configuration
-  and the startup hook. It does not delete retained MQTT discovery or entities from HA; remove those
-  separately if retiring the bridge. Ordinary upgrades do not need this action.
-
-### Legacy webhook setup
-
-### 1. Create a random local webhook
-
-Generate a unique webhook ID, for example with `openssl rand -hex 32`. Copy
-[`home-assistant/lg_picture_bridge_automation.example.yaml`](home-assistant/lg_picture_bridge_automation.example.yaml)
-into Home Assistant and replace `REPLACE_WITH_THE_SAME_RANDOM_WEBHOOK_ID`.
-
-The example webhook is `local_only: true`. Home Assistant recommends treating a webhook ID like a
-password; do not commit your real value to this repository or expose the endpoint to the internet.
-
-The example emits `lg_picture_bridge_dynamic_range_changed` without assuming a particular source
-policy. Add your existing game/movie profile dispatcher after that event, or consume the event in a
-separate automation.
-
-### 2. Add the pairing script
-
-Copy [`home-assistant/lg_picture_bridge_pairing_script.example.yaml`](home-assistant/lg_picture_bridge_pairing_script.example.yaml)
-into `scripts.yaml`, or recreate it in the UI. Run **Pair LG Picture Bridge** and provide:
-
-- the Home Assistant URL reachable from the TV, such as `http://10.0.0.4:8123`;
-- the same random webhook ID;
-- an optional command token (leaving it empty reuses the webhook ID);
-- the LG webOS media-player entity.
-
-The script uses `webostv.command` to launch the app with a `callback_url` parameter. The app sends
-the validated configuration directly to its narrowly scoped registered service, starts its monitor,
-and sends a test event. Pairing and status no longer depend on Homebrew Channel's generic shell-exec
-API, and nothing needs to be typed with the TV remote.
-
-The app also accepts split launch parameters:
+Example configuration:
 
 ```json
 {
-  "home_assistant_url": "http://10.0.0.4:8123",
-  "webhook_id": "a-long-random-value",
-  "device_id": "living-room-c9",
-  "device_name": "Living Room C9",
-  "debounce_ms": 500,
-  "command_token": "another-random-value-at-least-24-characters",
-  "command_port": 49191
-}
-```
-
-or a nested `setup` object containing the same fields. A complete `callback_url` takes precedence.
-
-## Webhook payloads
-
-Successful pairing sends:
-
-```json
-{
-  "event": "pairing_test",
-  "dynamic_range": null,
-  "device_id": "living-room-c9",
-  "device_name": "Living Room C9",
-  "bridge_version": "0.3.3"
-}
-```
-
-A signal transition sends:
-
-```json
-{
-  "event": "dynamic_range_changed",
-  "dynamic_range": "dolby_vision",
-  "previous_dynamic_range": "sdr",
-  "input": "hdmi3",
-  "previous_input": "hdmi3",
-  "picture_mode": "dolbyHdrCinema",
-  "source": "picture",
-  "raw_value": "dolbyHdr",
-  "observed_at": "2026-08-01T15:30:00.000Z",
-  "device_id": "living-room-c9",
-  "device_name": "Living Room C9",
-  "bridge_version": "0.3.3"
-}
-```
-
-`dynamic_range` is one of `sdr`, `hdr10`, `hlg`, or `dolby_vision`. The raw LG value is retained for
-diagnostics.
-
-## Picture-policy payload (MQTT or optional HTTP)
-
-MQTT is the recommended command transport. The policy schema below is shared by both transports.
-For optional HTTP access, merge
-[`home-assistant/lg_picture_bridge_rest_command.example.yaml`](home-assistant/lg_picture_bridge_rest_command.example.yaml)
-into Home Assistant and store the same pairing token in `secrets.yaml` with the `Bearer ` prefix.
-Home Assistant sends one policy object to:
-
-```text
-POST http://TV_IP:49191/v1/picture/policy
-Authorization: Bearer RANDOM_TOKEN
-```
-
-For example:
-
-```json
-{
-  "request_id": "apple-tv-dark",
-  "input": "hdmi3",
-  "scope": "active",
-  "modes": {
-    "sdr": "expert2",
-    "sdrALLM": "expert2",
-    "hdr": "hdrCinema",
-    "hdrALLM": "hdrCinema",
-    "dolbyHdr": "dolbyHdrCinema",
-    "dolbyHdrALLM": "dolbyHdrCinema"
-  },
-  "presets": {
-    "expert2": {
-      "settings": {"backlight": 35, "gamma": "medium"},
-      "current_app_settings": {"truMotionMode": "off"}
-    },
-    "hdrCinema": {"settings": {"backlight": 100}},
-    "dolbyHdrCinema": {"settings": {"backlight": 100}}
+  "device_id": "living-room-tv",
+  "device_name": "Living Room LG G6",
+  "transport": "mqtt",
+  "mqtt": {
+    "host": "192.168.1.10",
+    "port": 1883,
+    "username": "tv-bridge",
+    "password": "REPLACE_WITH_BROKER_PASSWORD",
+    "commands_enabled": true,
+    "cec_commands_enabled": true
   }
 }
 ```
 
-Use `scope: all` when a source, room profile, or shared HDMI-switch role changes. It preloads every
-supplied preset and range mapping. Use `scope: active` after a signal transition; the bridge reads
-the TV's current raw range, applies only its matching preset and mapping, and returns HTTP 409 if the
-requested physical input does not match (MQTT returns a correlated `stale_input` error instead).
-Add `"dry_run": true` to validate without writing anything; MQTT replies with the planned operation
-count and HTTP additionally lists the operations. Automatic content transitions should use
-`scope: active`; a manual preload can still use `all`.
+When replacing a TV, **reuse the previous `device_id`** to retain MQTT unique IDs and Home Assistant entity IDs. Change `device_name` to the new model. The ID is an opaque identity, not a hardware compatibility setting.
 
-On the tested C9, preset controls use `picture$input.pictureMode.2d.x`, while range selections use
-`picture$input.x.2d.dynamicRange`. Preset controls are written before mode mappings so the visible
-picture switches only after its destination preset is ready. If that input and dynamic-range bank
-is currently active, the bridge finishes with a base `picture` write containing the explicit
-`input`, `dynamicRange`, and `_3dStatus` dimensions plus `store: false` and `notify: true`. This
-forces webOS to reload the already-stored profile without an alert, ENTER press, or temporary mode
-cycle. Inactive inputs remain preload-only and activate normally when selected.
+The app shows broker, subscription, command, and CEC status. **Republish discovery** sends discovery and current observations again. **Remove configuration** stops the bridge, disables its CEC overlay, and removes its startup hook.
 
-## How it works
+Discovered entities use these default IDs:
 
-```text
-TV picture + signal subscriptions ──> MQTT discovery sensors ──> HA picture dispatcher
-                                                                     │
-TV settingsservice <── shared policy writer <── MQTT command <── game/movie recipe
-                               └── MQTT command-status results ──> waiting HA script
+| Entity | Meaning |
+| --- | --- |
+| `binary_sensor.lg_tv_hdmi_signal` | Confirmed good/bad HDMI video signal |
+| `sensor.lg_tv_input` | Active HDMI input |
+| `sensor.lg_tv_dynamic_range` | SDR, HDR10, HLG, or Dolby Vision |
+| `sensor.lg_tv_picture_mode` | LG picture-mode identifier |
+| `sensor.lg_tv_signal_state` | Raw HDMI signal state |
+| `sensor.lg_tv_screensaver_type` | LG screensaver reason |
+| `sensor.lg_tv_picture_command` | Correlated command results; enabled with picture commands |
+| `sensor.lg_tv_cec_filter` / `switch.lg_tv_cec_filter` | CEC policy status and master toggle |
+
+A stopped source or lost subscription must not be confused with confirmed no signal. Unknown states stay unknown. Observations are not retained, availability uses a last will, and discovery/state refresh after Home Assistant or broker restarts.
+
+## G6 picture profiles and HDMI icons
+
+Install [the correlated MQTT command script](home-assistant/lg_picture_bridge_mqtt_command.example.yaml), then merge [the G6 profile scripts](home-assistant/g6/picture_profiles.yaml) into `scripts.yaml`. Change their TV entity default to your installation. Create the three OLED-light number helpers used by the profiles: `lg_movie_bright_sdr_oled_light`, `lg_movie_dark_sdr_oled_light`, and `lg_game_sdr_oled_light`. The dispatcher expects `input_select.lg_tv_picture_write_backend` to be `rooted_bridge`.
+
+The profiles preserve separate bright/dark movie slots and Game Optimizer slots, with SDR, HDR, ALLM, and Dolby Vision mappings. G6 controls include Warm 40 (`colorTemperature: "-40"`), `gamma: mediumHavingLevel` plus `gammaLevel: 0`, and the structured HDMI range value. HLG shares LG's HDR picture bank. The source's RGB range must agree with the TV's range selection; HDR games use HGiG by default.
+
+The G6 starting values are informed by [RTINGS' G6 measurements](https://www.rtings.com/tv/reviews/lg/g6-oled/settings) and checked against the TV's own setting descriptions. These are editable profiles, not an individual panel calibration. Existing brightness helpers and the optional bright-room HDR boost remain user preferences. No copied white-balance calibration offsets are applied.
+
+The input-mode script uses the same acknowledged MQTT transport to set a physical port's PC, Game Console, or Home Theater icon and label. It does not open a notification or press Enter on the TV. Apply an icon change separately from a picture profile, because the icon may change the picture input dimension to an `_pc` bank.
+
+A picture policy looks like:
+
+```json
+{
+  "input": "hdmi3",
+  "scope": "all",
+  "modes": {"sdr": "expert2", "hdr": "hdrCinema"},
+  "presets": {
+    "expert2": {"settings": {"backlight": "35", "colorTemperature": "-40"}},
+    "hdrCinema": {"settings": {"backlight": "100", "hdrDynamicToneMapping": "off"}}
+  }
+}
 ```
 
-The IPK includes a registered JavaScript Luna service named
-`io.github.andrewkennedy.lgpicturebridge.service`. A narrow installed role permits outbound calls
-to `com.webos.settingsservice`, the optional `com.webos.service.videooutput` fallback, and the
-read-only foreground-session and HDMI signal methods on `com.webos.service.acb` and
-`com.webos.service.tv.externaldevice`.
-Homebrew Channel's elevated JS-service runner launches it outside the normal third-party jail.
-[LG ships Node.js 0.12.2 on webOS TV 4.x](https://webostv.developer.lge.com/develop/guides/js-service-basics);
-the monitor is deliberately written to that older JavaScript runtime.
-It creates this startup hook:
+`scope: active` requires a current matching HDMI context; `scope: all` configures the supplied banks. `dry_run: true` validates and lists operations without writes. Presets are written before mappings, followed by a non-storing active-context notification when applicable. A failed operation is reported with its index; earlier operations are not automatically rolled back.
 
-```text
-/var/lib/webosbrew/init.d/55-lg-picture-bridge
+An icon command is separate:
+
+```json
+{"input":"hdmi1","scope":"all","input_mode":{"icon":"pc","label":"Gaming PC"}}
 ```
 
-Configuration and logs are stored outside the application directory:
+MQTT commands require protocol 1, the current session ID from the command sensor, a unique request ID, and an expiry within 60 seconds. Retained requests are ignored; identical retries do not repeat writes. The Home Assistant script handles the envelope, retries, and correlated result. Broker authentication/ACLs protect this interface. Optional bearer-token HTTP commands and webhooks are still available through the example YAML files.
 
-```text
-/var/lib/io.github.andrewkennedy.lgpicturebridge/config.json
-/var/lib/io.github.andrewkennedy.lgpicturebridge/health.json
-/var/lib/io.github.andrewkennedy.lgpicturebridge/bridge.log
-```
+## CEC automatic-selection filter
 
-Broker credentials, the callback URL and any HTTP command token are stored in `config.json` with
-mode `0600` when supported. The app status screen redacts secrets and shows subscription states,
-command transport readiness, the last observed signal and reporting status. A running supervisor
-alone is not shown as healthy. Detailed command results remain available in the MQTT command sensor.
+[Configure CEC rules from Home Assistant](home-assistant/lg_picture_bridge_mqtt_cec_policy.example.yaml). The bridge has no built-in device identities or block rules. Match explicit input/vendor/name/type fields; every supplied field must match. The master switch preserves the saved rules.
 
-## Troubleshooting
+On the inspected G6 firmware the filter intercepts the HDMI app's **automatic CEC device selection**. Explicit device selection continues normally. This is not a general CEC firewall, and per-device standby blocking is not supported. SIMPLINK and eARC remain enabled.
 
-- **Configuration fails immediately:** confirm Homebrew Channel reports `Root status: ok` and install at
-  least version 0.3.2, which grants the web app its required Luna client permissions and talks
-  directly to the registered bridge service.
-- **MQTT republish fails:** check the broker address, credentials, connection and ACLs. Discovery is
-  republished automatically after reconnecting. A saved configuration alone does not mean connected.
-- **Legacy webhook test fails:** use a Home Assistant URL reachable directly from the TV. `homeassistant.local`
-  may not resolve on older webOS versions; a reserved LAN IP is safer.
-- **The monitor stops after a reboot:** launch Homebrew Channel once and verify its root startup hook
-  is current. Then open LG Picture Bridge and select **Refresh status**.
-- **After upgrading from 0.1 or 0.2:** re-run the pairing script once with a command token, then
-  confirm the TV app reports the picture command API as `listening`.
-- **No format changes arrive:** select **Refresh status**. At least one Luna subscription must show
-  `subscribed` or `responding`; inspect `bridge.log` over SSH for its exact error or payload.
-- **`videooutput` says unavailable:** this is expected on the tested C9 when the picture subscription
-  is subscribed. The bridge needs only one working source, and the C9 publishes
-  `dimension.dynamicRange` through `com.webos.settingsservice`.
-- **HTTPS fails on an older TV:** use an isolated local HTTP URL or a reverse proxy compatible with
-  the TV's older TLS stack. Keep the webhook local-only.
-- **A picture command returns HTTP 409:** the active physical input or dynamic range changed before
-  the request arrived. Let the newest bridge event retry with the current context.
-- **A picture command returns HTTP 502:** inspect the returned Luna error and failed category. An
-  unsupported setting key or picture-mode name can cause the C9 to reject that operation.
+The implementation uses a removable bind mount of a generated QML file. It verifies the original `SimplinkController.qml` SHA-256 before applying anything. A 90-second lease and rollback watchdog fail open; unknown firmware, missing policy, ambiguous identities, and expired leases preserve LG behavior. Stop/unpair revokes the lease and removes the owned overlay. Firmware updates may change the file hash and disable filtering until that firmware is inspected.
 
-To remove the persistent configuration, open the app and confirm **Remove configuration** before uninstalling.
+## G6 implementation and verification
 
-## Development
+The G6 uses:
 
-Requirements: Node.js 20+, npm, and the tools needed by `@webos-tools/cli`.
+- `com.webos.applicationManager/getForegroundAppInfo` and the active HDMI `MAIN` client from `com.webos.service.videooutput/getStatus` to identify a pipeline.
+- `com.webos.service.extinputs.hdmi/getSignalState` with **`pipelineId`** for actual signal state. A connected video output is not proof of signal.
+- `com.webos.settingsservice/getSystemSettings`, subscribed to `pictureMode`, for picture dimensions.
+- `picture$input.mode.x` for preset controls and `picture$input.x.range` for mode mappings. There is no 3D dimension on this model.
+- An explicit LS2 API permission for app-to-service status/configuration calls.
+
+Tests cover stale sessions, ambiguous MAIN clients, signal loss, coherent HLG/HDR telemetry, command expiry/replay, correlated failures, bounded input-mode commands, and CEC lease expiry/explicit-selection bypass. The live checks cover application status, MQTT discovery, inactive-bank write/readback, profile commands, and the mounted CEC filter. HDR/Dolby Vision content transitions still need representative playback on the attached sources; successful bank writes alone do not prove every source's output mode.
+
+Runtime files are in `/var/lib/io.github.andrewkennedy.lgpicturebridge/`, with a startup hook at `/var/lib/webosbrew/init.d/55-lg-picture-bridge`. `config.json` contains credentials and is mode 0600. `health.json` and `bridge.log` help diagnose problems without exposing broker passwords.
 
 ```sh
 npm ci
 npm test
-npx playwright install chromium
 npm run test:layout
 npm run validate
 npm run build
@@ -351,59 +130,4 @@ npm run manifest
 npm run site
 ```
 
-The IPK and release manifest are written to `dist/`. Tagged releases matching `v*` publish those
-artifacts and deploy `site/` to GitHub Pages. `app/appinfo.json` and `package.json` must have matching
-versions before tagging.
-
-Layout checks cover 1080p, 720p, and smaller viewports with normal/mixed transport,
-unconfigured state, long errors, larger text, and remote navigation. They use modern
-Chromium for geometry plus static checks for unsupported C9 CSS, not a webOS emulator.
-Set `LAYOUT_CHROMIUM_PATH` to reuse an existing Chromium executable if needed.
-
-## Optional MQTT-controlled CEC filtering (0.7.0)
-
-Home Assistant supplies the complete device/input rule set over MQTT. The app has
-no built-in device identities or block rules. Opt in with `mqtt.cec_commands_enabled`,
-then use the discovered `switch.lg_tv_cec_filter`, `sensor.lg_tv_cec_filter` and the
-[request/reply script](home-assistant/lg_picture_bridge_mqtt_cec_policy.example.yaml).
-The status sensor exposes capabilities, confirmed policy, results and cached CEC
-inventory; the inventory is not the external HDMI switch's selected route.
-
-The supported action is `automatic_selection`, not all CEC wake commands. `standby`
-and any unsupported action are rejected before changing the existing policy.
-Rules can target HDMI 1–4 and/or device identity. Rule edits on an installed overlay
-do not restart HDMI. **CEC filtering** in the TV UI is a master override; device
-rules are managed in HA. A removable overlay and 90-second renewable local permission
-retain fail-open behavior. SIMPLINK and Auto Power Sync settings are unchanged.
-
-Read [scope, safeguards, testing status and emergency restore](docs/cec-filter.md)
-before enabling it. Version 0.6's saved on/off setting cannot describe a generic
-rule: when upgrading, supply an explicit HA policy to restore that protection.
-Existing picture automations are unchanged. This does not fix the separate first
-AirPlay connection timeout.
-
-## Security model
-
-- The bridge accepts only HTTP(S) callback URLs without embedded credentials.
-- The LAN command endpoint requires a 24-character-or-longer bearer token and exposes only status
-  and a schema-validated `picture` policy route; it cannot invoke arbitrary Luna URIs or categories.
-- Picture setting keys, input names, mode names, body size, nesting, and command queue length are
-  bounded before a request reaches Luna.
-- The installed Luna role restricts outbound calls to settingsservice, the optional read-only
-  video-output monitor, and the foreground/HDMI signal services. Runtime LS2 sender checks limit pairing/status methods to the LG Picture
-  Bridge app itself.
-- Pairing payloads are validated before being written.
-- The webhook sends observations only; it does not accept commands from Home Assistant.
-- Home Assistant should keep the webhook local-only and use a unique, non-guessable ID.
-- MQTT credentials are stored only in the protected configuration, never in discovery messages or
-  status output. Commands are disabled by default. Enabling them trusts broker authentication and
-  topic ACLs to authorize picture changes; the HTTP token does not authorize MQTT messages. Use a
-  private broker and dedicated account/ACLs where possible. No shell or arbitrary Luna command
-  endpoint is exposed.
-- MQTT commands require a current connection session, a request ID and a short expiry. Retained
-  deliveries are ignored; exact retries are deduplicated. Guards run before each write. A context
-  change/failure can leave partial writes; it is not a transaction and there is no blind fallback.
-
-## License
-
-MIT
+Tagging a tested version as `vX.Y.Z` runs the release workflow, publishes the IPK/manifest/feed, and updates GitHub Pages. The feed requires webOS 11 or later; the verified CEC hash remains firmware-specific.

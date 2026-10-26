@@ -22,7 +22,7 @@ var feed = {
     manifestUrl: repository + '/releases/download/' + tag + '/' + app.id + '.manifest.json',
     manifest: manifest,
     pool: 'main',
-    requirements: {webosRelease: '>=4.0'},
+    requirements: {webosRelease: '>=11.0'},
     shortDescription: app.appDescription,
     fullDescriptionUrl: contentBase + '/full_description.html'
   }]

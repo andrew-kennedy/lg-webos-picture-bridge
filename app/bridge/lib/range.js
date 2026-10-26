@@ -6,7 +6,7 @@ function normalizeText(value) {
 }
 
 function classify(value) {
-  var normalized = normalizeText(value);
+  var normalized = normalizeText(value).replace(/allm$/, '');
   if (!normalized) return null;
 
   if (normalized.indexOf('dolbyvision') !== -1 ||

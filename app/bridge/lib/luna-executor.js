@@ -16,14 +16,14 @@ function executeOne(service, operation, callback) {
     if (request && typeof request.cancel === 'function') {
       try { request.cancel(); } catch (cancelError) { /* Best effort. */ }
     }
-    error = new Error('Timed out writing ' + operation.kind + ' for ' + operation.params.category);
+    error = new Error('Timed out writing ' + operation.kind + ' for ' + (operation.params.category || operation.params.id));
     error.code = 'luna_timeout';
     error.statusCode = 504;
     callback(error);
   }, 5000);
 
   try {
-    request = service.call(SETTINGS_URI, operation.params, function (message) {
+    request = service.call(operation.uri || SETTINGS_URI, operation.params, function (message) {
       var payload;
       var error;
       if (finished) return;

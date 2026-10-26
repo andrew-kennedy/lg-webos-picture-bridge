@@ -115,4 +115,11 @@ module.exports = function () {
   publisher.signal({input:'hdmi3',signal_present:true});
   assert.throws(lastGuard, /changed/, 'Signal loss and recovery to the same context must invalidate older work');
   publisher.stop();
+  var hdrPicture = {input: 'hdmi1_pc', dynamic_range: 'hdr10', picture_mode: 'hdrGame'};
+  var hdrSignal = {input: 'hdmi1', signal_present: true, dynamic_range: 'hlg'};
+  assert.strictEqual(discovery.snapshot(hdrPicture, hdrSignal, {device_id: 'g6'}).dynamic_range, 'hlg');
+  hdrSignal.dynamic_range = 'dolby_vision';
+  assert.strictEqual(discovery.snapshot(hdrPicture, hdrSignal, {device_id: 'g6'}).dynamic_range, null,
+    'A range transition must wait for matching picture dimensions');
+
 };

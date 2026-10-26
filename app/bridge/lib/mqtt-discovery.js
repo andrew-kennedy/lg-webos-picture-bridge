@@ -53,11 +53,16 @@ function buildDiscovery(config) {
 function physicalInput(value) { return value ? String(value).replace(/_pc$/, '') : null; }
 function snapshot(picture, signal, config) {
   var aligned = picture && signal && physicalInput(picture.input) === signal.input && signal.input;
+  // HLG uses the HDR picture bank on G6. The MAIN video output identifies the
+  // transfer function; wait for coherent picture dimensions during transitions.
+  var videoRange = signal && signal.dynamic_range;
+  var coherent = aligned && (!videoRange || videoRange === picture.dynamic_range ||
+    (videoRange === 'hlg' && picture.dynamic_range === 'hdr10'));
   return {
     device_id: config.device_id,
     input: signal ? signal.input : null,
     picture_input_dimension: aligned ? picture.input : null,
-    dynamic_range: aligned && signal.signal_present === true ? picture.dynamic_range : null,
+    dynamic_range: coherent && signal.signal_present === true ? (videoRange || picture.dynamic_range) : null,
     picture_mode: aligned ? picture.picture_mode : null,
     signal_present: signal ? signal.signal_present : null,
     signal_state: signal ? signal.signal_state : null,
@@ -103,7 +108,7 @@ function create(config, onHealth, dependencies) {
     // Mode notifications are caused by our own writes. Only routing/range/signal invalidate
     // work; use a revision so loss-and-recovery to the SAME context also invalidates old work.
     var next = JSON.stringify([picture && picture.input, picture && picture.raw_dynamic_range,
-      signal && signal.input, signal && signal.signal_present]);
+      signal && signal.input, signal && signal.signal_present, signal && signal.dynamic_range]);
     if (next !== contextKey) { contextKey = next; contextRevision += 1; }
   }
 

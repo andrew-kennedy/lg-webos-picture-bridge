@@ -1,30 +1,7 @@
-<h2>LG Picture Bridge</h2>
-<p>
-  LG Picture Bridge monitors a rooted LG webOS TV's internal video-output and picture-dimension
-  services. It reports SDR, HDR10, HLG, and Dolby Vision transitions to a local Home Assistant
-  MQTT device, including HDMI signal presence, so picture-setting automations can be reapplied whenever content changes format.
-</p>
-<p>
-  Version 0.5 adds opt-in MQTT picture commands with correlated success/error results, short expiry,
-  duplicate protection and context guards. A Home Assistant REST package is no longer necessary.
-  It silently targets active or inactive C9 picture banks without notification dialogs, then asks
-  webOS to refresh the active picture-processing pipeline without cycling modes. It has been tested
-  end-to-end on a 2019 LG C9. Configuration and status use the app's own registered service rather than
-  Homebrew Channel's generic shell-exec API.
-</p>
-<p>
-  Version 0.7 adds generic MQTT-configured CEC filtering for the inspected rooted C9 firmware.
-  Home Assistant supplies device/input rules; the app has no built-in device identities.
-  Supported rules block LG's automatic HDMI-device selection, not all CEC wake commands.
-  Standby blocking is not yet supported. Enable CEC commands separately, then configure rules
-  through HA; a 0.6 on/off preference needs an explicit policy when upgrading. The filter uses
-  a removable runtime overlay, with a master off switch in the app. SIMPLINK and Auto Power Sync
-  stay unchanged. The separate first-attempt AirPlay connection timeout is not fixed.
-</p>
+<h2>LG Picture Bridge for G6</h2>
+<p>Connect a rooted 2026 LG G6 running webOS 11 to Home Assistant. MQTT discovery reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision. Version 0.8.0 uses the G6 HDMI services and picture banks; older C9 firmware is no longer supported.</p>
+<p>Optional MQTT commands apply picture profiles and HDMI icons without notification dialogs. Commands have correlated results, short expiry, duplicate protection, and context checks. G6 profile examples include Warm 40, updated gamma controls, HDR/HGiG, and Dolby Vision game mappings.</p>
+<p>The optional CEC filter uses rules supplied by Home Assistant to block automatic HDMI-device selection. Explicit selection and eARC remain available. It does not block every CEC wake path or support per-device standby blocking. A verified firmware hash, short lease, and rollback watchdog keep unknown firmware and expired policies on LG's normal behavior.</p>
 <h3>Requirements</h3>
-<ul>
-  <li>A rooted LG webOS TV with an elevated Homebrew Channel installation</li>
-  <li>Home Assistant reachable from the TV over the local network</li>
-  <li>The MQTT configuration script from the project documentation</li>
-</ul>
-<p>No ambient-light capture server is required. Configuration is sent from Home Assistant as application launch parameters, so no credentials need to be typed with the TV remote. Settings survive updates. Version 0.5.2 fixes the status screen on older webOS browsers: action buttons stay within the screen and long details scroll with Up/Down. Left/Right selects an action. Optional HTTP commands and legacy webhooks remain supported.</p>
+<ul><li>A rooted G6 with elevated Homebrew Channel</li><li>A reachable MQTT broker and Home Assistant</li><li>The pairing and command scripts from the project</li></ul>
+<p>Configuration survives app updates. Keep the same device ID when replacing a TV to preserve Home Assistant entities. Homebrew Channel gets updates through the GitHub release feed. Home Assistant YAML is updated separately. Tested on OLED77G6WUA firmware 43.11.73; installing this app does not update TV firmware.</p>

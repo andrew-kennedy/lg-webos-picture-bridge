@@ -43,19 +43,19 @@ module.exports = function () {
   });
 
   assert.deepStrictEqual(full.map(function (operation) { return operation.params.category; }), [
-    'picture$hdmi3.dolbyHdrCinema.2d.x',
-    'picture$hdmi3.expert1.2d.x',
-    'picture$hdmi3.expert1.2d.x',
-    'picture$hdmi3.hdrCinema.2d.x',
-    'picture$hdmi3.x.2d.sdr',
-    'picture$hdmi3.x.2d.sdrALLM',
-    'picture$hdmi3.x.2d.hdr',
-    'picture$hdmi3.x.2d.dolbyHdr'
+    'picture$hdmi3.dolbyHdrCinema.x',
+    'picture$hdmi3.expert1.x',
+    'picture$hdmi3.expert1.x',
+    'picture$hdmi3.hdrCinema.x',
+    'picture$hdmi3.x.sdr',
+    'picture$hdmi3.x.sdrALLM',
+    'picture$hdmi3.x.hdr',
+    'picture$hdmi3.x.dolbyHdr'
   ]);
   assert.strictEqual(full[2].params.current_app, true);
   assert.deepStrictEqual(active.map(function (operation) { return operation.params.category; }), [
-    'picture$hdmi3.dolbyHdrCinema.2d.x',
-    'picture$hdmi3.x.2d.dolbyHdr',
+    'picture$hdmi3.dolbyHdrCinema.x',
+    'picture$hdmi3.x.dolbyHdr',
     'picture'
   ]);
   assert.strictEqual(active[1].params.settings.pictureMode, 'dolbyHdrCinema');
@@ -67,8 +67,7 @@ module.exports = function () {
       category: 'picture',
       dimension: {
         input: 'hdmi3',
-        dynamicRange: 'dolbyHdr',
-        _3dStatus: '2d'
+        dynamicRange: 'dolbyHdr'
       },
       settings: {pictureMode: 'dolbyHdrCinema'},
       store: false,
@@ -91,4 +90,17 @@ module.exports = function () {
   assert.throws(function () {
     picturePolicy.normalize({input: 'hdmi3', modes: {bogus: 'expert1'}, presets: {}});
   }, /Unsupported dynamic-range context/);
+  var inputMode = {input: 'hdmi1', input_mode: {icon: 'pc', label: 'Gaming PC'}};
+  assert.deepStrictEqual(picturePolicy.buildOperations(picturePolicy.normalize(inputMode), null), [{
+    kind: 'hdmi_input_mode', uri: 'luna://com.webos.service.eim/setDeviceInfo',
+    params: {id: 'HDMI_1', icon: 'pc.png', label: 'Gaming PC'}
+  }]);
+  assert.deepStrictEqual(picturePolicy.normalize(picturePolicy.normalize(inputMode)), picturePolicy.normalize(inputMode));
+  ['../pc', 'file:///tmp/icon', 'hdmi', ''].forEach(function (icon) {
+    assert.throws(function () { picturePolicy.normalize({input: 'hdmi1', input_mode: {icon: icon, label: 'PC'}}); }, /Input mode/);
+  });
+  assert.throws(function () { picturePolicy.normalize({input: 'hdmi1_pc', input_mode: inputMode.input_mode}); }, /physical HDMI/);
+  assert.throws(function () { picturePolicy.normalize({input: 'hdmi1', scope: 'active', input_mode: inputMode.input_mode}); }, /scope all/);
+  assert.throws(function () { picturePolicy.normalize({input: 'hdmi1', modes: {sdr: 'game'}, input_mode: inputMode.input_mode}); }, /separately/);
+  assert.throws(function () { picturePolicy.normalize({input: 'hdmi1', input_mode: {icon: 'pc', label: 'PC', uri: 'arbitrary'}}); }, /Input mode/);
 };

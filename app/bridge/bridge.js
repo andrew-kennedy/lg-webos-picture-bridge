@@ -319,8 +319,8 @@ function start(service, dependencies) {
         operations: operations.map(function (operation) {
           return {
             kind: operation.kind,
-            category: operation.params.category,
-            setting_keys: Object.keys(operation.params.settings)
+            category: operation.params.category || operation.params.id,
+            setting_keys: Object.keys(operation.params.settings || operation.params)
           };
         })
       });
@@ -331,7 +331,7 @@ function start(service, dependencies) {
       health.last_command = commandSummary(normalized, 'running', count);
       health.last_command.completed_operations = index + 1;
       saveHealth();
-      log('Applied ' + operation.kind + ' to ' + operation.params.category);
+      log('Applied ' + operation.kind + ' to ' + (operation.params.category || operation.params.id));
     }, function (error) {
       commandRunning = false;
       if (error) {
@@ -477,7 +477,7 @@ function start(service, dependencies) {
         var response = message && message.payload ? message.payload : message;
         if (stopping || subscriptionEpochs[source] !== epoch) return;
         if (response && (response.returnValue === false || response.subscribed === false)) {
-          // videooutput is absent on the C9; do not hammer a nonexistent fallback.
+          // An unavailable fallback must not create a tight retry loop.
           if (source === 'videooutput' && /service does not exist/i.test(response.errorText || '')) {
             handlePayload(source, response); return;
           }
@@ -540,6 +540,7 @@ function start(service, dependencies) {
   subscribe('videooutput', 'luna://com.webos.service.videooutput/getStatus', {subscribe: true});
   subscribe('picture', 'luna://com.webos.settingsservice/getSystemSettings', {
     category: 'picture',
+    keys: ['pictureMode'],
     subscribe: true
   });
   startPolicyServer();

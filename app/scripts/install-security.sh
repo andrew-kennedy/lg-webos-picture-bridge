@@ -10,6 +10,7 @@ APP_ROLE_TARGET="/var/luna-service2/roles.d/$APP_ID.app.role.json"
 ROLE_TARGET="/var/luna-service2/roles.d/$APP_ID.service.role.json"
 APP_PERMISSION_TARGET="/var/luna-service2/client-permissions.d/$APP_ID.app.perm.json"
 PERMISSION_TARGET="/var/luna-service2/client-permissions.d/$APP_ID.service.perm.json"
+API_TARGET="/var/luna-service2/api-permissions.d/$APP_ID.api.json"
 SERVICE_TARGET="/var/luna-service2/services.d/$APP_ID.service.service"
 changed=0
 
@@ -34,6 +35,7 @@ case "${1:-install}" in
         mkdir -p \
             /var/luna-service2/manifests.d \
             /var/luna-service2/roles.d \
+            /var/luna-service2/api-permissions.d \
             /var/luna-service2/client-permissions.d \
             /var/luna-service2/services.d
         copy_policy "$POLICY_ROOT/$APP_ID.manifest.json" "$MANIFEST_TARGET"
@@ -41,6 +43,7 @@ case "${1:-install}" in
         copy_policy "$POLICY_ROOT/$APP_ID.service.role.json" "$ROLE_TARGET"
         copy_policy "$POLICY_ROOT/$APP_ID.app.perm.json" "$APP_PERMISSION_TARGET"
         copy_policy "$POLICY_ROOT/$APP_ID.service.perm.json" "$PERMISSION_TARGET"
+        copy_policy "$POLICY_ROOT/$APP_ID.api.json" "$API_TARGET"
         copy_policy "$POLICY_ROOT/$APP_ID.service.service" "$SERVICE_TARGET"
         scan_if_changed
         ;;
@@ -51,6 +54,7 @@ case "${1:-install}" in
             "$ROLE_TARGET" \
             "$APP_PERMISSION_TARGET" \
             "$PERMISSION_TARGET" \
+            "$API_TARGET" \
             "$SERVICE_TARGET"
         do
             if [ -f "$target_file" ]; then

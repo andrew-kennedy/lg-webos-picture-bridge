@@ -28,7 +28,13 @@ module.exports = function () {
   assert.strictEqual(services.services[0].name, app.id + '.service');
   assert.strictEqual(manifest.id, app.id);
   assert.strictEqual(manifest.version, app.version);
-  assert.deepStrictEqual(appPermissions[app.id + '-*'], ['private', 'public']);
+  assert.deepStrictEqual(appPermissions[app.id + '-*'], [app.id + '.control', 'private', 'public']);
+  var api = require('../app/security/io.github.andrewkennedy.lgpicturebridge.api.json');
+  assert(api[app.id + '.control'].includes(app.id + '.service/uiStatus'));
+  assert(api[app.id + '.control'].every(function (uri) {
+    return uri.indexOf(app.id + '.service/') === 0 || uri === 'org.webosbrew.hbchannel.service/exec';
+  }));
+  assert.strictEqual(manifest.apiPermissionFiles.length, 1);
   assert.strictEqual(appRole.appId, app.id);
   assert.deepStrictEqual(appRole.allowedNames, [app.id + '-*']);
   assert.deepStrictEqual(appRole.permissions[0].outbound, [
@@ -44,8 +50,8 @@ module.exports = function () {
   assert.deepStrictEqual(role.permissions[0].outbound, [
     'com.webos.service.videooutput',
     'com.webos.settingsservice',
-    'com.webos.service.acb',
-    'com.webos.service.tv.externaldevice',
+    'com.webos.applicationManager',
+    'com.webos.service.extinputs.hdmi',
     'com.webos.service.eim'
   ]);
   assert.deepStrictEqual(role.permissions[0].inbound, ['*']);

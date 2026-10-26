@@ -14,8 +14,8 @@ module.exports = function () {
       }
     };
     var operations = [
-      {kind: 'preset_settings', params: {category: 'picture$hdmi3.expert1.2d.x', settings: {backlight: 80}}},
-      {kind: 'picture_mode_mapping', params: {category: 'picture$hdmi3.x.2d.sdr', settings: {pictureMode: 'expert1'}}}
+      {kind: 'preset_settings', params: {category: 'picture$hdmi3.expert1.x', settings: {backlight: 80}}},
+      {kind: 'picture_mode_mapping', params: {category: 'picture$hdmi3.x.sdr', settings: {pictureMode: 'expert1'}}}
     ];
     lunaExecutor.execute(service, operations, null, function (error, responses) {
       try {

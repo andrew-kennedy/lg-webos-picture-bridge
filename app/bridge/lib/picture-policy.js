@@ -5,12 +5,8 @@ var CONTEXTS = [
   'sdrALLM',
   'hdr',
   'hdrALLM',
-  'hlg',
-  'hlgALLM',
   'dolbyHdr',
-  'dolbyHdrALLM',
-  'technicolorHdr',
-  'technicolorHdrALLM'
+  'dolbyHdrALLM'
 ];
 var CONTEXT_LOOKUP = {};
 CONTEXTS.forEach(function (name) { CONTEXT_LOOKUP[name] = true; });
@@ -78,7 +74,7 @@ function normalize(input) {
   var modes = {};
   var presets = {};
   var scope = source.scope || 'all';
-  var requestId = source.request_id === undefined ? null : String(source.request_id);
+  var requestId = source.request_id === undefined || source.request_id === null ? null : String(source.request_id);
   var inputName;
 
   if (!source || typeof source !== 'object' || Array.isArray(source)) {
@@ -90,6 +86,22 @@ function normalize(input) {
   inputName = validateName(source.input, 'input');
   if (!/^hdmi[1-4](?:_pc)?$/.test(inputName)) {
     throw policyError('input must be hdmi1 through hdmi4, optionally with _pc');
+  }
+  if (source.input_mode !== undefined) {
+    var inputMode = source.input_mode;
+    if (scope !== 'all' || /_pc$/.test(inputName) || !inputMode || typeof inputMode !== 'object' ||
+        Array.isArray(inputMode) || Object.keys(inputMode).some(function (key) {
+          return key !== 'icon' && key !== 'label';
+        }) || ['pc', 'hometheater', 'gameconsole'].indexOf(inputMode.icon) === -1 ||
+        typeof inputMode.label !== 'string' || !inputMode.label.trim() || inputMode.label.length > 64 ||
+        /[\x00-\x1f\x7f]/.test(inputMode.label) ||
+        (source.modes && Object.keys(source.modes).length) ||
+        (source.presets && Object.keys(source.presets).length)) {
+      throw policyError('Input mode requires a physical HDMI input, scope all, an allowed icon and a label; send picture settings separately');
+    }
+    if (requestId && requestId.length > 128) throw policyError('request_id must be shorter than 128 characters');
+    return {request_id: requestId, input: inputName, scope: 'all', modes: {}, presets: {},
+      input_mode: {icon: inputMode.icon, label: inputMode.label.trim()}, dry_run: source.dry_run === true};
   }
   if (!source.modes || typeof source.modes !== 'object' || Array.isArray(source.modes)) {
     throw policyError('modes must be an object');
@@ -192,7 +204,7 @@ function activeMapping(policy, currentContext) {
 
 function settingsOperation(inputName, mode, settings, currentApp) {
   var params = {
-    category: 'picture$' + inputName + '.' + mode + '.2d.x',
+    category: 'picture$' + inputName + '.' + mode + '.x',
     settings: settings
   };
   if (currentApp) params.current_app = true;
@@ -210,7 +222,7 @@ function mappingOperation(inputName, context, mode) {
     context: context,
     picture_mode: mode,
     params: {
-      category: 'picture$' + inputName + '.x.2d.' + context,
+      category: 'picture$' + inputName + '.x.' + context,
       settings: {pictureMode: mode}
     }
   };
@@ -225,8 +237,7 @@ function activationOperation(inputName, active, currentContext) {
       category: 'picture',
       dimension: {
         input: inputName,
-        dynamicRange: active.target_context,
-        _3dStatus: String(currentContext.three_d_status || '2d')
+        dynamicRange: active.target_context
       },
       settings: {pictureMode: active.mode},
       store: false,
@@ -247,6 +258,11 @@ function optionalActiveMapping(policy, currentContext) {
 }
 
 function buildOperations(policy, currentContext) {
+  if (policy.input_mode) {
+    return [{kind: 'hdmi_input_mode', uri: 'luna://com.webos.service.eim/setDeviceInfo',
+      params: {id: 'HDMI_' + policy.input.slice(-1), icon: policy.input_mode.icon + '.png',
+        label: policy.input_mode.label}}];
+  }
   var operations = [];
   var selectedModes = {};
   var mappings = [];

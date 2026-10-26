@@ -1,6 +1,6 @@
 'use strict';
 
-// Bounded MQTT 3.1.1 client for webOS 4's Node 0.12 runtime.
+// Bounded MQTT 3.1.1 client for the webOS service runtime.
 // QoS 0 sends, clean sessions and no offline queue. Application replies confirm commands.
 var net = require('net');
 var tls = require('tls');

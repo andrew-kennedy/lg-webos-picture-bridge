@@ -10,7 +10,7 @@ function main() {
   var command = process.argv[2];
   var config;
   if (command === 'pair-stdin') {
-    // Node 0.12's readFileSync does not accept numeric file descriptors.
+    // Read pairing secrets from stdin without putting them in process arguments.
     var input = '';
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', function (chunk) {
