@@ -10,21 +10,21 @@
       "id": "io.github.andrewkennedy.lgpicturebridge",
       "title": "LG Picture Bridge",
       "iconUri": "https://raw.githubusercontent.com/andrew-kennedy/lg-webos-picture-bridge/main/site/icon160.png",
-      "manifestUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/download/v0.9.0/io.github.andrewkennedy.lgpicturebridge.manifest.json",
+      "manifestUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/download/v0.9.1/io.github.andrewkennedy.lgpicturebridge.manifest.json",
       "manifest": {
         "id": "io.github.andrewkennedy.lgpicturebridge",
-        "version": "0.9.0",
+        "version": "0.9.1",
         "type": "web",
         "title": "LG Picture Bridge",
         "appDescription": "TV settings and signal monitoring for Home Assistant",
         "iconUri": "https://raw.githubusercontent.com/andrew-kennedy/lg-webos-picture-bridge/main/app/assets/icon160.png",
         "sourceUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge",
         "rootRequired": true,
-        "ipkUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/download/v0.9.0/io.github.andrewkennedy.lgpicturebridge_0.9.0_all.ipk",
+        "ipkUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/download/v0.9.1/io.github.andrewkennedy.lgpicturebridge_0.9.1_all.ipk",
         "ipkHash": {
-          "sha256": "3985bda21161d1ab3d7e11046d6e765c8cd2963960404d4daabf48d9fdea5be9"
+          "sha256": "b220a646f3c7b916fc93fc4a8ab754316e5d7dc99d3dfb478a8788945175a992"
         },
-        "ipkSize": 85530
+        "ipkSize": 85528
       },
       "pool": "main",
       "requirements": {
