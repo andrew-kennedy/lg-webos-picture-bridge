@@ -10,9 +10,8 @@ var groups = {
     'aiPicture aiHdrRemastering filmmakerAmbientLight filmMakerMode nearBlackDetail ' +
     'skinColor grassColor skyColor aspectRatio justScan energySaving energySavingAutoMin ' +
     'eyeComfortMode screenShift logoLuminanceAdjust').split(' '),
-  sound: ('soundMode audioBalance autoVolume clearVoice aiSound aigamesound soundOptimizer ' +
+  sound: ('soundMode autoVolume clearVoice aiSound aigamesound soundOptimizer ' +
     'soundOutputDigital eArcSupport inputAudioFormatHDMI1 inputAudioFormatHDMI2 inputAudioFormatHDMI3 inputAudioFormatHDMI4 ' +
-    'avSync avSyncBypass avSyncBypassInput avSyncSpdif avSyncSpeaker avSyncBtSoundbar avSyncBtSurround avSyncWisa ' +
     'lgSoundSync soundModeSync virtualSurround supportATMOS volumeControl').split(' '),
   other: ('enableALLM gameOptimization freesync qmsVrr uhdDeepColor gameGenre ' +
     'blackStabilizer whiteStabilizer gameAdjustContrast gameBlackLevel gameColorDepth gameSharpness ' +
@@ -38,11 +37,11 @@ Object.keys(groups).forEach(function (category) {
       name: (category === 'other' ? 'Gaming / HDMI' : label(category)) + ': ' + label(key)});
   });
 });
-// Remove retained discovery from the pre-release convenience-control trial.
+// Remove retained discovery for controls retired from earlier versions.
 var retired = {
   general: 'homeAutoLaunch homePromotion powerOnScreen noSignalScreenSaver screenSaverAd screenSaverEnabled personalRecommend aiSettingsNudge aiNudge sportsAlarm remotePointer',
   option: 'audioGuidance audioGuidanceSpeed audioGuidancePitch audioGuidanceVolume highContrast greyscale colorInversion focusEmphasis focusedItemEnlarged menuTransparency helpOnSettings pointerSize pointerSpeed pointerAlignment standByLight powerOnLight quickStartMode hddEcoMode enableToastPopup longPressInterval repeatInterval remoteSlowInput subtitleMode closedCaption signLanguageGuidance signLanguageGuidanceSize signLanguageGuidanceSpeed screenSaverTimer',
-  sound: 'volumeStep audioDescription audioDescriptionVolume tvPowerSound tvSetupConfiguration',
+  sound: 'volumeStep audioDescription audioDescriptionVolume tvPowerSound tvSetupConfiguration audioBalance avSync avSyncBypass avSyncBypassInput avSyncSpdif avSyncSpeaker avSyncBtSoundbar avSyncBtSurround avSyncWisa',
   other: 'contentRecommendation screenRemoteAutoShow'
 };
 var retiredIds = [];

@@ -9,7 +9,7 @@ Tested on an OLED77G6WUA, firmware **43.11.73**, webOS **11.1.0-4407**, on 2026-
 | Volume, mute, sound output | Reads and same-value writes succeeded | Built-in webOS integration; native sound-output select below |
 | Screen off/on | Both succeeded; screen restored immediately | Existing webOS screen switch |
 | Apps, input list, foreground app, power state, media foreground, connection info, channel list | Read succeeded | Built-in webOS integration / `webostv.command` |
-| `settings/getSystemSettings` | 31 of the 95 retained setting candidates readable individually | Public reads do not imply write permission |
+| `settings/getSystemSettings` | 31 of the 95 setting candidates audited for v0.9.0 readable individually | Public reads do not imply write permission |
 | `settings/currentSystemSettings`, `config/getConfigs` | Read succeeded | Diagnostics; not an unrestricted configuration writer |
 | `settings/setSystemSettings` | **401 insufficient permissions**, including a same-value picture-mode write | Root bridge |
 | `externalpq/setExternalPqData` | **401** for OLED brightness, contrast, black level and color UI commands | Root bridge; no calibration session started |
@@ -26,7 +26,7 @@ Sources: [aiowebostv endpoints](https://github.com/home-assistant-libs/aiowebost
 
 ## Settings entities
 
-With `mqtt.commands_enabled: true`, the bridge discovers number and select entities for the reviewed picture, sound, gaming and HDMI catalog. On this G6 the initial catalog produced **91 controls**, plus the optional native sound-output select. Actual counts and availability depend on the active mode and firmware descriptions.
+With `mqtt.commands_enabled: true`, the bridge discovers number and select entities for the reviewed picture, sound, gaming and HDMI catalog, plus the optional native sound-output select. Actual counts and availability depend on the active mode and firmware descriptions.
 
 Examples:
 
@@ -54,7 +54,7 @@ Live end-to-end checks covered a Home Assistant OLED-brightness change from 80 t
 
 Manual changes can be overwritten when the existing source, dynamic-range or day/night automation reapplies a profile. Change the profile or brightness helper for a lasting automated preference.
 
-The catalog deliberately omits pointer, accessibility, sign-language, startup and other set-once convenience controls. It also omits service-menu operations, firmware settings, reset actions, private/account settings, calibration LUTs, white-balance fine adjustments, CMS and compound object/array editors. The existing profile API still handles structured HDMI RGB range. Discovery never copies RTINGS' panel-specific calibration values or changes a setting just by discovering it.
+The catalog deliberately omits AV-sync, audio-balance, pointer, accessibility, sign-language, startup and other set-once convenience controls. Upgrades remove their old Home Assistant discovery entries without changing the underlying TV settings. It also omits service-menu operations, firmware settings, reset actions, private/account settings, calibration LUTs, white-balance fine adjustments, CMS and compound object/array editors. The existing profile API still handles structured HDMI RGB range. Discovery never copies RTINGS' panel-specific calibration values or changes a setting just by discovering it.
 
 ## Native audio control
 
