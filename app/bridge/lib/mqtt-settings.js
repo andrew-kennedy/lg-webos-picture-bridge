@@ -34,10 +34,10 @@ function create(options) {
   var online = false, announced = {}, published = {}, known = {}, latest = {controls: {}, context_id: null};
   var channel, monitor;
   function publish(topic, value, retain) { return online && options.publish(topic, JSON.stringify(value), Boolean(retain)); }
-  function observation(topic, value, force) {
+  function observation(topic, value, force, observedAt) {
     var serialized = JSON.stringify(value);
     if (!force && published[topic] === serialized) return true;
-    value.observed_at = new Date(latest.observed_at || 0).toISOString();
+    value.observed_at = observedAt || latest.observed_at ? new Date(observedAt || latest.observed_at).toISOString() : null;
     if (!publish(topic, value, false)) return false;
     published[topic] = serialized;
     return true;
@@ -45,6 +45,7 @@ function create(options) {
   function status() {
     var s = channel.status();
     s.context = latest.context; s.context_id = latest.context_id;
+    s.capture = latest.capture;
     s.control_count = Object.keys(latest.controls).length;
     s.available_count = Object.keys(latest.controls).filter(function (key) { return latest.controls[key].available; }).length;
     return s;
@@ -64,7 +65,7 @@ function create(options) {
       var c = latest.controls[id]; known[id] = c;
       if (!observation(base + '/settings/' + id, {value: c.value, available: c.available && channel.status().ready && Boolean(latest.observed_at),
         category: c.category, key: c.key, dimension: c.dimension, backend: 'root_luna',
-        context_id: latest.context_id}, force)) ok = false;
+        context_id: latest.context_id}, force, c.observed_at)) ok = false;
     });
     Object.keys(known).forEach(function (id) {
       if (!latest.controls[id]) observation(base + '/settings/' + id, {value: known[id].value, available: false}, force);

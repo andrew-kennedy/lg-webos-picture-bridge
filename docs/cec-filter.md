@@ -89,6 +89,11 @@ or ambiguous device identity does not block. `inventory.devices` is read from EI
 every 30 seconds and can contain cached devices. It **does not reveal the external
 HDMI switch's selected route, live power state, or current active source**. Failed
 inventory requests publish unavailable/empty inventory, not fabricated presence.
+
+From 0.10.0, unchanged inventory observations do not trigger another publication or change timestamp
+attributes. Devices are compared in a stable order, and `inventory.changed_at` records changes to
+the device list or read/error status. It is not a freshness timestamp or proof of current presence.
+The regular 30-second CEC status heartbeat still prevents Home Assistant's 90-second expiry.
 The filter uses the HDMI app's current device metadata independently of that poll.
 
 A full policy replaces the old one. `{enabled: false}` or `{enabled: true}` changes

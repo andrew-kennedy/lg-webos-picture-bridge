@@ -3,15 +3,16 @@ var assert = require('assert');
 var controls = require('../app/bridge/lib/settings-controls');
 var catalog = require('../app/bridge/lib/settings-catalog');
 var mqtt = require('../app/bridge/lib/mqtt-settings');
+var EventEmitter = require('events').EventEmitter;
 module.exports = async function () {
   var context = {input: 'hdmi3', mode: 'filmMaker', range: 'sdr', ready: true};
-  var value = '3', writes = [], failWrite = false, ignoreWrite = false, delayed = null;
+  var value = '3', writes = [], failWrite = false, ignoreWrite = false, delayed = null, reportedInput = null;
   var desc = {key: 'backlight', category: 'picture', dataType: 'string', vtype: 'Range', dbtype: 'G',
     ui: {visible: true, active: true}, values: {range: {min: 0, max: 100, interval: 1}}, dimension: ['input', 'pictureMode']};
   var motion = {key: 'truMotionMode', category: 'picture', dataType: '', vtype: 'ArrayExt', dbtype: 'M',
     ui: {visible: true, active: true}, values: {arrayExt: [{value:'off',visible:true,active:true},{value:'user',visible:true,active:true},
       {value:'hidden',visible:false,active:true}]}, dimension: ['input', 'pictureMode']};
-  var service = {call: function (uri, params, callback) {
+  function responseFor(uri, params) {
     var response = {returnValue: true};
     if (uri.endsWith('getSystemSettingDesc')) response = {returnValue: false, results: params.category === 'picture' ? [desc, motion] : []};
     else if (uri.endsWith('setSystemSettings')) {
@@ -19,13 +20,24 @@ module.exports = async function () {
       if (failWrite) response = {returnValue: false, errorText: 'denied'};
       else if (!ignoreWrite && params.settings.backlight !== undefined) value = params.settings.backlight;
     } else if (params.category === 'picture') {
-      response = {returnValue: true, dimension: {input: context.input, pictureMode: context.mode}, settings: {}};
+      response = {returnValue: true, dimension: {input: reportedInput || context.input, pictureMode: context.mode}, settings: {}};
       if (params.current_app || params.app_id) { response.app_id = 'com.webos.app.hdmi3'; response.settings.truMotionMode = 'off'; }
       else response.settings.backlight = value;
     }
+    return response;
+  }
+  var service = {call: function (uri, params, callback) {
+    var response = responseFor(uri, params);
     var respond = function () { callback({payload: response}); };
     if (delayed) delayed.push(respond); else respond();
     return {cancel: function () {}};
+  }, subscribe:function (uri, params) {
+    var sub = new EventEmitter(), response = responseFor(uri, params);
+    sub.cancel = function () { sub.emit('cancel'); };
+    response.subscribed = true;
+    var respond = function () { sub.emit('response', {payload:response}); };
+    if (delayed) delayed.push(respond); else process.nextTick(respond);
+    return sub;
   }};
   var monitor = controls.create(service, {context: function () { return context; }, changed: function () {}});
   function refresh() { return new Promise(function (resolve,reject) { monitor.refresh(function(e) { if(e)reject(e);else resolve(); }); }); }
@@ -42,6 +54,17 @@ module.exports = async function () {
     await assert.rejects(write(101),/outside/);
     await assert.rejects(write(3.5),/outside/);
     await assert.rejects(write(true),/number/);
+    desc.ui.active = false;
+    await assert.rejects(write(4), /unavailable/, 'Preflight must recheck current TV applicability');
+    desc.ui.active = true;
+    var written = writes.length;
+    reportedInput = 'hdmi4';
+    await assert.rejects(write(4),/unavailable|scope changed/, 'A missed input notification cannot authorize a write to the cached input');
+    reportedInput = null;
+    assert.strictEqual(writes.length,written);
+    desc.values.range.max = 10;
+    await assert.rejects(write(20),/outside/, 'Preflight must enforce a changed native range');
+    desc.values.range.max = 100;
     assert.throws(function(){controls.normalize({setting:'option_password_ipcontrol',value:'x',context_id:'a'.repeat(24)});});
     var old = monitor.snapshot().context_id;
     context = {input:'hdmi1_pc',mode:'game',range:'sdrALLM',ready:true};

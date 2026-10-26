@@ -60,8 +60,8 @@ discovery entities, migration from 0.6, and safety limits. Extend broker ACLs fo
 those two topics only when enabling that feature.
 
 TLS is supported with `tls: true` (default port 8883), certificate verification enabled, and an
-optional PEM `ca` string. The C9's old Node/OpenSSL runtime may not negotiate a modern broker's TLS
-policy. Do not disable certificate verification to compensate. Plain MQTT credentials are visible
+optional PEM `ca` string. The supported G6 runs Node 20. Do not disable certificate verification
+to work around a broker configuration problem. Plain MQTT credentials are visible
 on the network; use it only on an appropriately isolated trusted LAN.
 
 ## Discovery and state
@@ -79,14 +79,24 @@ The bridge republishes discovery, its latest state and availability on broker co
 seconds without a fresh publish. Abrupt disconnection uses a retained offline Last Will; orderly
 shutdown sends offline explicitly. HA restarts must not replay an old no-signal reading as a new
 event. MQTT 3.1.1 QoS 0 snapshots are used; the regular refresh repairs dropped
-updates. A small bounded client uses only Node built-ins to support webOS 4's Node 0.12.2.
+updates. The bounded client uses only Node built-ins.
 
 The state object includes physical `input`, `picture_input_dimension` (e.g. `hdmi1_pc`),
 `signal_present` (true/false/null), `signal_state`, `screensaver_type`, `dynamic_range`,
-`picture_mode`, `device_id`, `observed_at`, and `bridge_version`. Input/signal/range are unknown
+`picture_mode`, `device_id`, `observed_at`, `heartbeat_at`, and `bridge_version`. `observed_at`
+is the most recent actual TV observation received by the picture/signal monitors; `heartbeat_at`
+is when the bridge publishes the snapshot. Heartbeats, reconnects, HA birth messages, and replaying
+cached state do not invent new TV observations. Subscription failures invalidate the relevant values
+without advancing `observed_at`. Input/signal/range are unknown
 outside a recognized active HDMI pipeline. The picture preset remains known on no signal if its
 input matches; range becomes unknown because stored picture settings can retain the previous HDR
 bank while no video is arriving. A failed picture subscription clears that picture data.
+
+HDMI session detection and range/webhook reporting share one video-output subscription. Settings
+use live subscriptions with a five-minute recovery read, described in the
+[G6 API notes](g6-api-capabilities.md). Runtime health/log files live in the G6's RAM-backed `/tmp`;
+monitoring does not continuously rewrite diagnostic files on internal flash. Persistent preferences
+are still saved when configured, and requested TV setting changes use LG's normal settings service.
 
 Use broker ACLs allowing the device to publish only its discovery topics and
 its state/availability/command-status topics, and to subscribe to `homeassistant/status` plus its

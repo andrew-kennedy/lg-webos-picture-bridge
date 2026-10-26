@@ -19,14 +19,19 @@ function extract(payload) {
         logical_address: number(device.uniqueId, 15)});
     });
   });
-  return result;
+  // EIM order is not meaningful and can change between identical observations.
+  return result.sort(function (a, b) {
+    var left = JSON.stringify(a), right = JSON.stringify(b);
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
 }
 function create(service, changed, deps) {
   deps = deps || {};
   var schedule = deps.setInterval || setInterval, cancel = deps.clearInterval || clearInterval;
   var later = deps.setTimeout || setTimeout, cancelLater = deps.clearTimeout || clearTimeout;
+  var clock = deps.now || Date.now, previous = null;
   var stopped = false, timer = null, pending = false, request = null, timeout = null, generation = 0;
-  var state = {devices: [], state: 'starting', observed_at: null,
+  var state = {devices: [], state: 'starting', changed_at: null,
     interpretation: 'cached_cec_discovery_not_hdmi_switch_route', last_error: null};
   function poll() {
     if (stopped || pending) return;
@@ -38,8 +43,13 @@ function create(service, changed, deps) {
       if (!error) { try { state.devices = extract(payload); } catch (e) { error = e; } }
       state.state = error ? 'unavailable' : 'observed';
       state.last_error = error ? String(error.message).slice(0, 256) : null;
-      if (error) state.devices = []; else state.observed_at = new Date().toISOString();
-      changed(JSON.parse(JSON.stringify(state)));
+      if (error) state.devices = [];
+      var next = JSON.stringify([state.devices, state.state, state.last_error]);
+      if (next !== previous) {
+        previous = next;
+        state.changed_at = new Date(clock()).toISOString();
+        changed(JSON.parse(JSON.stringify(state)));
+      }
     }
     timeout = later(function () {
       if (request && request.cancel) { try { request.cancel(); } catch (ignored) {} }

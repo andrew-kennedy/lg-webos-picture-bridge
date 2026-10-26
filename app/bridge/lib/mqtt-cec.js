@@ -34,7 +34,7 @@ function discovery(config, id, session) {
 }
 function create(options) {
   var guard = options.guard;
-  var devices = {state: 'starting', devices: [], observed_at: null};
+  var devices = {state: 'starting', devices: [], changed_at: null};
   var channel;
   function snapshot() {
     var status = guard.snapshot();

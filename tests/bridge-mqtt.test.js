@@ -10,6 +10,7 @@ module.exports = function () {
   var subscriptions = [];
   var publishers = [];
   var signalCallback;
+  var videoCallbacks;
   var webhookCalls = 0;
   var stopped = false;
   var mqttApply;
@@ -36,8 +37,9 @@ module.exports = function () {
   var bridge = holder.exports.start(service, {
     config: config, healthStore: {save: function () {}},
     webhook: {postJson: function () { webhookCalls++; }},
-    signalMonitor: {create: function (unused, callback) {
+    signalMonitor: {create: function (unused, callback, unusedHealth, options) {
       signalCallback = callback;
+      videoCallbacks = options;
       return {start: function () {}, stop: function () {}};
     }},
     mqttDiscovery: {create: function (unused, onHealth, dependencies) {
@@ -52,6 +54,12 @@ module.exports = function () {
     }}
   });
   var pictureSub = subscriptions.find(function (s) { return s.uri.includes('settingsservice'); }).sub;
+  assert.ok(!subscriptions.some(function(s){return s.uri.includes('videooutput');}),
+    'The bridge reuses signal-monitor video output instead of adding another subscription');
+  videoCallbacks.video({returnValue:true,subscribed:true,video:[{videoInfo:{hdrType:'HDR10'}}]});
+  assert.strictEqual(bridge.health.last_source,'videooutput','Shared video data still feeds range/webhook reporting');
+  videoCallbacks.videoError(new Error('disconnected'));
+  assert.strictEqual(bridge.health.subscriptions.videooutput.state,'error');
   function picture(mode) {
     pictureSub.emit('response', {payload:{returnValue:true, subscribed:true,
       dimension:{input:'hdmi3', dynamicRange:'sdr', _3dStatus:'2d'}, settings:{pictureMode:mode}}});

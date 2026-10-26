@@ -2,7 +2,7 @@
 
 LG Picture Bridge connects a **rooted 2026 LG G6 (webOS 11)** to Home Assistant. It reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision through MQTT discovery, and applies picture profiles without notification dialogs.
 
-Version **0.9.5** removes the Energy Saving Step, Minimum Brightness and Motion Eye Care controls. The included movie and game profiles keep picture energy saving off. Numeric MQTT settings remain sliders with the TV's live limits. It supports the inspected G6 CEC files from firmware **43.11.73** and **43.21.69**, and fits the normal status view on screen without vertical scrolling. Older C9 firmware is no longer supported. The live verification target is an OLED77G6WUA on **43.21.69 / webOS 11.2.0**, with Homebrew Channel 0.8.0-rc1 and Node 20.12.2. Installing the bridge does not update TV firmware.
+Version **0.10.0** captures settings through subscriptions, caches their descriptions, shares the HDMI video stream, and keeps routine diagnostics in RAM. A five-minute recovery check and fresh validation before manual writes preserve reliable control. It supports the inspected G6 CEC files from firmware **43.11.73** and **43.21.69**, and fits the normal status view on screen without vertical scrolling. Older C9 firmware is no longer supported. The live verification target is an OLED77G6WUA on **43.21.69 / webOS 11.2.0**, with Homebrew Channel 0.8.0-rc1 and Node 20.12.2. Installing the bridge does not update TV firmware.
 
 ## Install and receive updates
 
@@ -14,11 +14,13 @@ https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/latest/downlo
 
 Install **LG Picture Bridge** from that repository. Future GitHub releases appear as Homebrew Channel updates. Configuration, MQTT identity, and CEC policy live outside the package and survive app updates. Home Assistant YAML is maintained separately; updating the app does not overwrite your automations.
 
+After upgrading from 0.9.x, use **Restart bridge** in the app once, or reboot the TV, to move the existing supervisor's log and PID file into RAM. Later starts use the RAM paths automatically.
+
 For manual installation, download the IPK from [Releases](https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases), copy it to the TV, and use the ordinary webOS package installer:
 
 ```sh
 luna-send-pub -i luna://com.webos.appInstallService/dev/install \
-  '{"id":"com.ares.defaultName","ipkUrl":"/home/root/io.github.andrewkennedy.lgpicturebridge_0.9.5_all.ipk","subscribe":true}'
+  '{"id":"com.ares.defaultName","ipkUrl":"/home/root/io.github.andrewkennedy.lgpicturebridge_0.10.0_all.ipk","subscribe":true}'
 ```
 
 Wait for `state: installed`, then interrupt the subscription. Homebrew Channel must already be elevated. No system partition flashing is involved.
@@ -137,7 +139,7 @@ The G6 uses:
 
 Tests cover stale sessions, ambiguous MAIN clients, signal loss, coherent HLG/HDR telemetry, command expiry/replay, correlated failures, bounded input-mode commands, and CEC lease expiry/explicit-selection bypass. The live checks cover application status, MQTT discovery, inactive-bank write/readback, profile commands, and the mounted CEC filter. HDR/Dolby Vision content transitions still need representative playback on the attached sources; successful bank writes alone do not prove every source's output mode.
 
-Runtime files are in `/var/lib/io.github.andrewkennedy.lgpicturebridge/`, with a startup hook at `/var/lib/webosbrew/init.d/55-lg-picture-bridge`. `config.json` contains credentials and is mode 0600. `health.json` and `bridge.log` help diagnose problems without exposing broker passwords.
+Persistent configuration is in `/var/lib/io.github.andrewkennedy.lgpicturebridge/`, with a startup hook at `/var/lib/webosbrew/init.d/55-lg-picture-bridge`. `config.json` contains credentials and is mode 0600. Runtime health, logs, and the PID file are in `/tmp/io.github.andrewkennedy.lgpicturebridge/`, which is RAM-backed on the supported G6. Health updates are coalesced with a one-second deadline; the process heartbeat remains every 30 seconds. Logs contain startup/shutdown and errors, not routine observations or successful setting writes. When the log exceeds 64 KiB, it is trimmed to its newest 32 KiB. Runtime diagnostics disappear on reboot; configuration and CEC preferences persist. Upgrades still recognize the old persistent PID file so the previous supervisor can be stopped safely.
 
 ```sh
 npm ci

@@ -2,17 +2,17 @@
 
 var fs = require('fs');
 var path = require('path');
-var store = require('./config-store');
+var runtime = require('./runtime-store');
 
 function healthPath() {
-  return path.join(store.stateDir(), 'health.json');
+  return path.join(runtime.runtimeDir(), 'health.json');
 }
 
 function save(health) {
-  var directory = store.stateDir();
+  runtime.ensureDirectory();
+  runtime.trimLog();
   var target = healthPath();
   var temporary = target + '.tmp-' + process.pid;
-  if (!fs.existsSync(directory)) fs.mkdirSync(directory, 448); // 0700
   fs.writeFileSync(temporary, JSON.stringify(health, null, 2) + '\n', {mode: 384}); // 0600
   fs.renameSync(temporary, target);
   try { fs.chmodSync(target, 384); } catch (error) { /* Best effort on webOS. */ }
@@ -32,8 +32,33 @@ function clear() {
   }
 }
 
+// Keep live health in memory; persist the newest snapshot once per burst. A
+// fixed deadline (not a resettable debounce) also bounds latency during noise.
+function createWriter(write, snapshot, dependencies) {
+  var deps = dependencies || {};
+  var later = deps.setTimeout || setTimeout, cancel = deps.clearTimeout || clearTimeout;
+  var pending = null, dirty = false, stopped = false;
+  function flush() {
+    if (pending !== null) cancel(pending);
+    pending = null;
+    if (!dirty) return;
+    dirty = false;
+    try { write(snapshot()); } catch (error) { if (deps.onError) deps.onError(error); }
+  }
+  return {
+    request: function () {
+      if (stopped) return;
+      dirty = true;
+      if (pending === null) pending = later(flush, 1000);
+    },
+    flush: flush,
+    stop: function () { stopped = true; flush(); }
+  };
+}
+
 module.exports = {
   clear: clear,
+  createWriter: createWriter,
   healthPath: healthPath,
   load: load,
   save: save

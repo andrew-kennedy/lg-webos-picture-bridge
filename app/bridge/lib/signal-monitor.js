@@ -20,7 +20,8 @@ function pipelineFor(appId, payload) {
   return candidates.length === 1 ? candidates[0].clientId : null;
 }
 
-function create(service, onChange, onHealth) {
+function create(service, onChange, onHealth, options) {
+  options = options || {};
   var subscriptions = [];
   var signal = null;
   var retry = null;
@@ -29,14 +30,17 @@ function create(service, onChange, onHealth) {
   var discoveryGeneration = 0;
   var appId = null;
   var video = null;
-  var current = {input: null, pipeline_id: null, signal_present: null, signal_state: null, screensaver_type: null, dynamic_range: null};
+  var current = {input: null, pipeline_id: null, signal_present: null, signal_state: null, screensaver_type: null, dynamic_range: null, observed_at: null};
 
   function cancel(subscription) {
     if (subscription && typeof subscription.cancel === 'function') {
       try { subscription.cancel(); } catch (error) { /* Already closed. */ }
     }
   }
-  function publish() { onChange(JSON.parse(JSON.stringify(current))); }
+  function publish(observed) {
+    if (observed) current.observed_at = new Date().toISOString();
+    onChange(JSON.parse(JSON.stringify(current)));
+  }
   function health(state, error) { onHealth({state: state, last_error: error || null}); }
   function invalidate() {
     generation += 1;
@@ -68,7 +72,7 @@ function create(service, onChange, onHealth) {
         current.signal_present = state.videoSignalState === 'good' ? true :
           (state.videoSignalState === 'bad' ? false : null);
         clearTimeout(retry); retry = null;
-        health('subscribed'); publish();
+        health('subscribed'); publish(true);
       });
       signal.on('error', failed);
       signal.on('cancel', failed);
@@ -88,13 +92,13 @@ function create(service, onChange, onHealth) {
     }) : [];
     var dynamicRange = outputs.length === 1 ? range.classify((outputs[0].videoInfo || {}).hdrType) : null;
     if (input === current.input && pipeline === current.pipeline_id && signal) {
-      if (current.dynamic_range !== dynamicRange) { current.dynamic_range = dynamicRange; publish(); }
+      current.dynamic_range = dynamicRange; publish(true);
       return;
     }
     invalidate();
     current.input = input; current.pipeline_id = pipeline;
     current.dynamic_range = dynamicRange;
-    publish();
+    publish(true);
     if (pipeline) watchSignal();
     else {
       health(input ? 'waiting_for_pipeline' : 'not_hdmi');
@@ -115,6 +119,7 @@ function create(service, onChange, onHealth) {
       subscriptions.forEach(cancel); subscriptions = [];
       invalidate(); appId = null; video = null;
       current.input = null; current.pipeline_id = null;
+      if (options.videoError) options.videoError(new Error('HDMI session discovery subscription lost'));
       health('error', 'HDMI session discovery subscription lost'); publish(); recover();
     }
     function watch(uri, receive) {
@@ -136,6 +141,8 @@ function create(service, onChange, onHealth) {
       appId = payload.appId; reconcile();
     });
     if (epoch === discoveryGeneration) watch(VIDEO, function (payload) {
+      // Share this stream with range/webhook reporting instead of subscribing twice.
+      if (options.video) options.video(payload);
       if (!Array.isArray(payload.clients)) return;
       video = payload; reconcile();
     });

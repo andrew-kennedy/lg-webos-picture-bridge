@@ -122,4 +122,26 @@ module.exports = function () {
   assert.strictEqual(discovery.snapshot(hdrPicture, hdrSignal, {device_id: 'g6'}).dynamic_range, null,
     'A range transition must wait for matching picture dimensions');
 
+  var clock=require('./fake-clock')();
+  config.mqtt.commands_enabled=false;
+  fake=new EventEmitter();sent=[];
+  fake.publish=function(topic,payload,retain){sent.push({topic:topic,payload:payload,retain:retain});return true;};
+  fake.subscribe=function(){};fake.start=function(){this.emit('connect');};fake.stop=function(){};
+  publisher=discovery.create(config,function(){},Object.assign({},clock,{client:{create:function(){return fake;}}}));
+  var observed=new Date(clock.now()).toISOString();
+  publisher.picture({input:'hdmi3',picture_mode:'filmMaker',dynamic_range:'sdr',observed_at:observed});
+  publisher.signal({input:'hdmi3',signal_present:true,observed_at:observed});publisher.start();
+  function latestState(){return JSON.parse(sent.filter(function(s){return s.topic.endsWith('/state');}).at(-1).payload);}
+  assert.strictEqual(latestState().observed_at,observed);
+  clock.tick(30000);
+  assert.strictEqual(latestState().observed_at,observed,'Heartbeat publication is not a new TV observation');
+  assert.strictEqual(latestState().heartbeat_at,new Date(clock.now()).toISOString());
+  clock.tick(1000);fake.emit('message','homeassistant/status','online');
+  assert.strictEqual(latestState().observed_at,observed,'HA birth replays the original observation timestamp');
+  observed=new Date(clock.now()).toISOString();
+  publisher.signal({input:'hdmi3',signal_present:false,observed_at:observed});
+  assert.strictEqual(latestState().observed_at,observed);
+  clock.tick(1000);publisher.signal(null);
+  assert.strictEqual(latestState().observed_at,observed,'Subscription failure invalidates data without inventing an observation');
+  publisher.stop();assert.strictEqual(clock.size(),0);
 };

@@ -52,7 +52,8 @@ function buildDiscovery(config) {
   });
 }
 function physicalInput(value) { return value ? String(value).replace(/_pc$/, '') : null; }
-function snapshot(picture, signal, config) {
+function snapshot(picture, signal, config, timing) {
+  timing = timing || {};
   var aligned = picture && signal && physicalInput(picture.input) === signal.input && signal.input;
   // HLG uses the HDR picture bank on G6. The MAIN video output identifies the
   // transfer function; wait for coherent picture dimensions during transitions.
@@ -68,7 +69,8 @@ function snapshot(picture, signal, config) {
     signal_present: signal ? signal.signal_present : null,
     signal_state: signal ? signal.signal_state : null,
     screensaver_type: signal ? signal.screensaver_type : null,
-    observed_at: new Date().toISOString(),
+    observed_at: timing.observed_at || null,
+    heartbeat_at: timing.heartbeat_at || new Date().toISOString(),
     bridge_version: appInfo.version
   };
 }
@@ -86,6 +88,10 @@ function create(config, onHealth, dependencies) {
   var refreshTimer = null;
   var stopped = false;
   var lastPublished = null;
+  var lastObserved = null;
+  var clock = deps.now || Date.now;
+  var later = deps.setTimeout || setTimeout, cancelLater = deps.clearTimeout || clearTimeout;
+  var schedule = deps.setInterval || setInterval, cancel = deps.clearInterval || clearInterval;
   var client = (deps.client || mqtt).create({host: settings.host, port: settings.port,
     tls: settings.tls, ca: settings.ca, username: settings.username, password: settings.password,
     client_id: id, availability_topic: base + '/availability'});
@@ -131,11 +137,13 @@ function create(config, onHealth, dependencies) {
 
   function publish() {
     if (!online || stopped) return false;
-    var state = snapshot(picture, signal, config);
+    var state = snapshot(picture, signal, config, {
+      observed_at: lastObserved, heartbeat_at: new Date(clock()).toISOString()
+    });
     var submitted = false;
     // Do not retain observations: HA must not replay stale no-signal states on restart.
     if (client.publish(base + '/state', JSON.stringify(state), false)) {
-      lastPublished = state.observed_at;
+      lastPublished = state.heartbeat_at;
       reportHealth('connected');
       submitted = true;
     }
@@ -173,8 +181,14 @@ function create(config, onHealth, dependencies) {
     return submitted;
   }
   function update() {
-    clearTimeout(timer);
-    timer = setTimeout(publish, config.debounce_ms);
+    cancelLater(timer);
+    timer = later(publish, config.debounce_ms);
+  }
+  function observed(value) {
+    if (!value) return;
+    var timestamp = Object.prototype.hasOwnProperty.call(value, 'observed_at') ?
+      value.observed_at : new Date(clock()).toISOString();
+    if (timestamp && isFinite(Date.parse(timestamp)) && (!lastObserved || timestamp > lastObserved)) lastObserved = timestamp;
   }
   client.on('status', function (status) {
     reportHealth(status.state, status.error);
@@ -203,13 +217,14 @@ function create(config, onHealth, dependencies) {
     if (controls && topic === base + '/settings/command') controls.receive(message, metadata);
   });
   return {
-    start: function () { client.start(); if (cec) cec.start(); if (controls) controls.start(); refreshTimer = setInterval(publish, 30000); },
-    picture: function (value) { picture = value; observeContext(); update(); },
+    start: function () { client.start(); if (cec) cec.start(); if (controls) controls.start(); refreshTimer = schedule(publish, 30000); },
+    picture: function (value) { picture = value; observed(value); observeContext(); update(); },
     signal: function (value) {
       signal = value;
+      observed(value);
       observeContext();
       // Invalidated sessions and real signal loss are published immediately.
-      if (!value || value.signal_present !== true) { clearTimeout(timer); publish(); }
+      if (!value || value.signal_present !== true) { cancelLater(timer); publish(); }
       else update();
     },
     refresh: announce,
@@ -217,7 +232,7 @@ function create(config, onHealth, dependencies) {
       stopped = true; if (commands) commands.disconnect();
       if (cec) cec.stop();
       if (controls) controls.stop();
-      clearTimeout(timer); clearInterval(refreshTimer); client.stop(callback);
+      cancelLater(timer); cancel(refreshTimer); client.stop(callback);
     }
   };
 }

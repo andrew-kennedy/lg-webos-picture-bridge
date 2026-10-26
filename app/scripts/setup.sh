@@ -25,7 +25,7 @@ case "${1:-}" in
         "$NODE_BIN" "$APP_ROOT/bridge/cec-guard-cli.js" remove
         "$APP_ROOT/scripts/startup.sh" stop
         "$NODE_BIN" "$APP_ROOT/bridge/configure.js" clear
-        rm -f "$STATE_DIR/health.json"
+        rm -f "$STATE_DIR/health.json" "/tmp/$APP_ID/health.json"
         rm -f "$STARTUP_LINK"
         "$APP_ROOT/scripts/install-security.sh" remove
         ;;

@@ -1,6 +1,7 @@
 #!/bin/sh
 
 APP_ID="io.github.andrewkennedy.lgpicturebridge"
+APP_ROOT="/media/developer/apps/usr/palm/applications/$APP_ID"
 STATE_DIR="/var/lib/$APP_ID"
 SERVICE_ID="$APP_ID.service"
 SERVICE_ROOT="/media/developer/apps/usr/palm/services/$SERVICE_ID"
@@ -20,6 +21,7 @@ stop_child() {
 trap stop_child TERM INT HUP
 
 while [ "$stopping" -eq 0 ] && [ -f "$STATE_DIR/config.json" ]; do
+    /usr/bin/node -e 'require(process.argv[1]).trimLog()' "$APP_ROOT/bridge/lib/runtime-store" || exit 1
     if [ ! -x "$HOMEBREW_RUNNER" ]; then
         echo "Homebrew JS-service runner was not found: $HOMEBREW_RUNNER"
         sleep 30

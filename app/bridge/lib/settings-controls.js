@@ -1,6 +1,6 @@
 'use strict';
 
-var crypto = require('crypto');
+var observer = require('./settings-observer');
 var catalog = require('./settings-catalog');
 var executor = require('./luna-executor');
 var URI = 'luna://com.webos.settingsservice/';
@@ -19,6 +19,10 @@ function call(service, method, params, callback) {
       callback(null, (message && message.payload) || message || {});
     });
   } catch (error) { if (!done) { done = true; clearTimeout(timer); callback(error); } }
+  return {cancel:function () {
+    done = true; clearTimeout(timer);
+    if (request && request.cancel) { try { request.cancel(); } catch (ignored) { /* Already closed. */ } }
+  }};
 }
 function describe(entry, description, value) {
   if (!description || value === undefined || value === null || typeof value === 'object') return null;
@@ -70,117 +74,80 @@ function encode(control, value) {
   return control.choices[i];
 }
 function create(service, options) {
-  var controls = {}, contextId = null, currentSignature = null, observedAt = 0;
-  var stopped = false, polling = false, pending = false, timer = null, interval = null;
-  var writing = false, generation = 0, requestedSignature = null;
-  function snapshot() { return {context_id: contextId, observed_at: observedAt,
-    context: options.context(), controls: controls}; }
-  function emit() { if (!stopped) options.changed(snapshot()); }
-  function invalidate() {
-    contextId = crypto.randomBytes(12).toString('hex'); observedAt = 0; generation += 1;
-    Object.keys(controls).forEach(function (id) { controls[id].available = false; }); emit();
-  }
-  function refresh(callback) {
-    if (stopped) { if (callback) callback(failure('stopped', 'Settings monitor stopped')); return; }
-    if (polling) { pending = true; if (callback) callback(failure('settings_busy', 'Settings are refreshing; retry shortly')); return; }
-    polling = true;
-    var captured = signature(options.context()), epoch = generation, next = {}, categories = Object.keys(catalog.groups);
-    function finish(error) {
-      polling = false;
-      if (!stopped && epoch === generation && captured === signature(options.context())) {
-        controls = next; observedAt = error ? 0 : Date.now();
-        if (!contextId || currentSignature !== captured) contextId = crypto.randomBytes(12).toString('hex');
-        currentSignature = captured; emit();
-      }
-      if (callback) callback(error);
-      if (pending) { pending = false; schedule(); }
-    }
-    function category(index) {
-      if (stopped || epoch !== generation || captured !== signature(options.context())) { finish(failure('stale_context', 'TV context changed')); return; }
-      if (index >= categories.length) { finish(); return; }
-      var cat = categories[index], keys = catalog.groups[cat];
-      call(service, 'getSystemSettingDesc', {category: cat, keys: keys}, function (error, response) {
-        if (error) { finish(error); return; }
-        var descriptions = {};
-        // A mixed request can return partial results with returnValue:false.
-        (response.results || []).forEach(function (d) { if (keys.indexOf(d.key) !== -1) descriptions[d.key] = d; });
-        function read(appSpecific) {
-          var selected = keys.filter(function (key) { return descriptions[key] && (descriptions[key].dbtype === 'M') === appSpecific; });
-          if (!selected.length) { if (!appSpecific) read(true); else category(index + 1); return; }
-          var params = {category: cat, keys: selected};
-          if (appSpecific) params.current_app = true;
-          call(service, 'getSystemSettings', params, function (readError, values) {
-            if (readError) { finish(readError); return; }
-            catalog.entries.filter(function (e) { return e.category === cat; }).forEach(function (entry) {
-              if (selected.indexOf(entry.key) === -1) return;
-              var control = describe(entry, descriptions[entry.key], (values.settings || {})[entry.key]);
-              if (!control) return;
-              control.dimension = {};
-              if (appSpecific) { control.app_id = values.app_id; if (!control.app_id) control.available = false; }
-              control.dimensions.forEach(function (key) {
-                if (values.dimension && values.dimension[key] !== undefined) control.dimension[key] = values.dimension[key];
-                else control.available = false;
-              });
-              var ctx = options.context();
-              if (cat === 'picture' || control.dimensions.length || appSpecific) {
-                if (!ctx || !ctx.ready || !ctx.input || !/^hdmi[1-4](?:_pc)?$/.test(ctx.input)) control.available = false;
-              }
-              next[entry.id] = control;
-            });
-            if (!appSpecific) read(true); else category(index + 1);
-          });
-        }
-        read(false);
-      });
-    }
-    category(0);
-  }
-  function schedule() { clearTimeout(timer); if (!stopped) timer = setTimeout(refresh, 350); }
+  var monitor = observer.create(service, Object.assign({}, options, {describe:describe, call:call}));
+  var writing = false;
   function write(command, callback, guard) {
     if (writing) { callback(failure('settings_busy', 'A setting change is already in progress')); return; }
-    var control, value, captured = signature(options.context()), epoch = generation;
+    var control, description, value, epoch = monitor.generation(), captured = signature(options.context());
     function check() {
       if (guard) guard();
-      if (stopped || command.context_id !== contextId || epoch !== generation ||
-          captured !== currentSignature || captured !== signature(options.context()) || Date.now() - observedAt > 30000) {
+      if (!monitor.current() || command.context_id !== monitor.snapshot().context_id ||
+          epoch !== monitor.generation() || captured !== signature(options.context())) {
         throw failure('stale_context', 'TV settings changed context; wait for refreshed controls');
       }
     }
+    function done(error, result) { writing = false; callback(error, result); }
     try {
-      command = normalize(command); check(); control = controls[command.setting];
+      command = normalize(command); check(); control = monitor.snapshot().controls[command.setting];
       if (!control || !control.available) throw failure('setting_unavailable', 'This setting is unavailable in the current TV context');
-      value = encode(control, command.value);
+      encode(control, command.value);
     } catch (error) { callback(error); return; }
     writing = true;
-    var params = {category: control.category, settings: {}, store: true, notify: true};
-    params.settings[control.key] = value;
-    if (control.dimensions.length) params.dimension = control.dimension;
-    if (control.current_app) params.app_id = control.app_id;
-    try { check(); } catch (error) { writing = false; callback(error); return; }
-    executor.executeOne(service, {kind: 'user_setting', params: params}, function (error) {
-      if (error) { writing = false; callback(error); schedule(); return; }
-      var readParams = {category: control.category, keys: [control.key]};
-      if (control.dimensions.length) readParams.dimension = control.dimension;
-      if (control.current_app) readParams.app_id = control.app_id;
-      call(service, 'getSystemSettings', readParams, function (readError, response) {
-        writing = false;
-        var actual = response && response.settings && response.settings[control.key];
-        if (!readError && (!response || response.returnValue !== true || String(actual) !== String(value))) {
-          readError = failure('readback_failed', 'TV did not retain the requested setting');
-        }
-        // A mode change legitimately invalidates this snapshot. The readback is
-        // explicitly scoped to the original target, never the next input.
-        callback(readError, {setting: control.id, value: actual, backend: 'root_luna'});
-        schedule();
+    // A silent subscription is normal. Revalidate just the requested setting's
+    // live permissions/range and binding before writing, instead of polling to
+    // keep a 30-second cache-age deadline alive.
+    call(service, 'getSystemSettingDesc', {category:control.category, keys:[control.key]}, function (error, response) {
+      if (error) { done(error); return; }
+      try {
+        check();
+        var patch = (observer.descriptions(response) || []).find(function (d) { return d.key === control.key; });
+        if (!patch) throw failure('setting_unavailable', 'The TV no longer describes this setting');
+        description = observer.mergeDescription(monitor.description(control), patch);
+      } catch (invalid) { done(invalid); return; }
+      var readParams = {category:control.category, keys:[control.key]};
+      if (control.current_app) readParams.current_app = true;
+      call(service, 'getSystemSettings', readParams, function (readError, current) {
+        if (readError) { done(readError); return; }
+        try {
+          check();
+          if (current.returnValue !== true) throw failure('setting_unavailable', 'The TV did not confirm the current setting');
+          var fresh = observer.makeControl(control, description, {value:(current.settings || {})[control.key],
+            dimension:current.dimension, app_id:current.app_id}, options.context(), describe);
+          if (!fresh || !fresh.available) throw failure('setting_unavailable', 'This setting is unavailable in the current TV context');
+          if (signature(fresh.dimension) !== signature(control.dimension) || fresh.app_id !== control.app_id ||
+              fresh.current_app !== control.current_app) throw failure('stale_context', 'TV setting scope changed before the write');
+          value = encode(fresh, command.value);
+          monitor.update(control, description, current);
+          control = fresh;
+          check();
+        } catch (invalid) { done(invalid); return; }
+        var params = {category:control.category, settings:{}, store:true, notify:true};
+        params.settings[control.key] = value;
+        if (control.dimensions.length) params.dimension = control.dimension;
+        if (control.current_app) params.app_id = control.app_id;
+        executor.executeOne(service, {kind:'user_setting', params:params}, function (writeError) {
+          var verify = {category:control.category, keys:[control.key]};
+          if (control.dimensions.length) verify.dimension = control.dimension;
+          if (control.current_app) verify.app_id = control.app_id;
+          call(service, 'getSystemSettings', verify, function (verifyError, actual) {
+            var actualValue = actual && actual.settings && actual.settings[control.key];
+            if (!verifyError && (!actual || actual.returnValue !== true || String(actualValue) !== String(value) ||
+                control.dimensions.some(function (key) { return !actual.dimension || actual.dimension[key] !== control.dimension[key]; }))) {
+              verifyError = failure('readback_failed', 'TV did not retain the requested setting');
+            }
+            // Picture-mode writes can legitimately change context before the
+            // scoped readback. Never apply that readback to a newer cache.
+            if (epoch === monitor.generation() && monitor.current() && actual && actual.returnValue === true) {
+              monitor.update(control, description, actual);
+            }
+            done(writeError || verifyError, {setting:control.id, value:actualValue, backend:'root_luna'});
+          });
+        });
       });
     });
   }
-  return {snapshot: snapshot, write: write, refresh: refresh,
-    contextChanged: function () {
-      var next = signature(options.context());
-      if (next !== requestedSignature) { requestedSignature = next; invalidate(); schedule(); }
-    },
-    start: function () { stopped = false; requestedSignature = signature(options.context()); invalidate(); refresh(); interval = setInterval(refresh, 10000); },
-    stop: function () { stopped = true; generation += 1; clearTimeout(timer); clearInterval(interval); }};
+  return {snapshot:monitor.snapshot, write:write, refresh:monitor.refresh,
+    contextChanged:monitor.contextChanged, start:monitor.start, stop:monitor.stop};
 }
+
 module.exports = {create: create, describe: describe, normalize: normalize, encode: encode, call: call};

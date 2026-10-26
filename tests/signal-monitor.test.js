@@ -4,13 +4,14 @@ var EventEmitter = require('events').EventEmitter;
 var monitor = require('../app/bridge/lib/signal-monitor');
 
 module.exports = function () {
-  var calls = [], changes = [], health = [];
+  var calls = [], changes = [], health = [], videoPayloads = [];
   var service = {subscribe: function (uri, payload) {
     var sub = new EventEmitter();
     sub.cancel = function () { sub.emit('cancel'); };
     calls.push({uri: uri, payload: payload, sub: sub}); return sub;
   }};
-  var watcher = monitor.create(service, function (state) { changes.push(state); }, function (state) { health.push(state); });
+  var watcher = monitor.create(service, function (state) { changes.push(state); }, function (state) { health.push(state); },
+    {video:function(payload){videoPayloads.push(payload);}});
   function respond(index, payload) { calls[index].sub.emit('response', {payload: payload}); }
   function foreground(input) { return {returnValue: true, subscribed: true, appId: 'com.webos.app.' + input}; }
   function video(id, input) {
@@ -27,6 +28,8 @@ module.exports = function () {
   assert.strictEqual(calls[0].uri, 'luna://com.webos.applicationManager/getForegroundAppInfo');
   assert.strictEqual(calls[1].uri, 'luna://com.webos.service.videooutput/getStatus');
   respond(1, video('session1', 'hdmi3'));
+  assert.strictEqual(videoPayloads.length,1,'The range reporter receives the existing video subscription');
+  assert.strictEqual(calls.filter(function(c){return c.uri.includes('videooutput');}).length,1);
   assert.strictEqual(latest().signal_present, null, 'Video alone cannot identify the foreground input');
   respond(0, foreground('hdmi3'));
   assert.strictEqual(calls[2].uri, 'luna://com.webos.service.extinputs.hdmi/getSignalState');

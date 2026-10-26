@@ -5,6 +5,7 @@ var fs = require('fs');
 var path = require('path');
 var store = require('./lib/config-store');
 var healthStore = require('./lib/health-store');
+var runtimeStore = require('./lib/runtime-store');
 var appInfo = require('../appinfo.json');
 
 var APP_ID = 'io.github.andrewkennedy.lgpicturebridge';
@@ -23,10 +24,10 @@ function processIsRunning(pidFile) {
   }
 }
 
-var pidFile = path.join(store.stateDir(), 'bridge.pid');
+var pidFile = path.join(runtimeStore.runtimeDir(), 'bridge.pid');
 var paired = store.exists();
 var config = paired ? store.load() : null;
-var running = processIsRunning(pidFile);
+var running = processIsRunning(pidFile) || processIsRunning(path.join(store.stateDir(), 'bridge.pid'));
 var health = healthStore.load();
 var heartbeatAge = health && health.heartbeat_at ?
   Date.now() - new Date(health.heartbeat_at).getTime() : null;

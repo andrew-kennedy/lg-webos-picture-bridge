@@ -16,8 +16,11 @@ module.exports = function () {
     setTimeout: function (callback) { deadlines.push(callback); return 1; }, clearTimeout: function () {}});
   watcher.start(); replies[0]({payload: payload});
   assert.strictEqual(changes[0].state, 'observed');
-  intervals[0](); deadlines[1]();
+  assert.ok(changes[0].changed_at);
+  intervals[0](); replies[1]({payload:payload});
+  assert.strictEqual(changes.length,1,'Repeated inventory reads must not publish timestamp-only updates');
+  intervals[0](); deadlines[2]();
   assert.strictEqual(changes[1].state, 'unavailable'); assert.deepStrictEqual(changes[1].devices, []);
-  replies[1]({payload: payload}); assert.strictEqual(changes.length, 2, 'Late responses cannot revive timed-out discovery');
-  intervals[0](); watcher.stop(); replies[2]({payload: payload}); assert.strictEqual(changes.length, 2);
+  replies[2]({payload: payload}); assert.strictEqual(changes.length, 2, 'Late responses cannot revive timed-out discovery');
+  intervals[0](); watcher.stop(); replies[3]({payload: payload}); assert.strictEqual(changes.length, 2);
 };

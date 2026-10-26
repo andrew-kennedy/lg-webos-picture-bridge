@@ -44,6 +44,7 @@ function start(service, dependencies) {
   var policyServer = null;
   var commandQueue = [];
   var commandRunning = false;
+  var heartbeatTimer = null;
   var health = {
     bridge_version: appInfo.version,
     service_registered: true,
@@ -82,6 +83,9 @@ function start(service, dependencies) {
   };
   health.mqtt = {state: 'disabled'};
   health.hdmi_signal = null;
+  var healthWriter = healthStore.createWriter(function (value) { healthClient.save(value); },
+    function () { return health; }, {setTimeout: setTimeout, clearTimeout: clearTimeout,
+      onError: function (error) { log('Health state write failed: ' + error.message); }});
 
   function usesMqtt() { return config.mqtt && config.transport !== 'webhook'; }
   function usesWebhook() { return config.callback_url && config.transport !== 'mqtt'; }
@@ -111,10 +115,7 @@ function start(service, dependencies) {
   }
 
   function saveHealth() {
-    health.heartbeat_at = now();
-    try { healthClient.save(health); } catch (error) {
-      log('Health state write failed: ' + error.message);
-    }
+    healthWriter.request();
   }
 
   function selectNewestCandidate() {
@@ -177,8 +178,6 @@ function start(service, dependencies) {
       health.last_delivery_status = 'http_' + response.statusCode;
       health.last_error = null;
       saveHealth();
-      log('Delivered ' + candidate.dynamic_range + ' from ' + candidate.source +
-        ' (HTTP ' + response.statusCode + ')');
       newest = selectNewestCandidate();
       if (!pending && newest && candidateIdentity(newest) !== candidateIdentity(lastDelivered)) {
         pending = newest;
@@ -208,7 +207,9 @@ function start(service, dependencies) {
 
   function handlePayload(source, payload) {
     var extracted = range.extract(source, payload);
-    var pictureContext = source === 'picture' ?
+    var pictureContext = source === 'picture' && payload &&
+      ((payload.settings && payload.settings.pictureMode !== undefined) ||
+       (payload.dimension && Object.keys(payload.dimension).length)) ?
       range.extractPictureContext(payload, currentPictureContext) : null;
     var sourceHealth = health.subscriptions[source];
     var payloadSummary = summarizePayload(payload);
@@ -241,6 +242,7 @@ function start(service, dependencies) {
 
     sourceHealth.state = payload && payload.subscribed === true ? 'subscribed' : 'responding';
     if (pictureContext) {
+      pictureContext.observed_at = now();
       currentPictureContext = pictureContext;
       health.current_picture_context = pictureContext;
       if (mqttPublisher) mqttPublisher.picture(pictureContext);
@@ -252,7 +254,6 @@ function start(service, dependencies) {
       }
       if (sourceHealth.last_unrecognized_payload !== payloadSummary) {
         sourceHealth.last_unrecognized_payload = payloadSummary;
-        log('Unrecognized ' + source + ' payload: ' + payloadSummary);
       }
       saveHealth();
       return;
@@ -271,8 +272,6 @@ function start(service, dependencies) {
     health.last_observed_at = extracted.observed_at;
     health.last_error = null;
     saveHealth();
-    log('Observed ' + extracted.dynamic_range + ' from ' + source +
-      ' (' + extracted.raw_value + ')');
     scheduleDelivery();
   }
 
@@ -337,7 +336,6 @@ function start(service, dependencies) {
       health.last_command = commandSummary(normalized, 'running', count);
       health.last_command.completed_operations = index + 1;
       saveHealth();
-      log('Applied ' + operation.kind + ' to ' + (operation.params.category || operation.params.id));
     }, function (error) {
       commandRunning = false;
       if (error) {
@@ -354,8 +352,6 @@ function start(service, dependencies) {
       health.last_command.completed_operations = operations.length;
       health.last_error = null;
       saveHealth();
-      log('Completed ' + normalized.scope + ' picture policy for ' + normalized.input +
-        ' (' + operations.length + ' Luna writes)');
       queued.callback(null, {
         ok: true,
         dry_run: false,
@@ -509,6 +505,7 @@ function start(service, dependencies) {
     log('Stopping after ' + signal);
     if (debounceTimer) clearTimeout(debounceTimer);
     if (retryTimer) clearTimeout(retryTimer);
+    clearInterval(heartbeatTimer);
     Object.keys(subscriptionRetries).forEach(function (source) { clearTimeout(subscriptionRetries[source]); });
     if (signalWatcher) signalWatcher.stop();
     if (mqttPublisher) mqttPublisher.stop();
@@ -520,6 +517,8 @@ function start(service, dependencies) {
         if (subscription && typeof subscription.cancel === 'function') subscription.cancel();
       } catch (error) { /* Subscription is already closed. */ }
     });
+    health.stopped_at = now();
+    saveHealth(); healthWriter.stop();
     process.exit(0);
   }
 
@@ -531,31 +530,39 @@ function start(service, dependencies) {
   process.on('uncaughtException', function (error) {
     health.last_error = 'Fatal error: ' + (error.stack || error.message);
     saveHealth();
+    healthWriter.flush();
     log(health.last_error);
     process.exit(1);
   });
 
   log('Starting registered LG Picture Bridge ' + appInfo.version + ' for ' + config.device_id);
   saveHealth();
+  healthWriter.flush();
   startMqtt();
   signalWatcher = (injected.signalMonitor || signalMonitor).create(service, function (state) {
     currentSignal = state;
     health.hdmi_signal = state;
+    if (state.observed_at && (!health.last_observed_at || state.observed_at > health.last_observed_at)) {
+      health.last_observed_at = state.observed_at;
+    }
     if (mqttPublisher) mqttPublisher.signal(state);
     saveHealth();
   }, function (state) {
     health.subscriptions.hdmi_signal = state;
+    if (state.state === 'subscribing') health.subscriptions.videooutput.state = 'subscribing';
     saveHealth();
+  }, {
+    video: function (payload) { handlePayload('videooutput', payload); },
+    videoError: function (error) { markSubscriptionError('videooutput', error); }
   });
   signalWatcher.start();
-  subscribe('videooutput', 'luna://com.webos.service.videooutput/getStatus', {subscribe: true});
   subscribe('picture', 'luna://com.webos.settingsservice/getSystemSettings', {
     category: 'picture',
     keys: ['pictureMode'],
     subscribe: true
   });
   startPolicyServer();
-  setInterval(saveHealth, 30000);
+  heartbeatTimer = setInterval(function () { health.heartbeat_at = now(); saveHealth(); }, 30000);
   return {
     applyPolicy: applyPolicy,
     health: health,
