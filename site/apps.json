@@ -10,27 +10,27 @@
       "id": "io.github.andrewkennedy.lgpicturebridge",
       "title": "LG Picture Bridge",
       "iconUri": "https://raw.githubusercontent.com/andrew-kennedy/lg-webos-picture-bridge/main/site/icon160.png",
-      "manifestUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/download/v0.8.1/io.github.andrewkennedy.lgpicturebridge.manifest.json",
+      "manifestUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/download/v0.9.0/io.github.andrewkennedy.lgpicturebridge.manifest.json",
       "manifest": {
         "id": "io.github.andrewkennedy.lgpicturebridge",
-        "version": "0.8.1",
+        "version": "0.9.0",
         "type": "web",
         "title": "LG Picture Bridge",
-        "appDescription": "Reports TV dynamic-range changes to Home Assistant",
+        "appDescription": "TV settings and signal monitoring for Home Assistant",
         "iconUri": "https://raw.githubusercontent.com/andrew-kennedy/lg-webos-picture-bridge/main/app/assets/icon160.png",
         "sourceUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge",
         "rootRequired": true,
-        "ipkUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/download/v0.8.1/io.github.andrewkennedy.lgpicturebridge_0.8.1_all.ipk",
+        "ipkUrl": "https://github.com/andrew-kennedy/lg-webos-picture-bridge/releases/download/v0.9.0/io.github.andrewkennedy.lgpicturebridge_0.9.0_all.ipk",
         "ipkHash": {
-          "sha256": "69c9f84e686e2a816cc1dfe506f12d1db6424347428d335116c7032dc02e52a4"
+          "sha256": "3985bda21161d1ab3d7e11046d6e765c8cd2963960404d4daabf48d9fdea5be9"
         },
-        "ipkSize": 80752
+        "ipkSize": 85530
       },
       "pool": "main",
       "requirements": {
         "webosRelease": ">=11.0"
       },
-      "shortDescription": "Reports TV dynamic-range changes to Home Assistant",
+      "shortDescription": "TV settings and signal monitoring for Home Assistant",
       "fullDescriptionUrl": "https://raw.githubusercontent.com/andrew-kennedy/lg-webos-picture-bridge/main/site/full_description.html"
     }
   ]
