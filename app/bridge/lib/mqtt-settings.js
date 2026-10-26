@@ -24,7 +24,7 @@ function discovery(config, id, session, snapshot) {
         "'expires_at': as_timestamp(now()) + 30, 'policy': {'setting': '" + key +
         "', 'context_id': '" + (snapshot.context_id || '') + "', 'value': value}} | to_json }}"};
     if (component === 'number') {
-      payload.min = control.min; payload.max = control.max; payload.step = control.step; payload.mode = 'box';
+      payload.min = control.min; payload.max = control.max; payload.step = control.step; payload.mode = 'slider';
     } else payload.options = control.options;
     return {topic: config.mqtt.discovery_prefix + '/' + component + '/' + uid + '/config', payload: payload};
   });

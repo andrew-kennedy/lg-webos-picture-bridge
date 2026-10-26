@@ -63,6 +63,10 @@ module.exports = async function () {
     assert.ok(!catalog.entries.some(function(e) {return /whiteBalance|colorManagement|Reset|password|update|factory/i.test(e.key);}));
     assert.ok(!catalog.entries.some(function(e) {return ['option','general'].includes(e.category);}));
     assert.ok(mqtt.tombstones(config,'test').includes('homeassistant/select/test_setting_option_pointerSize/config'));
+    catalog.retiredIds.forEach(function (id) {
+      assert.throws(function () { controls.normalize({setting:id,value:'on',context_id:monitor.snapshot().context_id}); },
+        /discovered TV setting/, 'A removed control cannot be changed by an old MQTT command: ' + id);
+    });
     // A response from a previous input must not become the new control snapshot.
     delayed = []; var poll = refresh().catch(function(e){return e;});
     context.input = 'hdmi4'; monitor.contextChanged();

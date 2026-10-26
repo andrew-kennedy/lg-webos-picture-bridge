@@ -43,10 +43,9 @@ Examples:
 | `select.lg_tv_other_freesync` | FreeSync for the active HDMI port |
 | `select.lg_tv_other_qmsvrr` | Quick Media Switching |
 | `select.lg_tv_sound_soundoutputdigital` | PCM / Auto / Pass Through |
-| `select.lg_tv_sound_earcsupport` | eARC |
 | `sensor.lg_tv_settings_command` | Correlated results, active context and control counts |
 
-The TV supplies current values, ranges, choices and active/visible flags. Unsupported or mode-inapplicable controls are unavailable. Picture and dimension-dependent controls require a confirmed active HDMI picture. App-specific values are read separately and written to the captured application ID. Global audio settings remain usable without an HDMI picture. Controls refresh every ten seconds and after writes or input/mode changes.
+The TV supplies current values, ranges, choices and active/visible flags. Numeric controls use Home Assistant's MQTT slider mode, preserving each live minimum, maximum and step rather than assuming a 0–100 scale. For example, this G6 reports sharpness as 0–50, color temperature as −50–50, gamma level as −3–3, and stabilizers as 0–20. Unsupported or mode-inapplicable controls are unavailable. Picture and dimension-dependent controls require a confirmed active HDMI picture. App-specific values are read separately and written to the captured application ID. Global audio settings remain usable without an HDMI picture. Controls refresh every ten seconds and after writes or input/mode changes.
 
 Unchanged control observations are not repeatedly published, avoiding needless Home Assistant recorder updates. Discovery and values are republished when Home Assistant or the broker reconnects.
 
@@ -56,7 +55,7 @@ Live end-to-end checks covered a Home Assistant OLED-brightness change from 80 t
 
 Manual changes can be overwritten when the existing source, dynamic-range or day/night automation reapplies a profile. Change the profile or brightness helper for a lasting automated preference.
 
-The catalog deliberately omits AV-sync, audio-balance, pointer, accessibility, sign-language, startup and other set-once convenience controls. Upgrades remove their old Home Assistant discovery entries without changing the underlying TV settings. It also omits service-menu operations, firmware settings, reset actions, private/account settings, calibration LUTs, white-balance fine adjustments, CMS and compound object/array editors. The existing profile API still handles structured HDMI RGB range. Discovery never copies RTINGS' panel-specific calibration values or changes a setting just by discovering it.
+The catalog deliberately omits LG Sound Sync, Sound Optimizer, Sound Mode Sync, sound mode, Dolby Atmos support, virtual surround, eARC, AI Sound, AI Game Sound and Clear Voice controls, along with AV-sync, audio-balance, pointer, accessibility, sign-language, startup and other set-once convenience controls. Upgrades remove their old Home Assistant discovery entries without changing the underlying TV settings. Turning off AI audio processing is a separate TV preference, not a side effect of installing this app. The catalog also omits service-menu operations, firmware settings, reset actions, private/account settings, calibration LUTs, white-balance fine adjustments, CMS and compound object/array editors. The existing profile API still handles structured HDMI RGB range. Discovery never copies RTINGS' panel-specific calibration values or changes a setting just by discovering it.
 
 ## Native audio control
 

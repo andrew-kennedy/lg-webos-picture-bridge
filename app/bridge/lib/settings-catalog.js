@@ -10,9 +10,8 @@ var groups = {
     'aiPicture aiHdrRemastering filmmakerAmbientLight filmMakerMode nearBlackDetail ' +
     'skinColor grassColor skyColor aspectRatio justScan energySaving energySavingAutoMin ' +
     'eyeComfortMode screenShift logoLuminanceAdjust').split(' '),
-  sound: ('soundMode autoVolume clearVoice aiSound aigamesound soundOptimizer ' +
-    'soundOutputDigital eArcSupport inputAudioFormatHDMI1 inputAudioFormatHDMI2 inputAudioFormatHDMI3 inputAudioFormatHDMI4 ' +
-    'lgSoundSync soundModeSync virtualSurround supportATMOS volumeControl').split(' '),
+  sound: ('autoVolume soundOutputDigital inputAudioFormatHDMI1 inputAudioFormatHDMI2 ' +
+    'inputAudioFormatHDMI3 inputAudioFormatHDMI4 volumeControl').split(' '),
   other: ('enableALLM gameOptimization freesync qmsVrr uhdDeepColor gameGenre ' +
     'blackStabilizer whiteStabilizer gameAdjustContrast gameBlackLevel gameColorDepth gameSharpness ' +
     'blueLight darkMode inputOptimization preventInputDelay enable144HzBooster enableMotionBooster ' +
@@ -23,7 +22,7 @@ var names = {
   backlight: 'OLED pixel brightness', brightness: 'Black level', color: 'Color depth',
   hdrDynamicToneMapping: 'HDR tone mapping', gameOptimization: 'VRR and G-Sync',
   enableALLM: 'Auto low latency', uhdDeepColor: 'HDMI Deep Color', qmsVrr: 'Quick Media Switching',
-  eArcSupport: 'eARC', soundOutputDigital: 'Digital sound output',
+  soundOutputDigital: 'Digital sound output',
   truMotionJudder: 'TruMotion de-judder', truMotionBlur: 'TruMotion de-blur'
 };
 function label(key) {
@@ -41,7 +40,7 @@ Object.keys(groups).forEach(function (category) {
 var retired = {
   general: 'homeAutoLaunch homePromotion powerOnScreen noSignalScreenSaver screenSaverAd screenSaverEnabled personalRecommend aiSettingsNudge aiNudge sportsAlarm remotePointer',
   option: 'audioGuidance audioGuidanceSpeed audioGuidancePitch audioGuidanceVolume highContrast greyscale colorInversion focusEmphasis focusedItemEnlarged menuTransparency helpOnSettings pointerSize pointerSpeed pointerAlignment standByLight powerOnLight quickStartMode hddEcoMode enableToastPopup longPressInterval repeatInterval remoteSlowInput subtitleMode closedCaption signLanguageGuidance signLanguageGuidanceSize signLanguageGuidanceSpeed screenSaverTimer',
-  sound: 'volumeStep audioDescription audioDescriptionVolume tvPowerSound tvSetupConfiguration audioBalance avSync avSyncBypass avSyncBypassInput avSyncSpdif avSyncSpeaker avSyncBtSoundbar avSyncBtSurround avSyncWisa',
+  sound: 'volumeStep audioDescription audioDescriptionVolume tvPowerSound tvSetupConfiguration audioBalance avSync avSyncBypass avSyncBypassInput avSyncSpdif avSyncSpeaker avSyncBtSoundbar avSyncBtSurround avSyncWisa soundMode clearVoice aiSound aigamesound soundOptimizer eArcSupport lgSoundSync soundModeSync virtualSurround supportATMOS',
   other: 'contentRecommendation screenRemoteAutoShow'
 };
 var retiredIds = [];

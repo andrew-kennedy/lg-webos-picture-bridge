@@ -27,6 +27,13 @@ module.exports = function () {
   controller.connect();controller.subscribed();
   assert.strictEqual(JSON.parse(observations().at(-1).payload).value,5,'Broker reconnect must refresh actual state');
   assert.ok(sent.some(function(s){return s.topic.endsWith('_setting_option_pointerSize/config')&&s.payload==='';}));
+  ['soundMode','clearVoice','aiSound','aigamesound','soundOptimizer','eArcSupport','lgSoundSync',
+    'soundModeSync','virtualSurround','supportATMOS'].forEach(function (key) {
+    ['number','select'].forEach(function (kind) {
+      assert.ok(sent.some(function(s) { return s.topic==='homeassistant/'+kind+'/test_setting_sound_'+key+'/config' &&
+        s.payload==='' && s.retain; }), 'Upgrade removes retained discovery for '+key);
+    });
+  });
   state.controls={};changed(state);
   assert.strictEqual(JSON.parse(observations().at(-1).payload).available,false,'A setting omitted by the next mode must become unavailable');
   controller.stop();
