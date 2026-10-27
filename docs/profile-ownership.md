@@ -6,7 +6,7 @@ The TV stores and restores standards. Home Assistant 0.3 supplies day/night cont
 
 Open **Picture profiles** in the TV app or the HA sidebar. Select a device, its native profile, and Base/Bright/Dark. Selecting a profile in the editor does not select that HDMI input. Values are drafts until **Save standard**. TV descriptions supply supported options and numeric bounds. **Restore this profile** restores its saved values; **Keep current adjustments** explicitly promotes its tracked changes. Shared native banks have one shared standard, clearly labeled in the editor.
 
-Movie SDR brightness has separate bright/dark values; choose that room variant to edit it. SDR game brightness is shared across its assigned game banks. The companion exposes three number entities, and existing optional input_number helpers remain synchronized controllers. Native MQTT setting sliders are temporary controls, distinct from these standard-brightness controls.
+Movie SDR brightness has separate bright/dark values; choose that room variant to edit it. SDR game brightness is shared across its assigned game banks. The companion exposes three number entities. Version 0.4 removes optional input_number helper bindings and synchronization; saved TV preferences remain unchanged. Native MQTT setting sliders are temporary controls, distinct from these standard-brightness controls.
 
 Only keys defined in the collection are managed. Remote changes never automatically teach a new standard. Changing a managed mode mapping to a preset outside the curated collection is still a temporary deviation, but cannot be promoted as a supported standard. Panel-specific white balance/CMS calibration is not imported.
 
@@ -38,7 +38,7 @@ HA commits the envelope using its native atomic Store, then publishes a non-reta
 
 ## Migration
 
-Upgrade both components. The HA companion preserves its entire previous Store as `legacy`, stops HA-side policy execution, and waits for API version 2. If the TV has no collection, HA imports the existing standard document unchanged, the three current helper values, temporary adjustments, and pending restore scopes. The migration ID makes an identical retry harmless. Migration completes only after HA has saved a matching TV backup. A pre-existing TV collection is never silently replaced by HA's old copy.
+For an older HA-owned collection, first use companion 0.3.2 with bridge 0.13.2 or newer. That companion preserves its entire previous Store as `legacy`, stops HA-side policy execution, and waits for API version 2. If the TV has no collection, HA imports the existing standard document unchanged, the three current helper values, temporary adjustments, and pending restore scopes. The migration ID makes an identical retry harmless. Migration completes only after HA has saved a matching TV backup. A pre-existing TV collection is never silently replaced by HA's old copy. Once the TV owns the collection and HA has its complete backup, upgrade the companion to 0.4 or newer. Its entry migration removes helper bindings while preserving standards and brightness preferences. Move external references to the built-in number entities before deleting old helpers.
 
 Before the updated TV is reachable, the HA integration reports `awaiting_tv_migration`. Existing native settings remain on LG's saved banks; temporary restoration/day-night management resumes after migration. Downloadable backups remain available while the TV is offline, but edits require the TV because it is the sole authority. Do not edit live HA `.storage` manually.
 
