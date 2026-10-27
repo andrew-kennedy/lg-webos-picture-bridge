@@ -48,7 +48,11 @@ module.exports = async function () {
     await refresh();
     assert.strictEqual(monitor.snapshot().controls.picture_backlight.value,3);
     assert.deepStrictEqual(monitor.snapshot().controls.picture_truMotionMode.options,['off','user']);
-    assert.strictEqual((await write(4)).value,'4');
+    var changed = await write(4);
+    assert.strictEqual(changed.value,'4');
+    assert.strictEqual(changed.previous_value,'3');
+    assert.strictEqual(changed.kind,'user_setting');
+    assert.deepStrictEqual(changed.target,{category:'picture',dimension:{input:'hdmi3',pictureMode:'filmMaker'}});
     assert.strictEqual(writes[0].settings.backlight,'4','Preserve the TV string type');
     assert.deepStrictEqual(writes[0].dimension,{input:'hdmi3',pictureMode:'filmMaker'});
     await assert.rejects(write(101),/outside/);

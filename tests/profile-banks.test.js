@@ -1,0 +1,51 @@
+'use strict';
+var assert = require('assert');
+var banks = require('../app/bridge/lib/profile-banks');
+module.exports = async function () {
+  var target = {category:'other',dimension:{gameInput:'hdmi1',dynamicRange:'hdrALLM',gameGenre:'Standard'}};
+  var values = {gameColorDepth:55,gameSharpness:10}, writes = [], wrongScope = false, ignoreWrite = false;
+  var service = {call:function (uri,params,callback) {
+    var response;
+    if (uri.endsWith('getSystemSettingDesc')) {
+      assert.deepStrictEqual(Object.keys(params).sort(),['category','keys'],'G6 descriptions reject saved-value dimensions');
+      response = {returnValue:true,results:params.keys.map(function (key) {
+      return {key:key,dimension:Object.keys(target.dimension),dbtype:'G',dataType:'int',vtype:'Range',
+        ui:{visible:false,active:false},values:{range:{min:0,max:key==='gameSharpness'?50:100,interval:1}}};
+    })}; }
+    else if (uri.endsWith('getSystemSettings')) response = {returnValue:true,
+      dimension:wrongScope?{gameInput:'hdmi3'}:params.dimension,
+      settings:Object.fromEntries(params.keys.map(function(k){return [k,values[k]];}))};
+    else {
+      writes.push(params);
+      if (!ignoreWrite) Object.assign(values,params.settings);
+      response = {returnValue:true};
+    }
+    callback({payload:response});return {cancel:function(){}};
+  }};
+  function command(action,extra) {return banks.normalize({action:action,banks:[Object.assign({id:'pc_hdr',target:target},extra)]});}
+  var read = await banks.run(service,command('read',{keys:['gameColorDepth','gameSharpness']}),function(){});
+  assert.deepStrictEqual(read.banks[0].settings,values);
+  var apply = command('apply',{settings:{gameColorDepth:50,gameSharpness:0},expected:{gameColorDepth:55,gameSharpness:10}});
+  var result = await banks.run(service,apply,function(){},function(){return {input:'hdmi3',mode:'dolbyHdrCinema',range:'dolbyHdr',ready:true};});
+  assert.deepStrictEqual(result.banks[0].changed,['gameColorDepth','gameSharpness']);
+  assert.deepStrictEqual(writes[0].dimension,target.dimension);
+  assert.strictEqual(writes[0].store,true);
+  await banks.run(service,apply,function(){});
+  assert.strictEqual(writes.length,1,'Already-correct values never cause flash writes');
+  values.gameSharpness=5;
+  await assert.rejects(banks.run(service,apply,function(){}),/changed since/);
+  assert.strictEqual(writes.length,1,'A stale expected value cannot overwrite a newer edit');
+  var tooHigh=command('apply',{settings:{gameSharpness:51},expected:{gameSharpness:5}});
+  await assert.rejects(banks.run(service,tooHigh,function(){}),/outside/);
+  wrongScope=true;
+  await assert.rejects(banks.run(service,command('read',{keys:['gameSharpness']}),function(){}),/different/);
+  wrongScope=false;ignoreWrite=true;
+  await assert.rejects(banks.run(service,command('apply',{settings:{gameSharpness:0},expected:{gameSharpness:5}}),function(){}),/readback/);
+  assert.throws(function(){command('read',{keys:['factoryReset']});},/Unreviewed/);
+  assert.throws(function(){banks.normalize({action:'apply',banks:[{id:'x',target:target,settings:{gameSharpness:0}}]});},/expected/);
+  assert.throws(function(){banks.target({category:'picture',dimension:{input:'hdmi1_pc',pictureMode:'game'},app_id:'com.webos.app.hdmi3'});},/app/);
+  assert.throws(function(){banks.target({category:'other',dimension:{gameInput:'hdmi1_pc'}});});
+  assert.throws(function(){banks.normalize({action:'read',banks:Array(9).fill({id:'x',target:target,keys:['gameSharpness']})});});
+  assert.throws(function(){banks.normalize({action:'read',banks:[{id:'constructor',target:target,keys:['gameSharpness']}]});});
+  await assert.rejects(banks.run(service,command('read',{keys:['gameSharpness']}),function(){throw Error('expired');}),/expired/);
+};

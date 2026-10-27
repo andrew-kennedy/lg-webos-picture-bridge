@@ -83,7 +83,11 @@ Discovered entities use these default IDs:
 
 A stopped source or lost subscription must not be confused with confirmed no signal. Unknown states stay unknown. Observations are not retained, availability uses a last will, and discovery/state refresh after Home Assistant or broker restarts.
 
-Version 0.9 adds individual settings controls when MQTT commands are enabled. See the [G6 public API audit and control guide](docs/g6-api-capabilities.md) for entity examples, unavailable-mode behavior, and the native sound-output select. Volume, mute, source selection, screen control and sound routing use Home Assistant's non-root webOS integration. This G6 rejects public picture-setting writes, so picture profiles and advanced settings continue through the root bridge. Manual edits may be reapplied by the existing source/day/night profile automations.
+Version 0.9 adds individual settings controls when MQTT commands are enabled. See the [G6 public API audit and control guide](docs/g6-api-capabilities.md) for entity examples, unavailable-mode behavior, and the native sound-output select. Volume, mute, source selection, screen control and sound routing use Home Assistant's non-root webOS integration. This G6 rejects public picture-setting writes, so picture profiles and advanced settings continue through the root bridge.
+
+Version 0.11 adds explicit saved-preset reads and verified writes for the [LG Picture Profiles Home Assistant companion](https://github.com/andrew-kennedy/home-assistant-lg-picture-profiles), installable through HACS. The companion stores standards and temporary adjustments on Home Assistant, supplies Restore/Save buttons, and owns day/night updates. Existing MQTT entity IDs and native input/range/ALLM selection remain. Disable older profile-maintenance automations when enabling the companion.
+
+The bounded `/profiles/command` endpoint uses the existing expiring, session-bound command envelope and replies on `/profiles/status`. Reads and writes specify the native category, dimensions, and optional HDMI app ID. Writes require expected old values, validate native ranges and scope, skip unchanged settings, and verify readback. Large snapshots are command replies only; recurring status messages are small. This adds no settings polling or recurring TV storage writes. Confirmed individual setting commands include their exact target so the companion can restore an inactive preset after an input or format change.
 
 ## G6 picture profiles and HDMI icons
 

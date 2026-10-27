@@ -26,7 +26,7 @@ function create(options) {
     results[id] = result;
     resultOrder = resultOrder.filter(function (key) { return key !== id; });
     resultOrder.push(id);
-    if (resultOrder.length > 16) delete results[resultOrder.shift()];
+    if (resultOrder.length > (options.resultLimit || 16)) delete results[resultOrder.shift()];
     state = result.state; lastId = id;
   }
   function finish(id, failure, value) {

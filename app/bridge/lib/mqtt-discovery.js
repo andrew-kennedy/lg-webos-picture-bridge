@@ -5,6 +5,7 @@ var mqtt = require('./mqtt-client');
 var mqttCommands = require('./mqtt-commands');
 var mqttCec = require('./mqtt-cec');
 var mqttSettings = require('./mqtt-settings');
+var mqttProfiles = require('./mqtt-profiles');
 var appInfo = require('../../appinfo.json');
 
 function identity(deviceId) {
@@ -118,6 +119,12 @@ function create(config, onHealth, dependencies) {
         range: picture && picture.raw_dynamic_range, ready: Boolean(snapshot(picture, signal, config).dynamic_range)};
     }
   }) : null;
+  var profiles = settings.commands_enabled && deps.service ? mqttProfiles.create({
+    base:base, service:deps.service, enqueue:deps.enqueueSetting,
+    publish:function (topic,payload,retain) { return online && !stopped && client.publish(topic,payload,retain); },
+    context:function () { return {input:picture && picture.input, mode:picture && picture.picture_mode,
+      range:picture && picture.raw_dynamic_range, ready:Boolean(snapshot(picture,signal,config).dynamic_range)}; }
+  }) : null;
 
   function observeContext() {
     // Mode notifications are caused by our own writes. Only routing/range/signal invalidate
@@ -150,6 +157,7 @@ function create(config, onHealth, dependencies) {
     if (commands && commands.status().ready && !commands.publish()) submitted = false;
     if (cec && !cec.publish()) submitted = false;
     if (controls && !controls.publish()) submitted = false;
+    if (profiles && !profiles.publish()) submitted = false;
     return submitted;
   }
   function announce() {
@@ -198,6 +206,7 @@ function create(config, onHealth, dependencies) {
     if (commands) { commands.connect(); client.subscribe(base + '/command'); }
     if (cec) { cec.connect(); client.subscribe(base + '/cec/command'); }
     if (controls) { controls.connect(); client.subscribe(base + '/settings/command'); }
+    if (profiles) { profiles.connect(); client.subscribe(base + '/profiles/command'); }
     client.subscribe(settings.discovery_prefix + '/status');
     announce();
   });
@@ -205,16 +214,19 @@ function create(config, onHealth, dependencies) {
     if (commands && topic === base + '/command') { commands.subscribed(); reportHealth('connected'); }
     if (cec && topic === base + '/cec/command') { cec.subscribed(); reportHealth('connected'); }
     if (controls && topic === base + '/settings/command') controls.subscribed();
+    if (profiles && topic === base + '/profiles/command') profiles.subscribed();
   });
   client.on('disconnect', function () {
     online = false; if (commands) commands.disconnect(); if (cec) cec.disconnect(); reportHealth('disconnected');
     if (controls) controls.disconnect();
+    if (profiles) profiles.disconnect();
   });
   client.on('message', function (topic, message, metadata) {
     if (topic === settings.discovery_prefix + '/status' && message === 'online') announce();
     if (commands && topic === base + '/command') commands.receive(message, metadata);
     if (cec && topic === base + '/cec/command') cec.receive(message, metadata);
     if (controls && topic === base + '/settings/command') controls.receive(message, metadata);
+    if (profiles && topic === base + '/profiles/command') profiles.receive(message, metadata);
   });
   return {
     start: function () { client.start(); if (cec) cec.start(); if (controls) controls.start(); refreshTimer = schedule(publish, 30000); },
@@ -232,6 +244,7 @@ function create(config, onHealth, dependencies) {
       stopped = true; if (commands) commands.disconnect();
       if (cec) cec.stop();
       if (controls) controls.stop();
+      if (profiles) profiles.disconnect();
       cancelLater(timer); cancel(refreshTimer); client.stop(callback);
     }
   };

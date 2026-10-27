@@ -140,7 +140,10 @@ function create(service, options) {
             if (epoch === monitor.generation() && monitor.current() && actual && actual.returnValue === true) {
               monitor.update(control, description, actual);
             }
-            done(writeError || verifyError, {setting:control.id, value:actualValue, backend:'root_luna'});
+            var target = {category:control.category, dimension:control.dimension || {}};
+            if (control.current_app) target.app_id = control.app_id;
+            done(writeError || verifyError, {setting:control.id, value:actualValue, previous_value:control.raw_value,
+              target:target, key:control.key, kind:'user_setting', backend:'root_luna'});
           });
         });
       });
