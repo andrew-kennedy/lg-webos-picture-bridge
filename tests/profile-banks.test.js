@@ -30,6 +30,7 @@ module.exports = async function () {
   assert.deepStrictEqual(result.banks[0].changed,['gameColorDepth','gameSharpness']);
   assert.deepStrictEqual(writes[0].dimension,target.dimension);
   assert.strictEqual(writes[0].store,true);
+  assert.strictEqual(writes[0].valueCheck,false,'Explicit validated banks must not use the active signal visibility filter');
   await banks.run(service,apply,function(){});
   assert.strictEqual(writes.length,1,'Already-correct values never cause flash writes');
   values.gameSharpness=5;
@@ -48,4 +49,24 @@ module.exports = async function () {
   assert.throws(function(){banks.normalize({action:'read',banks:Array(9).fill({id:'x',target:target,keys:['gameSharpness']})});});
   assert.throws(function(){banks.normalize({action:'read',banks:[{id:'constructor',target:target,keys:['gameSharpness']}]});});
   await assert.rejects(banks.run(service,command('read',{keys:['gameSharpness']}),function(){throw Error('expired');}),/expired/);
+
+  var mapping = {category:'picture',dimension:{input:'hdmi3',dynamicRange:'dolbyHdr'}};
+  var selected = 'dolbyHdrCinema', mappingWrites = [];
+  var onHome = {call:function (uri,params,callback) {
+    var response;
+    if(uri.endsWith('getSystemSettings')) response={returnValue:true,dimension:params.dimension,settings:{pictureMode:selected}};
+    else if(uri.endsWith('getSystemSettingDesc')) response={returnValue:true,results:[{key:'pictureMode',dimension:['input','dynamicRange'],dbtype:'G',dataType:'',vtype:'ArrayExt',values:{arrayExt:[
+      {value:'filmMaker',visible:true,active:true},{value:'dolbyHdrCinemaBright',visible:false,active:true}]} }]};
+    else if(params.valueCheck!==false) response={returnValue:false,errorText:'There is No matched extended item: pictureMode'};
+    else {mappingWrites.push(params);selected=params.settings.pictureMode;response={returnValue:true};}
+    callback({payload:response});return {cancel:function(){}};
+  }};
+  var dvCommand = banks.normalize({action:'apply',banks:[{id:'dv',target:mapping,settings:{pictureMode:'dolbyHdrCinemaBright'},expected:{pictureMode:'dolbyHdrCinema'}}]});
+  var saved = await banks.run(onHome,dvCommand,function(){},function(){return {input:'default',range:'sdr',mode:'filmMaker',ready:false};});
+  assert.equal(saved.banks[0].settings.pictureMode,'dolbyHdrCinemaBright');
+  assert.equal(mappingWrites.length,1,'Saving an inactive DV bank must not activate it');
+  assert.deepStrictEqual(mappingWrites[0].dimension,mapping.dimension);
+  var invalidFamily = banks.normalize({action:'apply',banks:[{id:'dv',target:mapping,settings:{pictureMode:'hdrGame'},expected:{pictureMode:'dolbyHdrCinemaBright'}}]});
+  await assert.rejects(banks.run(onHome,invalidFamily,function(){}),/does not match range/);
+  assert.equal(mappingWrites.length,1,'Skipping native visibility checks cannot admit an invalid preset family');
 };

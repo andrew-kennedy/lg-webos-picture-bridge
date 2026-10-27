@@ -122,7 +122,12 @@ async function run(service, command, guard, context) {
       }
       guard();
       if (Object.keys(patch).length) {
-        await write(service, Object.assign({}, bank.target, {settings:patch,store:true,notify:true}));
+        // LG's ArrayExt check uses the CURRENT signal's visible choices even
+        // for an explicit inactive bank (for example DV while Home is SDR).
+        // Values were already checked above against the native ranges/options
+        // and reviewed mode families. Avoid that second active-context filter;
+        // scope, expected values and native readback still have to match.
+        await write(service, Object.assign({}, bank.target, {settings:patch,store:true,notify:true,valueCheck:false}));
         var active = context && context();
         if (patch.pictureMode && active && active.ready && active.input === bank.target.dimension.input && active.range === bank.target.dimension.dynamicRange) {
           guard();
