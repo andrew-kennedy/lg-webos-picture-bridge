@@ -36,6 +36,7 @@ module.exports = function () {
   var config = store.validate({mqtt: {host:'broker'}, device_id:'test'});
   var bridge = holder.exports.start(service, {
     config: config, healthStore: {save: function () {}},
+    settingsMonitor:{start:function(){},stop:function(){},contextChanged:function(){},snapshot:function(){return {controls:{}};}},
     webhook: {postJson: function () { webhookCalls++; }},
     signalMonitor: {create: function (unused, callback, unusedHealth, options) {
       signalCallback = callback;

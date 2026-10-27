@@ -22,12 +22,25 @@
   var cecButton = document.getElementById('cec-button');
   var cecDisplay = document.getElementById('cec-display');
   var cecEnabled = false;
-  var actionButtons = ['refresh-button', 'restart-button', 'test-button', 'cec-button', 'clear-button'].map(function (id) {
+  var actionButtons = ['refresh-button', 'restart-button', 'test-button', 'cec-button', 'clear-button', 'profiles-button'].map(function (id) {
     return document.getElementById(id);
   });
   var bridges = [];
   var busy = false;
   var configurationGeneration = 0;
+  var profileView = document.getElementById('profiles-view');
+  document.getElementById('profiles-button').addEventListener('click', function () {
+    profileView.hidden = false;
+    document.getElementById('profile-editor').configure({tvRemote:true,request:function (command) {
+      return new Promise(function (resolve,reject) {
+        lunaCall(SERVICE_URI + 'profiles',command,function (error,response) { if(error)reject(error);else resolve(response.result); });
+      });
+    }});
+    document.getElementById('profiles-close').focus();
+  });
+  document.getElementById('profiles-close').addEventListener('click', function () {
+    profileView.hidden = true; document.getElementById('profiles-button').focus();
+  });
 
   function setOperation(message) {
     operationDisplay.textContent = message;
@@ -314,6 +327,16 @@
   // The remote can scroll long status/errors without moving the always-visible actions.
   // Leave OK/Enter, Back, and pointer clicks to their native behavior.
   document.addEventListener('keydown', function (event) {
+    if (profileView.hidden === false) {
+      if ((event.keyCode || event.which) === 461) {
+        profileView.hidden = true; document.getElementById('profiles-button').focus(); event.preventDefault();
+      } else if ((event.keyCode || event.which) === 40 && document.activeElement.id === 'profiles-close') {
+        var editor = document.getElementById('profile-editor');
+        if (editor.shadowRoot && editor.shadowRoot.querySelector('button')) editor.shadowRoot.querySelector('button').focus();
+        event.preventDefault();
+      }
+      return;
+    }
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
     var key = event.keyCode || event.which;
     if (key === 38 || key === 40) {

@@ -52,7 +52,8 @@ module.exports = function () {
     'com.webos.settingsservice',
     'com.webos.applicationManager',
     'com.webos.service.extinputs.hdmi',
-    'com.webos.service.eim'
+    'com.webos.service.eim',
+    'com.webos.service.tvpower'
   ]);
   assert.deepStrictEqual(role.permissions[0].inbound, ['*']);
 };

@@ -41,7 +41,7 @@ const status = {
           const url = new URL(route.request().url());
           if (url.hostname !== 'bridge.test') return route.abort();
           const name = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
-          if (!/^(index\.html|app\.js|styles\.css|assets\/icon160\.png)$/.test(name)) return route.abort();
+          if (!/^(index\.html|app\.js|profile-editor\.js|styles\.css|assets\/icon160\.png)$/.test(name)) return route.abort();
           return route.fulfill({path: path.join(appRoot, name)});
         });
         await page.addInitScript(initial => {
@@ -70,7 +70,7 @@ const status = {
             return {top: r.top, bottom: r.bottom, left: r.left, right: r.right};
           };
           const content = document.getElementById('content');
-          return {buttons: Array.from(document.querySelectorAll('button')).map(bounds),
+          return {buttons: Array.from(document.querySelectorAll('button')).filter(button => !button.closest('[hidden]')).map(bounds),
             footer: bounds(document.querySelector('footer')), content: bounds(content),
             instructions: bounds(document.querySelector('.instructions')),
             bodyWidth: document.documentElement.scrollWidth, contentWidth: content.clientWidth,

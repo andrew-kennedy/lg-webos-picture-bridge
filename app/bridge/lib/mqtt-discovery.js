@@ -112,7 +112,7 @@ function create(config, onHealth, dependencies) {
     }
   }) : null;
   var controls = settings.commands_enabled && deps.service ? mqttSettings.create({
-    config: config, id: id, service: deps.service, enqueue: deps.enqueueSetting,
+    config: config, id: id, service: deps.service, enqueue: deps.enqueueSetting, monitor:deps.settingsMonitor,
     publish: function (topic, payload, retain) { return online && !stopped && client.publish(topic, payload, retain); },
     context: function () {
       return {input: picture && picture.input, mode: picture && picture.picture_mode,
@@ -120,7 +120,7 @@ function create(config, onHealth, dependencies) {
     }
   }) : null;
   var profiles = settings.commands_enabled && deps.service ? mqttProfiles.create({
-    base:base, service:deps.service, enqueue:deps.enqueueSetting,
+    base:base, service:deps.service, enqueue:deps.enqueueSetting,engine:deps.profileEngine,
     publish:function (topic,payload,retain) { return online && !stopped && client.publish(topic,payload,retain); },
     context:function () { return {input:picture && picture.input, mode:picture && picture.picture_mode,
       range:picture && picture.raw_dynamic_range, ready:Boolean(snapshot(picture,signal,config).dynamic_range)}; }
@@ -183,6 +183,7 @@ function create(config, onHealth, dependencies) {
     }
     if (controls) controls.refresh();
     else if (deps.service) mqttSettings.tombstones(config, id).forEach(function (topic) { client.publish(topic, '', true); });
+    if (profiles && profiles.refresh) profiles.refresh();
     if (!publish()) submitted = false;
     if (!client.publish(base + '/availability', 'online', true)) submitted = false;
     // QoS 0 only confirms submission to the local socket, not broker/HA receipt.
@@ -206,7 +207,10 @@ function create(config, onHealth, dependencies) {
     if (commands) { commands.connect(); client.subscribe(base + '/command'); }
     if (cec) { cec.connect(); client.subscribe(base + '/cec/command'); }
     if (controls) { controls.connect(); client.subscribe(base + '/settings/command'); }
-    if (profiles) { profiles.connect(); client.subscribe(base + '/profiles/command'); }
+    if (profiles) {
+      profiles.connect(); client.subscribe(base + '/profiles/command');
+      if (deps.profileEngine) { client.subscribe(base + '/profiles/environment'); client.subscribe(base + '/profiles/backup/ack'); }
+    }
     client.subscribe(settings.discovery_prefix + '/status');
     announce();
   });
@@ -227,6 +231,7 @@ function create(config, onHealth, dependencies) {
     if (cec && topic === base + '/cec/command') cec.receive(message, metadata);
     if (controls && topic === base + '/settings/command') controls.receive(message, metadata);
     if (profiles && topic === base + '/profiles/command') profiles.receive(message, metadata);
+    if (profiles && profiles.message) profiles.message(topic,message,metadata || {});
   });
   return {
     start: function () { client.start(); if (cec) cec.start(); if (controls) controls.start(); refreshTimer = schedule(publish, 30000); },
@@ -244,7 +249,7 @@ function create(config, onHealth, dependencies) {
       stopped = true; if (commands) commands.disconnect();
       if (cec) cec.stop();
       if (controls) controls.stop();
-      if (profiles) profiles.disconnect();
+      if (profiles) { if (profiles.stop) profiles.stop(); else profiles.disconnect(); }
       cancelLater(timer); cancel(refreshTimer); client.stop(callback);
     }
   };

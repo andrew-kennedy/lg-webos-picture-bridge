@@ -57,7 +57,7 @@ module.exports = async function () {
     assert.strictEqual(packets[0].body[7], 230, 'CONNECT: clean session, will, retain, username/password');
     assert.ok(packets[0].body.includes(Buffer.from('offline')));
     assert.ok(packets.some(function (p) { return p.header === 48 && p.body.includes(Buffer.from('signal_present')); }));
-    assert.throws(function () { mqtt.packet(48, Buffer.alloc(65537)); });
+    assert.throws(function () { mqtt.packet(48, Buffer.alloc(1048577)); });
     assert.throws(function () { mqtt.string('bad\0string'); });
     client.stop();
     await new Promise(function (resolve) { setTimeout(resolve, 30); });

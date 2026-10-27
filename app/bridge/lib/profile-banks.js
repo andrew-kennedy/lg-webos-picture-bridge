@@ -165,4 +165,21 @@ function observation(category, key, description, record, context) {
   return {target:scope, key:key, value:record.value, observed_at:new Date(record.observed_at).toISOString()};
 }
 module.exports = {normalize:normalize, target:target, run:run, same:same,
-  observationKeys:observationKeys, observation:observation};
+  observationKeys:observationKeys, observation:observation, request:request, encode:encode,
+  async inspect(service, bank, guard, context) {
+    var result = (await run(service, normalize({action:'read',banks:[{
+      id:bank.id,target:bank.target,keys:Object.keys(bank.settings)}]}),guard,context)).banks[0];
+    guard();
+    var desc = await request(service,'getSystemSettingDesc',{category:bank.target.category,keys:Object.keys(bank.settings)});
+    result.descriptions = desc.results || [];
+    result.controls = {};
+    for (var key of Object.keys(bank.settings)) {
+      var d = result.descriptions.find(v => v.key === key);
+      if (!d) continue;
+      var expanded = Object.assign({},d,{ui:{visible:true,active:true}});
+      if (d.values && Array.isArray(d.values.arrayExt)) expanded.values = {arrayExt:d.values.arrayExt.map(v => Object.assign({},v,{visible:true,active:true}))};
+      var control = settings.describe({key:key},expanded,result.settings[key]);
+      if (control) result.controls[key] = control;
+    }
+    return result;
+  }};

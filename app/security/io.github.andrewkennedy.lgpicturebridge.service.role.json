@@ -15,7 +15,8 @@
         "com.webos.settingsservice",
         "com.webos.applicationManager",
         "com.webos.service.extinputs.hdmi",
-        "com.webos.service.eim"
+        "com.webos.service.eim",
+        "com.webos.service.tvpower"
       ]
     }
   ]

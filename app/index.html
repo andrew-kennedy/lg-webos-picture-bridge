@@ -16,6 +16,11 @@
           <p class="subtitle">Home Assistant MQTT discovery, TV signal monitoring, and picture controls.</p>
         </div>
       </header>
+      <button id="profiles-button" class="profiles-open" type="button">Picture profiles</button>
+      <section id="profiles-view" class="profiles-view" hidden aria-label="Picture profile editor">
+        <button id="profiles-close" type="button">Back to bridge status</button>
+        <lg-profile-editor id="profile-editor"></lg-profile-editor>
+      </section>
 
       <div id="content" class="content" role="region" aria-label="Bridge status and setup" tabindex="0">
         <section class="status-card" aria-live="polite">
@@ -62,6 +67,7 @@
         <p class="navigation-help">↑ / ↓ Scroll details &nbsp; · &nbsp; ← / → Choose action &nbsp; · &nbsp; OK Select</p>
       </footer>
     </main>
+    <script src="profile-editor.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

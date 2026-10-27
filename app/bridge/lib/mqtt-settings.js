@@ -95,7 +95,11 @@ function create(options) {
     }
     return ok;
   }
-  monitor = (options.createMonitor || settings.create)(options.service, {context: options.context,
+  var unsubscribe;
+  if (options.monitor) {
+    monitor = options.monitor; latest = monitor.snapshot();
+    unsubscribe = monitor.onChange(function (snapshot) { latest = snapshot; announce(false); });
+  } else monitor = (options.createMonitor || settings.create)(options.service, {context: options.context,
     observationKeys:profiles.observationKeys, observation:profiles.observation,
     changed: function (snapshot) { latest = snapshot; announce(false); }});
   channel = commands.create({topic: base + '/settings/command', normalize: settings.normalize,
@@ -111,7 +115,8 @@ function create(options) {
     refresh: function () { observed = {}; monitor.refresh(); return announce(true); },
     publish: function () { return announce(false); },
     contextChanged: monitor.contextChanged,
-    start: monitor.start, stop: function () { monitor.stop(); channel.disconnect(); online = false; }};
+    start: function () { if (!options.monitor) monitor.start(); },
+    stop: function () { if (unsubscribe) unsubscribe(); else monitor.stop(); channel.disconnect(); online = false; }};
 }
 function tombstones(config, id) {
   var items = [];

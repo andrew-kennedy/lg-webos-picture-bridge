@@ -1,6 +1,7 @@
 {
   "io.github.andrewkennedy.lgpicturebridge.control": [
     "io.github.andrewkennedy.lgpicturebridge.service/uiStatus",
+    "io.github.andrewkennedy.lgpicturebridge.service/profiles",
     "io.github.andrewkennedy.lgpicturebridge.service/configure",
     "io.github.andrewkennedy.lgpicturebridge.service/setCecGuard",
     "io.github.andrewkennedy.lgpicturebridge.service/refreshReporting",

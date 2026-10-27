@@ -97,6 +97,14 @@ service.register('uiStatus', function (message) {
   message.respond({returnValue: true, status: statusSnapshot()});
 });
 
+service.register('profiles', function (message) {
+  if (!appIsAuthorized(message)) return;
+  if (!controller) { respondError(message,new Error('Configure and start the bridge first')); return; }
+  controller.profiles.command(message.payload || {}).then(function (result) {
+    message.respond({returnValue:true,result:result});
+  },function (error) { respondError(message,error); });
+});
+
 service.register('setCecGuard', function (message) {
   if (!appIsAuthorized(message)) return;
   try {

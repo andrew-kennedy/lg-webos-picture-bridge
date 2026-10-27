@@ -5,7 +5,9 @@
 var net = require('net');
 var tls = require('tls');
 var EventEmitter = require('events').EventEmitter;
-var MAX_PACKET = 65536;
+// Complete managed-profile backups are larger than individual setting commands.
+// Still bounded; there is no offline send queue or unbounded receive buffer.
+var MAX_PACKET = 1048576;
 
 function buffer(value) { return new Buffer(value); }
 function word(value) { return buffer([value >> 8, value & 255]); }

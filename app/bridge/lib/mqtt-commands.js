@@ -50,7 +50,7 @@ function create(options) {
   function receive(message, metadata) {
     var envelope, id, digest, entry, policy, context, currentSession = session;
     // Ignore retained deliveries, malformed envelopes and oversized data without reflecting it.
-    if (!ready || !metadata || metadata.retain || Buffer.byteLength(message, 'utf8') > 49152) return;
+    if (!ready || !metadata || metadata.retain || Buffer.byteLength(message, 'utf8') > (options.maxBytes || 49152)) return;
     try { envelope = JSON.parse(message); } catch (ignored) { return; }
     if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) return;
     id = envelope.request_id;

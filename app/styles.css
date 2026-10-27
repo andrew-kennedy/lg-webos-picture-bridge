@@ -5,6 +5,12 @@
   font-size: 24px;
 }
 * { box-sizing: border-box; }
+.profiles-open { position:absolute; top:5vh; right:6%; }
+.profiles-view { position:fixed; inset:3vh 4vw; z-index:2; background:#101a2b; border:1px solid #53637a; border-radius:18px; padding:12px; display:flex; flex-direction:column; }
+.profiles-view[hidden] { display:none; }
+.profiles-view > button { align-self:flex-start; margin:0 0 8px 12px; }
+lg-profile-editor { flex:1; min-height:0; }
+@media(max-width:1100px) { .profiles-open { top:2vh; right:6%; font-size:14px; padding:8px; } }
 
 html, body { height: 100%; overflow: hidden; }
 

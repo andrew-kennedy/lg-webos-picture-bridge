@@ -9,6 +9,10 @@ var lunaExecutor = require('./lib/luna-executor');
 var picturePolicy = require('./lib/picture-policy');
 var signalMonitor = require('./lib/signal-monitor');
 var mqttDiscovery = require('./lib/mqtt-discovery');
+var profileEngine = require('./lib/profile-engine');
+var profilePower = require('./lib/profile-power');
+var profileBanks = require('./lib/profile-banks');
+var settingsControls = require('./lib/settings-controls');
 var appInfo = require('../appinfo.json');
 
 function now() {
@@ -45,6 +49,29 @@ function start(service, dependencies) {
   var commandQueue = [];
   var commandRunning = false;
   var heartbeatTimer = null;
+  var profileManager = (injected.profileEngine || profileEngine).create({service:service,enqueue:enqueueSetting});
+  var powerMonitor = (injected.profilePower || profilePower).create(service,profileManager.setPower);
+  var settingsListeners = new Set();
+  function settingsContext() {
+    return {input:currentPictureContext && currentPictureContext.input,mode:currentPictureContext && currentPictureContext.picture_mode,
+      range:currentPictureContext && currentPictureContext.raw_dynamic_range,
+      ready:Boolean(mqttDiscovery.snapshot(currentPictureContext,currentSignal,config).dynamic_range)};
+  }
+  var settingsMonitor = injected.settingsMonitor || settingsControls.create(service,{context:settingsContext,
+    observationKeys:profileBanks.observationKeys,observation:profileBanks.observation,
+    changed:function (snapshot) {
+      profileManager.observe(snapshot.observations || []);
+      settingsListeners.forEach(function (fn) { fn(snapshot); });
+    }});
+  settingsMonitor.onChange = function (fn) { settingsListeners.add(fn); return function () { settingsListeners.delete(fn); }; };
+  var writeSetting = settingsMonitor.write;
+  if (writeSetting) settingsMonitor.write = function (command,callback,guard) {
+    writeSetting(command,function (error,result) {
+      if (!error && result && result.target) profileManager.observe([{target:result.target,key:result.key,value:result.value,observed_at:now()}]);
+      callback(error,result);
+    },guard);
+  };
+  function pictureContextChanged() { profileManager.contextChanged(settingsContext()); settingsMonitor.contextChanged(); }
   var health = {
     bridge_version: appInfo.version,
     service_registered: true,
@@ -100,7 +127,8 @@ function start(service, dependencies) {
         if (epoch !== mqttGeneration) return;
         health.mqtt = state;
         saveHealth();
-      }, {applyPolicy: applyPolicy, cecGuard: injected.cecGuard, service: service, enqueueSetting: enqueueSetting});
+      }, {applyPolicy: applyPolicy, cecGuard: injected.cecGuard, service: service, enqueueSetting: enqueueSetting,
+        profileEngine:profileManager,settingsMonitor:settingsMonitor});
       mqttPublisher.picture(currentPictureContext);
       mqttPublisher.signal(currentSignal);
       mqttPublisher.start();
@@ -244,6 +272,7 @@ function start(service, dependencies) {
     if (pictureContext) {
       pictureContext.observed_at = now();
       currentPictureContext = pictureContext;
+      pictureContextChanged();
       health.current_picture_context = pictureContext;
       if (mqttPublisher) mqttPublisher.picture(pictureContext);
     }
@@ -304,6 +333,9 @@ function start(service, dependencies) {
       if (queued.guard) queued.guard();
       normalized = picturePolicy.normalize(queued.payload);
       operations = picturePolicy.buildOperations(normalized, currentPictureContext);
+      if (profileManager.ownsProfiles() && !normalized.dry_run && operations.some(function (op) { return op.kind !== 'hdmi_input_mode'; })) {
+        throw new Error('The TV owns picture profiles; use its profile editor or temporary setting controls');
+      }
     } catch (error) {
       commandRunning = false;
       queued.callback(error);
@@ -453,6 +485,7 @@ function start(service, dependencies) {
     health.last_error = source + ' subscription error: ' + message;
     if (source === 'picture') {
       currentPictureContext = null;
+      pictureContextChanged();
       health.current_picture_context = null;
       if (mqttPublisher) mqttPublisher.picture(null);
     }
@@ -508,6 +541,7 @@ function start(service, dependencies) {
     clearInterval(heartbeatTimer);
     Object.keys(subscriptionRetries).forEach(function (source) { clearTimeout(subscriptionRetries[source]); });
     if (signalWatcher) signalWatcher.stop();
+    powerMonitor.stop(); settingsMonitor.stop(); profileManager.stop();
     if (mqttPublisher) mqttPublisher.stop();
     if (policyServer) {
       try { policyServer.close(); } catch (serverError) { /* Already closed. */ }
@@ -539,8 +573,10 @@ function start(service, dependencies) {
   saveHealth();
   healthWriter.flush();
   startMqtt();
+  powerMonitor.start(); settingsMonitor.start();
   signalWatcher = (injected.signalMonitor || signalMonitor).create(service, function (state) {
     currentSignal = state;
+    pictureContextChanged();
     health.hdmi_signal = state;
     if (state.observed_at && (!health.last_observed_at || state.observed_at > health.last_observed_at)) {
       health.last_observed_at = state.observed_at;
@@ -565,6 +601,7 @@ function start(service, dependencies) {
   heartbeatTimer = setInterval(function () { health.heartbeat_at = now(); saveHealth(); }, 30000);
   return {
     applyPolicy: applyPolicy,
+    profiles:profileManager,
     health: health,
     handlePayload: handlePayload,
     reconfigure: reconfigure,
