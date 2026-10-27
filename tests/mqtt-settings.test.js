@@ -6,6 +6,7 @@ module.exports = function () {
   var state = {context_id:'a'.repeat(24),observed_at:Date.now(),context:{input:'hdmi3'},controls:{
     picture_backlight:{id:'picture_backlight',category:'picture',key:'backlight',name:'OLED light',component:'number',
       min:0,max:100,step:1,value:3,available:true,dimension:{input:'hdmi3',pictureMode:'filmMaker'}}}};
+  state.observations=[{target:{category:'picture',dimension:{input:'hdmi3',pictureMode:'filmMaker'}},key:'backlight',value:'3',observed_at:new Date().toISOString()}];
   var controller = mqtt.create({config:{device_name:'Test',mqtt:{topic_prefix:'lg',discovery_prefix:'homeassistant'}},id:'test',
     context:function(){return state.context;},
     publish:function(topic,payload,retain){sent.push({topic:topic,payload:payload,retain:retain});return true;},
@@ -15,8 +16,15 @@ module.exports = function () {
   function observations() { return sent.filter(function(s){return s.topic==='lg/test/settings/picture_backlight';}); }
   controller.connect(); controller.start(); controller.subscribed();
   var count=observations().length;
+  function profileObservations(){return sent.filter(function(s){return s.topic==='lg/test/settings/observations';});}
+  var profileCount=profileObservations().length;
+  assert.ok(profileCount>0);
   state.observed_at+=10000; changed(state); controller.publish();
   assert.strictEqual(observations().length,count,'Polling unchanged values must not churn HA recorder attributes');
+  assert.strictEqual(profileObservations().length,profileCount,'Unchanged profile observations are not heartbeats');
+  state.observations[0].value='4';changed(state);
+  assert.strictEqual(profileObservations().length,profileCount+1);
+  assert.strictEqual(profileObservations().at(-1).retain,false,'Observations must never be retained commands/state');
   state.controls.picture_backlight.value=4; changed(state);
   assert.strictEqual(observations().length,count+1);
   assert.strictEqual(JSON.parse(observations().at(-1).payload).value,4);

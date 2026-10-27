@@ -4,11 +4,13 @@ var EventEmitter = require('events').EventEmitter;
 var observer = require('../app/bridge/lib/settings-observer');
 var controls = require('../app/bridge/lib/settings-controls');
 var fakeClock = require('./fake-clock');
+var banks = require('../app/bridge/lib/profile-banks');
 
 module.exports = function () {
   var clock = fakeClock(), subscriptions = [], reads = [], deferred = false, pending = [], failSubscribe = false;
   var context = {input:'hdmi3', mode:'filmMaker', range:'sdr', ready:true};
   var values = {backlight:'3',contrast:'95',truMotionMode:'off',autoVolume:'off',blackStabilizer:10};
+  values.blackLevel = {ntsc:'auto',pal:'auto'};
   function desc(category, key, app) {
     var numeric = ['backlight','contrast','blackStabilizer'].includes(key);
     return {category:category,key:key,dbtype:app?'M':'G',dataType:numeric?'int':'string',
@@ -19,6 +21,7 @@ module.exports = function () {
   }
   var descriptions = {picture:[desc('picture','backlight'),desc('picture','contrast'),desc('picture','truMotionMode',true)],
     sound:[desc('sound','autoVolume')],other:[desc('other','blackStabilizer')]};
+  descriptions.picture.push(desc('picture','blackLevel'));
   function response(method, params) {
     if (method.endsWith('getSystemSettingDesc')) return {returnValue:false,subscribed:true,results:descriptions[params.category]};
     var r = {returnValue:true,subscribed:true,settings:{},dimension:params.category==='picture'?
@@ -36,6 +39,7 @@ module.exports = function () {
     return sub;
   }};
   var monitor = observer.create(service,Object.assign({},clock,{context:function () { return context; },
+    observationKeys:banks.observationKeys,observation:banks.observation,
     changed:function () {},describe:controls.describe,call:function (unused,method,params,done) {
       var r={method:method,params:params,reply:response(method,params),cancelled:false}; reads.push(r);
       if (deferred) pending.push(function () { done(null,r.reply); }); else done(null,r.reply);
@@ -51,6 +55,9 @@ module.exports = function () {
     assert.strictEqual(subscriptions.length,7);
     assert.strictEqual(monitor.snapshot().capture.subscribed,7);
     assert.strictEqual(backlight().value,3,'Useful partial batches are accepted even with returnValue:false');
+    assert.ok(!monitor.snapshot().controls.picture_blackLevel,'Observation-only settings add no UI entities');
+    assert.deepStrictEqual(monitor.snapshot().observations.find(function(v){return v.key==='blackLevel';}).value,values.blackLevel);
+    assert.strictEqual(monitor.snapshot().observations.find(function(v){return v.key==='truMotionMode';}).target.app_id,'com.webos.app.hdmi3');
     clock.tick(299999);
     assert.strictEqual(reads.length,0,'Quiet streams need no ten-second polling');
     assert.strictEqual(subscriptions.length,7,'Quiet streams do not repeatedly resubscribe');
@@ -85,11 +92,13 @@ module.exports = function () {
     var previousId=monitor.snapshot().context_id;
     context={input:'hdmi4',mode:'game',range:'sdr',ready:true};monitor.contextChanged();
     assert.strictEqual(backlight().available,false);
+    assert.deepStrictEqual(monitor.snapshot().observations,[],'No old observations during an input transition');
     notify(picture,{settings:{backlight:'99'}});
     assert.strictEqual(backlight().value,9,'Cancelled input callbacks must not leak into the next context');
     clock.tick(350);
     assert.notStrictEqual(monitor.snapshot().context_id,previousId);
     assert.deepStrictEqual(backlight().dimension,{input:'hdmi4',pictureMode:'game'});
+    assert.ok(monitor.snapshot().observations.every(function(v){return v.target.dimension.input==='hdmi4';}));
     assert.strictEqual(monitor.snapshot().controls.picture_truMotionMode.app_id,'com.webos.app.hdmi4');
     assert.strictEqual(backlight().available,true);
     var lost=active('getSystemSettings','picture');

@@ -140,4 +140,29 @@ async function run(service, command, guard, context) {
   }
   return {action:command.action, banks:results};
 }
-module.exports = {normalize:normalize, target:target, run:run, same:same};
+// Reuse the existing category subscriptions for managed values that need no
+// individual HA control (for example structured HDMI RGB range).
+var observationKeys = {picture:PICTURE.concat(['pictureMode','truMotionMode','truMotionJudder','truMotionBlur']),
+  other:GAME.concat(PORT)};
+function observation(category, key, description, record, context) {
+  if (!description || !record || !context || !context.ready ||
+      !/^hdmi[1-4](_pc)?$/.test(context.input || '') || !Array.isArray(description.dimension) ||
+      !Number.isFinite(record.observed_at)) return null;
+  var dimensions = {}, physical = context.input.replace(/_pc$/, '');
+  var expected = {input:context.input, pictureMode:context.mode, dynamicRange:context.range, gameInput:physical};
+  for (var name of description.dimension) {
+    var value = (record.dimension || {})[name];
+    if (typeof value !== 'string' || (expected[name] && expected[name] !== value)) return null;
+    dimensions[name] = value;
+  }
+  var scope = {category:category, dimension:dimensions};
+  if (description.dbtype === 'M') {
+    if (record.app_id !== 'com.webos.app.' + physical) return null;
+    scope.app_id = record.app_id;
+  }
+  try { if (!target(scope).allowed.includes(key)) return null; } catch (error) { return null; }
+  if (record.value === null || record.value === undefined || JSON.stringify(record.value).length > 2048) return null;
+  return {target:scope, key:key, value:record.value, observed_at:new Date(record.observed_at).toISOString()};
+}
+module.exports = {normalize:normalize, target:target, run:run, same:same,
+  observationKeys:observationKeys, observation:observation};

@@ -3,6 +3,7 @@
 var commands = require('./mqtt-commands');
 var settings = require('./settings-controls');
 var catalog = require('./settings-catalog');
+var profiles = require('./profile-banks');
 function discovery(config, id, session, snapshot) {
   var base = config.mqtt.topic_prefix + '/' + id;
   return Object.keys(snapshot.controls).sort().map(function (key) {
@@ -32,7 +33,7 @@ function discovery(config, id, session, snapshot) {
 function create(options) {
   var base = options.config.mqtt.topic_prefix + '/' + options.id;
   var online = false, announced = {}, published = {}, known = {}, latest = {controls: {}, context_id: null};
-  var channel, monitor;
+  var channel, monitor, observed = {};
   function publish(topic, value, retain) { return online && options.publish(topic, JSON.stringify(value), Boolean(retain)); }
   function observation(topic, value, force, observedAt) {
     var serialized = JSON.stringify(value);
@@ -81,9 +82,21 @@ function create(options) {
       else ok = false;
     }
     if (!publish(base + '/settings/status', status(), false)) ok = false;
+    if (channel.status().ready) {
+      var updates = [], next = {};
+      (latest.observations || []).forEach(function (item) {
+        var id = JSON.stringify([item.target, item.key]), value = JSON.stringify(item.value);
+        if (force || observed[id] !== value) { updates.push(item); next[id] = value; }
+      });
+      if (updates.length) {
+        if (publish(base + '/settings/observations', {protocol:1, observations:updates}, false)) Object.assign(observed,next);
+        else ok = false;
+      }
+    }
     return ok;
   }
   monitor = (options.createMonitor || settings.create)(options.service, {context: options.context,
+    observationKeys:profiles.observationKeys, observation:profiles.observation,
     changed: function (snapshot) { latest = snapshot; announce(false); }});
   channel = commands.create({topic: base + '/settings/command', normalize: settings.normalize,
     publish: function () { return publish(base + '/settings/status', status(), false); },
@@ -91,11 +104,11 @@ function create(options) {
       var run = function (done) { monitor.write(command, done, guard); };
       if (options.enqueue) options.enqueue(run, callback); else run(callback);
     }, summarizeResult: function (value) { return value; }});
-  return {connect: function () { online = true; announced = {}; published = {}; channel.connect(); monitor.contextChanged(); },
+  return {connect: function () { online = true; announced = {}; published = {}; observed = {}; channel.connect(); monitor.contextChanged(); },
     subscribed: function () { channel.subscribed(); announce(true); },
     disconnect: function () { online = false; channel.disconnect(); },
     receive: channel.receive, status: status,
-    refresh: function () { monitor.refresh(); return announce(true); },
+    refresh: function () { observed = {}; monitor.refresh(); return announce(true); },
     publish: function () { return announce(false); },
     contextChanged: monitor.contextChanged,
     start: monitor.start, stop: function () { monitor.stop(); channel.disconnect(); online = false; }};

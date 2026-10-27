@@ -54,8 +54,26 @@ function create(service, options) {
   var groups = {}, streams = [], reads = [], controls = {}, generation = 0, observedAt = 0;
   var contextId = null, captured = null, started = false, stopped = false;
   var restart = null, recovery = null, checking = false, waiting = [], lastError = null, backoff = 5000;
+  var watchedKeys = {};
+  Object.keys(catalog.groups).forEach(function (category) {
+    watchedKeys[category] = Array.from(new Set(catalog.groups[category].concat((options.observationKeys || {})[category] || [])));
+  });
+  function observations() {
+    if (!observedAt || !options.observation || captured !== signature(options.context())) return [];
+    var result = [];
+    Object.keys(options.observationKeys || {}).forEach(function (category) {
+      var group = groups[category];
+      if (!group) return;
+      options.observationKeys[category].forEach(function (key) {
+        var value = options.observation(category, key, group.descriptions[key], group.values[key], options.context());
+        if (value) result.push(value);
+      });
+    });
+    return result;
+  }
   function snapshot() {
     return {context_id: contextId, observed_at: observedAt, context: options.context(), controls: controls,
+      observations: observations(),
       capture: {mode:'subscriptions', subscribed:streams.filter(function (s) { return s.ready; }).length,
         expected:streams.length, recovery_interval_seconds:RECOVERY_MS / 1000, last_error:lastError}};
   }
@@ -117,7 +135,7 @@ function create(service, options) {
     [false, true].forEach(function (appSpecific) {
       if (epoch !== generation || stopped) return;
       var name = appSpecific ? 'app' : 'global';
-      var keys = catalog.groups[group.category].filter(function (key) {
+      var keys = watchedKeys[group.category].filter(function (key) {
         var d = group.descriptions[key]; return d && (d.dbtype === 'M') === appSpecific;
       });
       var previous = group.streams[name];
@@ -145,7 +163,7 @@ function create(service, options) {
     if (list) {
       if (full) group.descriptions = {};
       list.forEach(function (patch) {
-        if (catalog.groups[group.category].indexOf(patch.key) !== -1) {
+        if (watchedKeys[group.category].indexOf(patch.key) !== -1) {
           group.descriptions[patch.key] = mergeDescription(group.descriptions[patch.key], patch);
         }
       });
@@ -211,7 +229,7 @@ function create(service, options) {
       if (epoch !== generation || stopped) return;
       var group = {category:category, descriptions:{}, values:{}, streams:{}};
       groups[category] = group;
-      watch(group, 'getSystemSettingDesc', {category:category, keys:catalog.groups[category]});
+      watch(group, 'getSystemSettingDesc', {category:category, keys:watchedKeys[category]});
     });
   }
   return {
