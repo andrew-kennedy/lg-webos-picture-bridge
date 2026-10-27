@@ -1,6 +1,10 @@
 # This device-specific policy belongs in Home Assistant, not in the webOS app.
 # Replace matches with the inventory advertised by YOUR bridge. Rules are AND
 # matches, and this example leaves Nintendo, audio devices and standby untouched.
+# To make a physical HDMI input switch without selecting/waking any source, use
+# a rule such as {id: hdmi3_input_only, match: {input: hdmi3}, block: [device_selection]}.
+# Repeat for each desired port. This also covers explicit LG input-picker selections;
+# source remotes/HA still wake devices, and inbound CEC wake and eARC remain enabled.
 lg_tv_configure_cec_filter:
   alias: LG TV Configure CEC Filter
   description: >-

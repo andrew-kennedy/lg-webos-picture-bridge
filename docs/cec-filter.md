@@ -9,8 +9,10 @@ reversible interception mechanism and a strict generic rule evaluator.
 The inspected G6 supports `automatic_selection`: skip the HDMI app's automatic
 `setCECUniqueId` call when a configured rule matches. This includes LG's unknown-device
 fallback on a shared input containing a matching device, as described below. It is
-**not a universal CEC wake-command filter**. Explicit device selections, inbound
-device→TV power requests, and other CEC paths are unaffected.
+**not a universal CEC wake-command filter**. `automatic_selection` leaves explicit
+selections alone. The additional `device_selection` action makes a configured HDMI
+input a TV-only operation, as described below. Inbound device→TV power requests
+and other CEC paths are unaffected.
 
 Per-device `standby` interception is **not implemented or advertised as supported**.
 Read-only inspection on 2026-09-20 found `API_CECP_SetStandby`, `CECP_SetStandby` and
@@ -50,7 +52,8 @@ if needed. The discovered switch does not embed an HA entity ID in its command
 template, so renaming the sensor does not break the switch.
 
 The TV UI's **CEC filtering** button is a master override, not a device-policy editor.
-There are no built-in exceptions: preserve Nintendo/Sonos by not matching them.
+There are no built-in exceptions. Device rules match only configured identities;
+input-only rules suppress outgoing HDMI-app selection on the configured port.
 Rules persist locally and reapply through the bridge's existing startup hook; HA
 does not need to race a wake event or replay configuration on every restart. Run
 the HA rules script after editing it. It is not automatically re-sent on connection,
@@ -103,6 +106,50 @@ the device list or read/error status. It is not a freshness timestamp or proof o
 The regular 30-second CEC status heartbeat still prevents Home Assistant's 90-second expiry.
 The filter uses the HDMI app's current device metadata independently of that poll.
 
+### Input switching without source wake (0.10.2)
+
+LG's input picker can launch HDMI 3 with `{"id":"uniqueId","value":4}` even when
+the user intends to select the physical port. `automatic_selection` deliberately
+allows such a fresh explicit request. On the verified G6 that request selected
+Apple TV and sent it `Set Stream Path` after a successful Nintendo wake test.
+
+Use `device_selection` with an **input-only** match to suppress both automatic and
+explicit CEC selection from the HDMI app. For example:
+
+```yaml
+rules:
+  - id: hdmi1_input_only
+    match: {input: hdmi1}
+    block: [device_selection]
+  - id: hdmi2_input_only
+    match: {input: hdmi2}
+    block: [device_selection]
+  - id: hdmi3_input_only
+    match: {input: hdmi3}
+    block: [device_selection]
+  - id: hdmi4_input_only
+    match: {input: hdmi4}
+    block: [device_selection]
+```
+
+This changes only the TV's video input. It does not select a device behind an external
+HDMI switch. Source remotes and Home Assistant can still wake those devices and route
+the external switch. Incoming CEC wake/active-source messages and audio/volume control
+are unaffected. Matching is independent of device inventory, logical address, and
+explicit-selection parameters. Combining `device_selection` with vendor/name/type
+matches is rejected; `automatic_selection` remains available for device-specific rules.
+Existing policies keep their behavior until changed. The same permission lease and
+master switch govern both actions. Missing or expired permission restores LG behavior.
+
+Live G6 validation on 2026-10-27 used the installed 0.10.2 IPK. After Apple TV was
+put to sleep, Nintendo woke the TV; the user selected HDMI 1 and returned to HDMI 3
+through LG's input picker. QML logged `device_selection` suppression for HDMI 1's
+unknown selection and HDMI 3's explicit device ID. The user confirmed Apple TV
+stayed asleep and Nintendo remained visible. HA showed Nintendo's session armed
+and Game mode; SIMPLINK and Auto Power Sync remained on. All four port rules were
+confirmed through MQTT. Automated tests also exercise the minified IPK's policy
+and generated QML, including explicit Apple TV-style IDs and missing inventory.
+
 A full policy replaces the old one. `{enabled: false}` or `{enabled: true}` changes
 only the master state. `rules: []` with a full policy blocks nothing and removes the
 overlay. With an existing generic overlay, rule edits update its local permission
@@ -131,7 +178,7 @@ is not optimistic. Status refreshes every 30 seconds and expires after 90 second
 The exact inspected original `SimplinkController.qml` SHA-256 is required. The G6
 allowlist covers firmware **43.11.73** and **43.21.69**. The latter adds logging and
 only marks CEC selection complete when the unique ID is valid; the intercepted
-automatic-selection call and explicit-selection bypass are unchanged. Unknown firmware
+selection call is the same interception point for both supported actions. Unknown firmware
 or foreign overlays are refused. A generated copy is bind-mounted; firmware is
 never overwritten or remounted writable. Root refreshes a non-secret permission
 file every 30 seconds; it expires after 90 seconds. Missing, unreadable, invalid or

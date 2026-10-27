@@ -82,4 +82,16 @@ module.exports = function () {
   assert.strictEqual(calls, 10, 'Unknown-device fallback also fails open when the bridge lease expires');
   clock = 2000; context.launchUniqueId = '4'; context._setCecUniqueId();
   assert.strictEqual(calls, 11, 'A fresh explicit selection keeps LG behavior even with unknown cached ID');
+  rules.rules = [{id: 'input_only', match: {input: 'hdmi2'}, block: ['device_selection']}];
+  raw = JSON.stringify(lease); context.subList = [];
+  context.uniqueId = 4; context.launchUniqueId = '4'; context._setCecUniqueId();
+  assert.strictEqual(calls, 11, 'Port-only policy intercepts the fresh explicit device ID sent by LG input picker');
+  context.windowMinimizedAction(); context.uniqueId = 255; context._setCecUniqueId();
+  assert.strictEqual(calls, 11, 'Port-only policy intercepts automatic unknown fallback without inventory');
+  rules.enabled = false; raw = JSON.stringify(lease); context._setCecUniqueId();
+  assert.strictEqual(calls, 12, 'Disabling policy restores LG input-picker behavior immediately');
+  rules.enabled = true; raw = JSON.stringify(lease); clock = 91000; context._setCecUniqueId();
+  assert.strictEqual(calls, 13, 'Port-only policy retains lease-expiry fail-open behavior');
+  clock = 2000; rules.rules[0].match.input = 'hdmi3'; raw = JSON.stringify(lease); context._setCecUniqueId();
+  assert.strictEqual(calls, 14, 'Other inputs remain untouched without a matching port-only rule');
 };

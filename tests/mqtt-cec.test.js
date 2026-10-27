@@ -32,7 +32,15 @@ module.exports = function () {
   var oldSession = request; channel.disconnect(); channel.connect(); channel.subscribed();
   channel.receive(oldSession, {retain: false}); assert.strictEqual(calls, 2);
   assert.strictEqual(channel.status().results.test1.error, 'stale_session');
-  assert.deepStrictEqual(channel.status().capabilities.supported_actions, ['automatic_selection']);
+  assert.deepStrictEqual(channel.status().capabilities.supported_actions, ['automatic_selection', 'device_selection']);
+  var portOnly = {version: 1, enabled: true, rules: [{id: 'hdmi3_only', match: {input: 'hdmi3'}, block: ['device_selection']}]};
+  channel.receive(JSON.stringify(envelope('port_only', portOnly)), {retain: false});
+  assert.strictEqual(calls, 3); assert.strictEqual(channel.status().results.port_only.ok, true);
+  assert.deepStrictEqual(saved.rules[0].block, ['device_selection']);
+  var invalidPort = JSON.parse(JSON.stringify(portOnly)); invalidPort.rules[0].match.vendor_id = 123;
+  channel.receive(JSON.stringify(envelope('invalid_port', invalidPort)), {retain: false});
+  assert.strictEqual(calls, 3); assert.strictEqual(channel.status().results.invalid_port.error, 'invalid_cec_policy');
+  assert.deepStrictEqual(saved, portOnly, 'Invalid mixed identity/port policy cannot replace the current rules');
   channel.stop();
 
   var config = store.validate({device_id: 'test', mqtt: {host: 'broker', cec_commands_enabled: true}});

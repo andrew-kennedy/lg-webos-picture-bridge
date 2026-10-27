@@ -51,10 +51,17 @@ function inject(source) {
   var condition = [
     '            // Optional LG Picture Bridge filter. Missing/expired policy keeps LG behavior.',
     '            try {',
-    '                var lgpbRule = _lgpbCecMatchingRule(_lgpbCecPolicy(), "automatic_selection",',
+    '                var lgpbPolicy = _lgpbCecPolicy();',
+    '                var lgpbAction = "device_selection";',
+    '                var lgpbRule = _lgpbCecMatchingRule(lgpbPolicy, lgpbAction,',
     '                    "com.webos.app.hdmi" + portId, launchUniqueId, cecUniqueId, subList);',
+    '                if (!lgpbRule) {',
+    '                    lgpbAction = "automatic_selection";',
+    '                    lgpbRule = _lgpbCecMatchingRule(lgpbPolicy, lgpbAction,',
+    '                        "com.webos.app.hdmi" + portId, launchUniqueId, cecUniqueId, subList);',
+    '                }',
     '                if (lgpbRule) {',
-    '                    console.log("LGPB_CEC_GUARD blocked automatic_selection rule=" + lgpbRule + " device=" + cecUniqueId);',
+    '                    console.log("LGPB_CEC_GUARD blocked " + lgpbAction + " rule=" + lgpbRule + " device=" + cecUniqueId);',
     '                    return;',
     '                }',
     '            } catch (lgpbError) { console.log("LGPB_CEC_GUARD failed open: " + lgpbError); }',
@@ -72,6 +79,6 @@ function inject(source) {
 }
 
 module.exports = {TARGET: TARGET, ORIGINAL_SHA256S: ORIGINAL_SHA256S, POLICY_URL: POLICY_URL,
-  REVISION: 5, digest: digest, checkOriginal: checkOriginal,
+  REVISION: 6, digest: digest, checkOriginal: checkOriginal,
   validLease: validLease, injectForTest: inject,
   build: function (source) { checkOriginal(source); return inject(source); }};

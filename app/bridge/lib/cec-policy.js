@@ -1,7 +1,7 @@
 'use strict';
 
 // Device identities are configuration, never firmware-specific constants.
-var ACTIONS = ['automatic_selection'];
+var ACTIONS = ['automatic_selection', 'device_selection'];
 var INPUTS = ['hdmi1', 'hdmi2', 'hdmi3', 'hdmi4'];
 function fail(code, message) { var e = new Error(message); e.code = code; throw e; }
 function object(value, keys, label) {
@@ -46,6 +46,10 @@ function normalize(value) {
       if (block.indexOf(action) !== -1) fail('invalid_cec_policy', 'Duplicate block action');
       block.push(action);
     });
+    if (block.indexOf('device_selection') !== -1 &&
+        (Object.keys(match).length !== 1 || !match.input)) {
+      fail('invalid_cec_policy', 'device_selection requires an input-only match');
+    }
     return {id: rule.id, match: match, block: block.sort()};
   })};
 }
@@ -57,10 +61,23 @@ function empty() { return {version: 1, enabled: false, rules: []}; }
 
 // ES5, pure and self-contained: this function is also embedded in native Qt QML.
 function matchingRule(policy, action, appId, launchUniqueId, uniqueId, devices) {
-  if (!policy || policy.version !== 1 || policy.enabled !== true || action !== 'automatic_selection' ||
-      launchUniqueId || !Array.isArray(policy.rules) || policy.rules.length > 32 || !Array.isArray(devices)) return null;
+  if (!policy || policy.version !== 1 || policy.enabled !== true ||
+      !Array.isArray(policy.rules) || policy.rules.length > 32) return null;
   var input = /^com\.webos\.app\.hdmi([1-4])$/.exec(appId || '');
-  if (!input || uniqueId === undefined || uniqueId === null || uniqueId === '') return null;
+  if (!input) return null;
+  // A port-only operation must not depend on a CEC inventory or treat a device
+  // ID supplied by LG's input picker as permission to wake that device.
+  if (action === 'device_selection') {
+    for (var p = 0; p < policy.rules.length; p++) {
+      var portRule = policy.rules[p];
+      if (portRule && portRule.match && Object.keys(portRule.match).length === 1 &&
+          portRule.match.input === 'hdmi' + input[1] && Array.isArray(portRule.block) &&
+          portRule.block.indexOf(action) !== -1) return portRule.id;
+    }
+    return null;
+  }
+  if (action !== 'automatic_selection' || launchUniqueId || !Array.isArray(devices) ||
+      uniqueId === undefined || uniqueId === null || uniqueId === '') return null;
   // 255 is LG's unknown-device sentinel, not a CEC logical address. On G6,
   // selecting it restores the last physical route on this input, which can
   // wake a protected device even though its logical ID was never requested.
@@ -103,4 +120,5 @@ module.exports = {normalize: normalize, normalizeCommand: normalizeCommand, empt
   capabilities: function () { return {supported_actions: ACTIONS.slice(), inputs: INPUTS.slice(),
     direction: 'tv_to_device', standby_supported: false,
     standby_reason: 'No verified per-device standby interception on this firmware',
+    device_selection_scope: 'LG HDMI app explicit and automatic CEC selection; input-only rules keep TV input changes independent of source selection and wake',
     automatic_selection_scope: 'LG HDMI app automatic selection, including unknown-device fallback on inputs with a matching device; explicit selection and other power paths are unchanged'}; }};

@@ -45,5 +45,28 @@ module.exports = function () {
   assert.throws(function () { policy.normalize(duplicate); });
   assert.deepStrictEqual(policy.normalizeCommand({enabled: false}), {enabled: false});
   assert.throws(function () { policy.normalizeCommand({enabled: true, command: 'reboot'}); });
-  assert.deepStrictEqual(policy.capabilities().supported_actions, ['automatic_selection']);
+  assert.deepStrictEqual(policy.capabilities().supported_actions, ['automatic_selection', 'device_selection']);
+  var portPolicy = {version: 1, enabled: true, rules: ['hdmi1', 'hdmi2', 'hdmi3', 'hdmi4'].map(function (input) {
+    return {id: input + '_only', match: {input: input}, block: ['device_selection']};
+  })};
+  portPolicy = policy.normalize(portPolicy);
+  portPolicy.rules.forEach(function (r) {
+    [undefined, null, [], [a, a]].forEach(function (inventory) {
+      ['', '4', '255'].forEach(function (explicit) {
+        assert.strictEqual(policy.matchingRule(portPolicy, 'device_selection', 'com.webos.app.' + r.match.input,
+          explicit, 255, inventory), r.id, 'Port-only selection covers input-picker device IDs and absent/ambiguous inventory');
+      });
+    });
+  });
+  assert.strictEqual(policy.matchingRule(portPolicy, 'device_selection', 'com.webos.app.livetv', '4', 4, [a]), null);
+  assert.strictEqual(policy.matchingRule(portPolicy, 'standby', 'com.webos.app.hdmi3', '', 4, [a]), null);
+  var singlePort = {version: 1, enabled: true, rules: [portPolicy.rules[2]]};
+  assert.strictEqual(policy.matchingRule(singlePort, 'device_selection', 'com.webos.app.hdmi4', '4', 4, [a]), null);
+  singlePort.enabled = false;
+  assert.strictEqual(policy.matchingRule(singlePort, 'device_selection', 'com.webos.app.hdmi3', '4', 4, [a]), null);
+  [{vendor_id: 123}, {input: 'hdmi3', vendor_id: 123}].forEach(function (match) {
+    var bad = rule(match); bad.rules[0].block = ['device_selection'];
+    assert.throws(function () { policy.normalize(bad); }, /input-only/);
+    assert.strictEqual(policy.matchingRule(bad, 'device_selection', 'com.webos.app.hdmi3', '4', 4, [a]), null);
+  });
 };
