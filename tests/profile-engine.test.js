@@ -7,7 +7,8 @@ const clone = model.clone;
 const doc = {schema:1,name:'Test G6',devices:{switch_2:'Switch 2',apple:'Apple TV',shield:'Shield'},banks:[
   {id:'game',name:'Switch game',devices:['switch_2'],target:{category:'other',dimension:{gameInput:'hdmi3',dynamicRange:'hdrALLM',gameGenre:'Standard'}},settings:{gameSharpness:0,gameColorDepth:50}},
   {id:'movie',name:'Shared movie SDR',devices:['apple','shield'],target:{category:'picture',dimension:{input:'hdmi3',pictureMode:'filmMaker'}},settings:{backlight:3,color:50},brightness_role:'movie_sdr'},
-  {id:'mapping',name:'SDR movie mapping',target:{category:'picture',dimension:{input:'hdmi3',dynamicRange:'sdr'}},settings:{pictureMode:'filmMaker'},devices:['apple','shield']}
+  {id:'mapping',name:'SDR movie mapping',target:{category:'picture',dimension:{input:'hdmi3',dynamicRange:'sdr'}},settings:{pictureMode:'filmMaker'},devices:['apple','shield']},
+  {id:'port',name:'HDMI 3 game capability',target:{category:'other',dimension:{gameInput:'hdmi3'}},settings:{enableALLM:'on'},devices:['switch_2']}
 ]};
 function fixture() {
   const files = {}, writes = [], operations = [], values = Object.fromEntries(doc.banks.map(b => [b.id,clone(b.settings)]));
@@ -78,6 +79,7 @@ module.exports = async function () {
   e.contextChanged({ready:true,input:'hdmi3',range:'sdr',mode:'filmMaker'});
   await e.idle();
   assert.equal(f.operations.length,operationsBefore,'Input/range changes do not reapply profiles');
+  assert.deepEqual(e.status().active_devices,['Apple TV','Shield'],'HDMI port capability banks do not identify the active device');
   await e.command({action:'set_environment',room:'bright'});
   assert.equal(f.values.movie.backlight,100);
   f.observe(e,'movie','backlight',70);

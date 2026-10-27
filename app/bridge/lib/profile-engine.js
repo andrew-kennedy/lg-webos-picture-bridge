@@ -75,7 +75,9 @@ function create(options) {
       enabled:!!(saved && saved.enabled),room,power,context,temporary_count:Object.values(overrides).reduce((n,v) => n + Object.keys(v).length,0),
       pending_restore:Object.keys(journal.restore).length > 0,applying,changed_count:changedCount,
       error:loadError || lastError,backup_sequence:latestBackup ? sequence : null,backup_acknowledged:acknowledged,
-      active_devices:document() ? [...new Set(document().banks.filter(b => model.active(b,context)).flatMap(b => b.devices || []))].map(d => document().devices[d]) : []};
+      active_devices:document() ? [...new Set(document().banks.filter(b =>
+        (Object.hasOwn(b.target.dimension,'pictureMode') || Object.hasOwn(b.target.dimension,'dynamicRange')) &&
+        model.active(b,context)).flatMap(b => b.devices || []))].map(d => document().devices[d]) : []};
   }
   function notify() { for (const fn of listeners) fn(status()); }
   function publishBackup() {
