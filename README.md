@@ -2,7 +2,7 @@
 
 LG Picture Bridge connects a **rooted 2026 LG G6 (webOS 11)** to Home Assistant. It reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision through MQTT discovery, and applies picture profiles without notification dialogs.
 
-Version **0.10.0** captures settings through subscriptions, caches their descriptions, shares the HDMI video stream, and keeps routine diagnostics in RAM. A five-minute recovery check and fresh validation before manual writes preserve reliable control. It supports the inspected G6 CEC files from firmware **43.11.73** and **43.21.69**, and fits the normal status view on screen without vertical scrolling. Older C9 firmware is no longer supported. The live verification target is an OLED77G6WUA on **43.21.69 / webOS 11.2.0**, with Homebrew Channel 0.8.0-rc1 and Node 20.12.2. Installing the bridge does not update TV firmware.
+Version **0.10.1** fixes stale and unknown CEC selections that could wake the previous player on a shared HDMI input. It captures settings through subscriptions, caches their descriptions, shares the HDMI video stream, and keeps routine diagnostics in RAM. A five-minute recovery check and fresh validation before manual writes preserve reliable control. It supports the inspected G6 CEC files from firmware **43.11.73** and **43.21.69**, and fits the normal status view on screen without vertical scrolling. Older C9 firmware is no longer supported. The live verification target is an OLED77G6WUA on **43.21.69 / webOS 11.2.0**, with Homebrew Channel 0.8.0-rc1 and Node 20.12.2. Installing the bridge does not update TV firmware.
 
 ## Install and receive updates
 
@@ -20,7 +20,7 @@ For manual installation, download the IPK from [Releases](https://github.com/and
 
 ```sh
 luna-send-pub -i luna://com.webos.appInstallService/dev/install \
-  '{"id":"com.ares.defaultName","ipkUrl":"/home/root/io.github.andrewkennedy.lgpicturebridge_0.10.0_all.ipk","subscribe":true}'
+  '{"id":"com.ares.defaultName","ipkUrl":"/home/root/io.github.andrewkennedy.lgpicturebridge_0.10.1_all.ipk","subscribe":true}'
 ```
 
 Wait for `state: installed`, then interrupt the subscription. Homebrew Channel must already be elevated. No system partition flashing is involved.
@@ -124,6 +124,8 @@ MQTT commands require protocol 1, the current session ID from the command sensor
 [Configure CEC rules from Home Assistant](home-assistant/lg_picture_bridge_mqtt_cec_policy.example.yaml). The bridge has no built-in device identities or block rules. Match explicit input/vendor/name/type fields; every supplied field must match. The master switch preserves the saved rules.
 
 On the inspected G6 firmware the filter intercepts the HDMI app's **automatic CEC device selection**. Explicit device selection continues normally. This is not a general CEC firewall, and per-device standby blocking is not supported. SIMPLINK and eARC remain enabled.
+
+The filter also suppresses LG's unknown-device fallback when the input contains a device matched by the policy: that fallback can otherwise wake the previously used player behind an HDMI switch. It clears stale explicit-selection state across HDMI minimization while preserving fresh selections. Known unprotected devices continue normally. See [CEC behavior and limitations](docs/cec-filter.md).
 
 The implementation uses a removable bind mount of a generated QML file. It verifies the original `SimplinkController.qml` SHA-256 before applying anything. A 90-second lease and rollback watchdog fail open; unknown firmware, missing policy, ambiguous identities, and expired leases preserve LG behavior. Stop/unpair revokes the lease and removes the owned overlay. Firmware updates may change the file hash and disable filtering until that firmware is inspected.
 

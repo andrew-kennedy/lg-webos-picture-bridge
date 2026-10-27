@@ -10,6 +10,7 @@ var ORIGINAL_SHA256S = [
 ];
 var POLICY_URL = 'file:///tmp/lgpb-apple-tv-cec/lease.json';
 var CALL = '        setCECUniqueId(cecUniqueId, portId);';
+var CLEAR_SELECTION = '        deeplinkHandler.launchUniqueId = "";';
 
 // This function also runs inside the TV's native QML engine.
 function validLease(lease, now) {
@@ -28,7 +29,8 @@ function checkOriginal(source) {
 function inject(source) {
   var text = source.toString('utf8');
   var anchor = '    function _setCecUniqueId () {';
-  if (text.split(CALL).length !== 2 || text.split(anchor).length !== 2 || text.indexOf('_lgpbCec') !== -1) {
+  if (text.split(CALL).length !== 2 || text.split(anchor).length !== 2 ||
+      text.split(CLEAR_SELECTION).length !== 2 || text.indexOf('_lgpbCec') !== -1) {
     throw new Error('Unexpected QML layout; CEC filter not applied');
   }
   var helpers = [
@@ -52,16 +54,24 @@ function inject(source) {
     '                var lgpbRule = _lgpbCecMatchingRule(_lgpbCecPolicy(), "automatic_selection",',
     '                    "com.webos.app.hdmi" + portId, launchUniqueId, cecUniqueId, subList);',
     '                if (lgpbRule) {',
-    '                    console.log("LGPB_CEC_GUARD blocked automatic_selection rule=" + lgpbRule);',
+    '                    console.log("LGPB_CEC_GUARD blocked automatic_selection rule=" + lgpbRule + " device=" + cecUniqueId);',
     '                    return;',
     '                }',
     '            } catch (lgpbError) { console.log("LGPB_CEC_GUARD failed open: " + lgpbError); }',
     CALL
   ].join('\n');
-  return text.replace(CALL, condition).replace(anchor, helpers + '\n' + anchor);
+  // LG's explicit-selection handler assigns this property, replacing its QML
+  // binding to deeplinkHandler. Clearing only the latter leaves a stale device
+  // ID across standby and incorrectly bypasses the automatic-selection filter.
+  // Restore the binding when HDMI is minimized; fresh explicit selections still
+  // take the normal LG path on the next launch.
+  var clearSelection = CLEAR_SELECTION + '\n' +
+    '        launchUniqueId = Qt.binding(function () { return deeplinkHandler.launchUniqueId; });';
+  return text.replace(CALL, condition).replace(CLEAR_SELECTION, clearSelection)
+    .replace(anchor, helpers + '\n' + anchor);
 }
 
 module.exports = {TARGET: TARGET, ORIGINAL_SHA256S: ORIGINAL_SHA256S, POLICY_URL: POLICY_URL,
-  REVISION: 3, digest: digest, checkOriginal: checkOriginal,
+  REVISION: 5, digest: digest, checkOriginal: checkOriginal,
   validLease: validLease, injectForTest: inject,
   build: function (source) { checkOriginal(source); return inject(source); }};

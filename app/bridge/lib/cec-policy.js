@@ -61,31 +61,40 @@ function matchingRule(policy, action, appId, launchUniqueId, uniqueId, devices) 
       launchUniqueId || !Array.isArray(policy.rules) || policy.rules.length > 32 || !Array.isArray(devices)) return null;
   var input = /^com\.webos\.app\.hdmi([1-4])$/.exec(appId || '');
   if (!input || uniqueId === undefined || uniqueId === null || uniqueId === '') return null;
-  var selected = null;
+  // 255 is LG's unknown-device sentinel, not a CEC logical address. On G6,
+  // selecting it restores the last physical route on this input, which can
+  // wake a protected device even though its logical ID was never requested.
+  // Suppress that ambiguous fallback when this input contains a policy match.
+  var unknown = uniqueId === 255 || uniqueId === '255';
+  var selected = [];
   for (var i = 0; i < devices.length; i++) {
     var device = devices[i];
-    if (device && String(device.uniqueId) === String(uniqueId)) {
-      if (selected) return null; // Ambiguity is never permission to block.
-      selected = device;
+    if (device && (unknown || String(device.uniqueId) === String(uniqueId))) {
+      if (!unknown && selected.length) return null; // Conflicting identities fail open.
+      selected.push(device);
     }
   }
-  if (!selected || selected.id !== 'SIMPLINK' || Number(selected.portId) !== Number(input[1])) return null;
-  var identity = {input: 'hdmi' + input[1], vendor_id: selected.vendorId, osd_name: selected.osdName,
-    device_type: selected.cecpDevType, physical_address: selected.physicalAddress};
-  for (var r = 0; r < policy.rules.length; r++) {
-    var rule = policy.rules[r];
-    if (!rule || !rule.match || !Array.isArray(rule.block) || rule.block.indexOf(action) === -1) continue;
-    var keys = Object.keys(rule.match), matches = keys.length > 0;
-    for (var k = 0; k < keys.length; k++) {
-      var key = keys[k], expected = rule.match[key], actual = identity[key];
-      if (!Object.prototype.hasOwnProperty.call(identity, key) || actual === undefined || actual === null) { matches = false; break; }
-      if (key === 'osd_name') {
-        if (typeof actual !== 'string' || typeof expected !== 'string' || actual.trim().toLowerCase() !== expected.trim().toLowerCase()) matches = false;
-      } else if (key === 'input') {
-        if (actual !== expected) matches = false;
-      } else if (typeof expected !== 'number' || !isFinite(Number(actual)) || Number(actual) !== expected) matches = false;
+  for (var s = 0; s < selected.length; s++) {
+    device = selected[s];
+    if (device.id !== 'SIMPLINK' || Number(device.portId) !== Number(input[1])) continue;
+    if (unknown && (!/^(?:[1-9]|1[0-4])$/.test(String(device.uniqueId)))) continue;
+    var identity = {input: 'hdmi' + input[1], vendor_id: device.vendorId, osd_name: device.osdName,
+      device_type: device.cecpDevType, physical_address: device.physicalAddress};
+    for (var r = 0; r < policy.rules.length; r++) {
+      var rule = policy.rules[r];
+      if (!rule || !rule.match || !Array.isArray(rule.block) || rule.block.indexOf(action) === -1) continue;
+      var keys = Object.keys(rule.match), matches = keys.length > 0;
+      for (var k = 0; k < keys.length; k++) {
+        var key = keys[k], expected = rule.match[key], actual = identity[key];
+        if (!Object.prototype.hasOwnProperty.call(identity, key) || actual === undefined || actual === null) { matches = false; break; }
+        if (key === 'osd_name') {
+          if (typeof actual !== 'string' || typeof expected !== 'string' || actual.trim().toLowerCase() !== expected.trim().toLowerCase()) matches = false;
+        } else if (key === 'input') {
+          if (actual !== expected) matches = false;
+        } else if (typeof expected !== 'number' || !isFinite(Number(actual)) || Number(actual) !== expected) matches = false;
+      }
+      if (matches) return rule.id;
     }
-    if (matches) return rule.id;
   }
   return null;
 }
@@ -94,4 +103,4 @@ module.exports = {normalize: normalize, normalizeCommand: normalizeCommand, empt
   capabilities: function () { return {supported_actions: ACTIONS.slice(), inputs: INPUTS.slice(),
     direction: 'tv_to_device', standby_supported: false,
     standby_reason: 'No verified per-device standby interception on this firmware',
-    automatic_selection_scope: 'LG HDMI app automatic CEC selection only; explicit selection and other power paths are unchanged'}; }};
+    automatic_selection_scope: 'LG HDMI app automatic selection, including unknown-device fallback on inputs with a matching device; explicit selection and other power paths are unchanged'}; }};

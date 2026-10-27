@@ -1,4 +1,4 @@
-# Generic MQTT-configured CEC filtering (0.7.1)
+# MQTT-configured CEC filtering on G6
 
 Home Assistant owns the device/input policy. The webOS app contains **no device
 names, vendor IDs or default block rules**. It provides a firmware-specific,
@@ -6,9 +6,9 @@ reversible interception mechanism and a strict generic rule evaluator.
 
 ## Supported behavior—and the standby limitation
 
-The inspected C9 supports `automatic_selection`: skip the HDMI app's automatic
-`setCecUniqueId` call when a configured rule matches. This prevented unwanted
-source wake on return from native LG AirPlay in the supervised 0.6 tests. It is
+The inspected G6 supports `automatic_selection`: skip the HDMI app's automatic
+`setCECUniqueId` call when a configured rule matches. This includes LG's unknown-device
+fallback on a shared input containing a matching device, as described below. It is
 **not a universal CEC wake-command filter**. Explicit device selections, inbound
 device→TV power requests, and other CEC paths are unaffected.
 
@@ -28,7 +28,7 @@ The status sensor publishes the firmware's actual capabilities.
 
 ## Setup and Home Assistant controls
 
-1. Install the full 0.7 package so the read-only EIM discovery permission is installed.
+1. Install the full package so the read-only EIM discovery permission is installed.
 2. Opt in with `mqtt.cec_commands_enabled: true` in the saved broker setup. This is
    separate from `mqtt.commands_enabled` for picture writes; preserve all existing
    credentials, device ID and other setup fields when reconfiguring.
@@ -84,8 +84,15 @@ deliberately covers all identified CEC devices selected on that TV input. Be car
 with shared inputs. Maximum 32 rules; IDs are unique, bounded strings. There are no
 regexes, shell snippets, arbitrary Luna URIs or policy-selected executable paths.
 
-Logical addresses are discovered per call rather than stored as match keys. Unknown
-or ambiguous device identity does not block. `inventory.devices` is read from EIM
+Logical addresses are discovered per call rather than stored as match keys. Conflicting
+identities for a requested logical address fail open. LG's `255` sentinel is a special
+case: it requests restoration of the input's remembered physical route, not a specific
+CEC device. If the HDMI app identifies any policy-matched device on that input, the
+filter suppresses this automatic fallback. It cannot determine which device the native
+fallback would select. Known unprotected devices and fresh explicit device selections
+still follow normal LG behavior. Missing or unmatched inventory leaves the fallback alone.
+
+`inventory.devices` is read from EIM
 every 30 seconds and can contain cached devices. It **does not reveal the external
 HDMI switch's selected route, live power state, or current active source**. Failed
 inventory requests publish unavailable/empty inventory, not fabricated presence.
@@ -132,6 +139,35 @@ expired permission leaves normal LG behavior intact. A separate watchdog removes
 the owned overlay after expiry, with the bounded late-tick grace described below.
 Broker disconnection alone does not erase a saved
 policy: the running local bridge continues enforcing it independently of MQTT.
+
+## G6 selection lifecycle and unknown-device fallback
+
+Two G6 wake paths could bypass the original HDMI-app filter:
+
+- LG's explicit-selection handler assigns `launchUniqueId`, replacing its QML binding
+  to the deep-link handler. Minimizing HDMI cleared only the deep-link value, leaving
+  the prior selection marked explicit on the next wake. The overlay now restores that
+  binding when HDMI is minimized. Fresh direct and deferred selections remain available.
+- With no current CEC focus, the HDMI app can send `uniqueId: 255`. On firmware
+  43.21.69, a captured Nintendo wake followed this call with native
+  `_commandHandler_SelectDevice_unknownDev`, a restore of Apple TV's physical route,
+  and a `Set Stream Path` message waking Apple TV. Policy matching now covers this
+  fallback when a protected device is identified on the same input.
+
+These changes add no polling, Home Assistant timing rules, native binary patches,
+or persistent diagnostic writes. They keep the existing lease and removable QML
+overlay. They do not intercept the separate native last-device power-on path.
+Regression tests cover stale explicit selections across repeated minimization,
+fresh explicit selections, shared-input fallback, known unprotected sources,
+missing/unmatched inventory, and expired leases.
+
+Live verification on OLED77G6WUA / 43.21.69, 2026-10-27: after the user put Apple TV
+to sleep and woke Nintendo with its controller, QML logged the configured rule
+blocking `device=255`. The CEC log showed Nintendo's wake and active-source messages,
+then focus moving to Nintendo, with no Apple TV `Set Stream Path` during that wake.
+The user confirmed Apple TV stayed asleep; Home Assistant agreed and armed the
+Nintendo session. This verifies that sequence, not every native CEC power path or
+long-standby ordering. No Home Assistant automation guard was added.
 
 ## Standby recovery (0.7.1)
 

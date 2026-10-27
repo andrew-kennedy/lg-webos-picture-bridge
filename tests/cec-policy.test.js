@@ -12,6 +12,25 @@ module.exports = function () {
   assert.strictEqual(matches(rule({input: 'hdmi3'}), [a, a]), null);
   assert.strictEqual(matches(rule({input: 'hdmi3'}), [a], 'com.webos.app.hdmi4'), null);
   assert.strictEqual(matches(rule({input: 'hdmi3'}), [a], undefined, '8'), null);
+  var other = Object.assign({}, a, {uniqueId: 4, vendorId: 456, osdName: 'Other player'});
+  function fallback(devices, explicit, id, app, enabled) {
+    var p = rule({input: 'hdmi3', vendor_id: 123, osd_name: 'player'});
+    if (enabled === false) p.enabled = false;
+    return policy.matchingRule(p, 'automatic_selection', app || 'com.webos.app.hdmi3', explicit,
+      id === undefined ? 255 : id, devices);
+  }
+  assert.strictEqual(fallback([other, a]), 'test', 'Unknown fallback may restore a protected player behind a shared input');
+  assert.strictEqual(fallback([a, other], '', '255'), 'test', 'LG also reports the sentinel as a string');
+  assert.strictEqual(fallback([other]), null, 'An unrelated player alone does not block an unknown fallback');
+  assert.strictEqual(fallback([]), null, 'Missing inventory fails open');
+  assert.strictEqual(fallback([a], '8'), null, 'Explicit device selection bypasses the filter');
+  assert.strictEqual(fallback([a, other], '', 4), null, 'Known unrelated devices on the shared input remain selectable');
+  assert.strictEqual(fallback([a], '', 0), null, 'Selecting the TV itself is not an unknown-device fallback');
+  assert.strictEqual(fallback([a], '', -1), null, 'Only the observed 255 sentinel uses fallback matching');
+  assert.strictEqual(fallback([a], '', 255, 'com.webos.app.hdmi4'), null, 'A protected device on another input is irrelevant');
+  assert.strictEqual(fallback([a], '', 255, undefined, false), null, 'Disabling policy also disables fallback filtering');
+  assert.strictEqual(fallback([Object.assign({}, a, {id: 'HDMI'})]), null);
+  assert.strictEqual(fallback([Object.assign({}, a, {uniqueId: 255})]), null, 'Unidentified inventory is not proof of a protected CEC device');
   ['hdmi1', 'hdmi2', 'hdmi3', 'hdmi4'].forEach(function (input, index) {
     var d = Object.assign({}, a, {portId: index + 1});
     assert.strictEqual(matches(rule({input: input}), [d], 'com.webos.app.' + input), 'test');
