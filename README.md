@@ -2,7 +2,7 @@
 
 LG Picture Bridge connects a **rooted 2026 LG G6 (webOS 11)** to Home Assistant. It reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision through MQTT discovery, and applies picture profiles without notification dialogs.
 
-Version **0.10.2** adds an input-only CEC policy: selecting an LG HDMI input can change the TV input without selecting or waking a source device, including through LG's input picker. It also fixes stale and unknown CEC selections that could wake the previous player on a shared HDMI input. Settings capture uses subscriptions, cached descriptions, a shared HDMI video stream, and RAM diagnostics, with a five-minute recovery check. It supports the inspected G6 CEC files from firmware **43.11.73** and **43.21.69**, and fits the normal status view on screen without vertical scrolling. Older C9 firmware is no longer supported. The live verification target is an OLED77G6WUA on **43.21.69 / webOS 11.2.0**, with Homebrew Channel 0.8.0-rc1 and Node 20.12.2. Installing the bridge does not update TV firmware.
+Version **0.13.3** preserves the active full-screen HDMI input when installing the CEC filter after a cold boot or bridge restart. It fixes a reload that could leave the TV on Home just as picture profiles were restored. The input-only CEC policy means selecting an LG HDMI input can change the TV input without selecting or waking a source device, including through LG's input picker. It also fixes stale and unknown CEC selections that could wake the previous player on a shared HDMI input. Settings capture uses subscriptions, cached descriptions, a shared HDMI video stream, and RAM diagnostics, with a five-minute recovery check. It supports the inspected G6 CEC files from firmware **43.11.73** and **43.21.69**, and fits the normal status view on screen without vertical scrolling. Older C9 firmware is no longer supported. The live verification target is an OLED77G6WUA on **43.21.69 / webOS 11.2.0**, with Homebrew Channel 0.8.0 and Node 20.12.2. Installing the bridge does not update TV firmware.
 
 ## Install and receive updates
 
@@ -20,7 +20,7 @@ For manual installation, download the IPK from [Releases](https://github.com/and
 
 ```sh
 luna-send-pub -i luna://com.webos.appInstallService/dev/install \
-  '{"id":"com.ares.defaultName","ipkUrl":"/home/root/io.github.andrewkennedy.lgpicturebridge_0.10.2_all.ipk","subscribe":true}'
+  '{"id":"com.ares.defaultName","ipkUrl":"/home/root/io.github.andrewkennedy.lgpicturebridge_0.13.3_all.ipk","subscribe":true}'
 ```
 
 Wait for `state: installed`, then interrupt the subscription. Homebrew Channel must already be elevated. No system partition flashing is involved.

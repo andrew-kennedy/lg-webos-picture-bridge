@@ -9,6 +9,7 @@ function environment(options) {
   options = options || {};
   var files = {}, sequence = 0, mounted = options.foreign ? 'foreign' : false, clock = 10000;
   var commands = [], writes = [], intervals = [], spawns = [];
+  var foreground = options.foreground || ['com.webos.app.home'], power = options.power || 'Active';
   function entry(value, mode) { return {value: value, mode: mode || (value === null ? 493 : 420),
     uid: 0, ino: ++sequence, nlink: 1, link: false}; }
   files[guard.APP_ROOT + '/appinfo.json'] = entry('{}');
@@ -39,7 +40,31 @@ function environment(options) {
       commands.push([bin].concat(args));
       if (bin === '/bin/mount') mounted = true;
       else if (bin === '/bin/umount') mounted = false;
-      else if (bin === '/usr/bin/luna-send') return '{"returnValue":true}';
+      else if (bin === '/usr/bin/luna-send') {
+        var method = args[4].split('/').pop(), params = JSON.parse(args[5]);
+        if (method === 'getForegroundApps') {
+          if (options.foregroundFailure) throw Error('Foreground unavailable');
+          return JSON.stringify({returnValue: true, foregroundApps: foreground.map(function (id) { return {appId: id}; })});
+        }
+        if (method === 'getPowerState') {
+          if (options.powerFailure) throw Error('Power unavailable');
+          return JSON.stringify({returnValue: true, state: power});
+        }
+        if (method === 'closeByAppId') {
+          if (options.closeFailure) return '{"returnValue":false}';
+          if (foreground.indexOf(params.id) !== -1) {
+            foreground = options.afterCloseForeground || ['com.webos.app.home'];
+            power = options.afterClosePower || power;
+          } else if (options.afterBackgroundCloseForeground) foreground = options.afterBackgroundCloseForeground;
+        } else if (method === 'launch') {
+          assert(mounted && patch.validLease(JSON.parse(files[guard.LEASE].value), clock),
+            'The filter must be mounted and permitted before HDMI reopens');
+          assert.deepStrictEqual(Object.keys(params), ['id'], 'Never replay device selection or preview parameters');
+          if (options.launchFailure) return '{"returnValue":false}';
+          foreground = [params.id];
+        }
+        return '{"returnValue":true}';
+      }
       else throw Error('Unexpected command ' + bin);
     },
     spawn: function (bin, args) {
@@ -59,6 +84,7 @@ function environment(options) {
   return {manager: guard.create(deps), newManager: function () { return guard.create(deps); }, files: files,
     writes: writes, commands: commands, intervals: intervals, spawns: spawns, options: options,
     advance: function (ms) { clock += ms; }, mounted: function () { return mounted; },
+    foreground: function () { return foreground; },
     addUnsafe: function (p, kind) { files[p] = entry(p === guard.ROOT ? null : 'unsafe'); files[p][kind] = kind === 'uid' ? 1000 : true; }};
 }
 
@@ -71,7 +97,11 @@ module.exports = function () {
   assert(enabled.enabled && enabled.supported && enabled.mounted && enabled.lease_active);
   assert.strictEqual(e.files[guard.STATE_DIR + '/config.json'].value, 'existing broker configuration');
   assert(e.writes.every(function (p) { return p.indexOf(guard.ROOT + '/') === 0 || p.indexOf(guard.CONFIG) === 0; }), 'Never write firmware');
-  assert.strictEqual(e.commands.filter(function (c) { return c[0] === '/usr/bin/luna-send'; }).length, 4);
+  function calls(env, method) {
+    return env.commands.filter(function (c) { return c[0] === '/usr/bin/luna-send' && c[5].split('/').pop() === method; });
+  }
+  assert.strictEqual(calls(e, 'closeByAppId').length, 4);
+  assert.strictEqual(calls(e, 'launch').length, 0, 'Home stays on Home');
   var before = e.commands.length; e.advance(30000); e.manager.tick();
   assert.strictEqual(e.commands.length, before, 'Lease refresh must not restart HDMI again');
   e.newManager().start(); assert.strictEqual(e.commands.length, before, 'Service restart adopts owned overlay');
@@ -84,6 +114,59 @@ module.exports = function () {
   e.newManager().start(); assert.strictEqual(e.mounted(), true, 'Saved opt-in restores after restart');
   e.manager.remove(); assert(!e.files[guard.CONFIG] && !e.mounted());
   assert(!e.files[guard.ROOT], 'Removing the option also cleans its runtime files');
+
+  ['hdmi1', 'hdmi2', 'hdmi3', 'hdmi4'].forEach(function (input) {
+    var appId = 'com.webos.app.' + input;
+    var active = environment({foreground: [appId]});
+    var state = active.manager.setPolicy(configuredPolicy());
+    assert.deepStrictEqual(active.foreground(), [appId], 'Cold-start filter install preserves full-screen ' + input);
+    assert.strictEqual(state.reload_status[input], 'reopened');
+    assert.strictEqual(calls(active, 'launch').length, 1, 'Restore exactly once');
+    var count = active.commands.length;
+    active.advance(30000); active.manager.tick(); active.newManager().start();
+    active.manager.setPolicy(configuredPolicy());
+    assert.strictEqual(active.commands.length, count, 'Healthy renewal, process restart and rule edits never touch apps');
+  });
+  [[], ['com.webos.app.home'], ['com.webos.app.hdmi3'], ['com.webos.app.home', 'com.webos.app.hdmi3']].forEach(function (after) {
+    var fallback = environment({foreground: ['com.webos.app.hdmi3'], afterCloseForeground: after});
+    assert.strictEqual(fallback.manager.setPolicy(configuredPolicy()).reload_status.hdmi3, 'reopened',
+      'Restore after blank, Home, closing HDMI or Home-preview fallback');
+  });
+  [['com.webos.app.home', 'com.webos.app.hdmi3'], ['com.webos.app.hdmi3', 'com.webos.app.hdmi1'],
+    ['com.webos.app.browser']].forEach(function (apps) {
+    var layout = environment({foreground: apps});
+    layout.manager.setPolicy(configuredPolicy());
+    assert.deepStrictEqual(layout.foreground(), apps, 'Existing Home, native app and multiview layout survives');
+    assert.strictEqual(calls(layout, 'launch').length, 0);
+  });
+  ['Suspend', 'Active Standby', 'Power Off', 'Screen Off', 'Screen Saver', 'Unknown'].forEach(function (power) {
+    var sleeping = environment({foreground: ['com.webos.app.hdmi3'], power: power});
+    assert.strictEqual(sleeping.manager.setPolicy(configuredPolicy()).reload_status.hdmi3, 'next_launch');
+    assert.strictEqual(calls(sleeping, 'launch').length, 0, 'Never wake or reveal the screen: ' + power);
+  });
+  ['com.webos.app.browser', 'com.webos.app.hdmi1'].forEach(function (destination) {
+    var navigated = environment({foreground: ['com.webos.app.hdmi3'], afterCloseForeground: [destination]});
+    assert.strictEqual(navigated.manager.setPolicy(configuredPolicy()).reload_status.hdmi3, 'reopen_skipped');
+    assert.deepStrictEqual(navigated.foreground(), [destination], 'Concurrent navigation wins');
+    assert.strictEqual(calls(navigated, 'launch').length, 0);
+  });
+  var turnedOff = environment({foreground: ['com.webos.app.hdmi3'], afterClosePower: 'Power Off'});
+  assert.strictEqual(turnedOff.manager.setPolicy(configuredPolicy()).reload_status.hdmi3, 'reopen_skipped');
+  assert.strictEqual(calls(turnedOff, 'launch').length, 0, 'Power-off during reload wins');
+  var movedEarly = environment({foreground: ['com.webos.app.hdmi3'], afterBackgroundCloseForeground: ['com.webos.app.browser']});
+  movedEarly.manager.setPolicy(configuredPolicy());
+  assert.strictEqual(calls(movedEarly, 'launch').length, 0, 'Re-read foreground just before each close');
+  ['foregroundFailure', 'powerFailure', 'closeFailure', 'launchFailure'].forEach(function (failure) {
+    var options = {foreground: ['com.webos.app.hdmi3']}; options[failure] = true;
+    var failed = environment(options), state = failed.manager.setPolicy(configuredPolicy());
+    assert(state.lease_active, 'A reload API failure does not remove the filter');
+    assert.strictEqual(state.reload_status.hdmi3, failure === 'launchFailure' ? 'reopen_failed' : 'next_launch');
+    if (failure !== 'launchFailure') assert.strictEqual(calls(failed, 'launch').length, 0);
+    if (failure === 'foregroundFailure') assert.strictEqual(calls(failed, 'closeByAppId').length, 0);
+  });
+  var noForeground = environment({foreground: []});
+  noForeground.manager.setPolicy(configuredPolicy());
+  assert.strictEqual(calls(noForeground, 'closeByAppId').length, 0, 'Do not close apps during an unknown boot transition');
 
   var updated = environment({updatedFirmware: true});
   assert(updated.manager.snapshot().supported, 'Status recognizes every inspected firmware before installing an overlay');

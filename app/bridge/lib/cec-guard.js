@@ -128,15 +128,49 @@ function create(deps) {
   function reloadHdmi() {
     // Reload cached copies once when INSTALLING the generic shared overlay, not
     // when changing rules. Targets are a fixed allowlist, never an MQTT URI/app ID.
+    function call(method, params) {
+      var output = cp.execFileSync('/usr/bin/luna-send', ['-n', '1', '-w', '3000',
+        'luna://' + method, JSON.stringify(params)], {encoding: 'utf8', timeout: 4500});
+      var result = JSON.parse(output);
+      if (result.returnValue !== true) throw new Error(result.errorText || 'TV request failed');
+      return result;
+    }
+    function foreground() {
+      var result = call('com.webos.applicationManager/getForegroundApps', {});
+      if (!Array.isArray(result.foregroundApps) || result.foregroundApps.some(function (app) {
+        return !app || typeof app.appId !== 'string';
+      })) throw new Error('Unknown foreground apps');
+      return result.foregroundApps.map(function (app) { return app.appId; });
+    }
+    function screenActive() {
+      return call('com.webos.service.tvpower/power/getPowerState', {}).state === 'Active';
+    }
     reloadStatus = {};
     policies.capabilities().inputs.forEach(function (input) {
+      var appId = 'com.webos.app.' + input;
+      reloadStatus[input] = 'next_launch';
       try {
-        var output = cp.execFileSync('/usr/bin/luna-send', ['-n', '1', '-w', '5000',
-          'luna://com.webos.applicationManager/closeByAppId', JSON.stringify({id: 'com.webos.app.' + input})],
-          {encoding: 'utf8', timeout: 6500});
-        var result = JSON.parse(output);
-        reloadStatus[input] = result.returnValue ? 'requested' : 'next_launch';
-      } catch (error) { reloadStatus[input] = 'next_launch'; }
+        var before = foreground();
+        if (!before.length) return;
+        var visible = before.indexOf(appId) !== -1;
+        // Leave PiP/multiview layouts and a sleeping or screen-off TV alone.
+        // Failed foreground/power reads also defer instead of closing blindly.
+        if (visible && (before.length !== 1 || !screenActive())) return;
+        call('com.webos.applicationManager/closeByAppId', {id: appId});
+        reloadStatus[input] = 'requested';
+        if (!visible) return;
+        // A close normally falls back to Home. Reopen only our just-closed
+        // full-screen input, once; never override another app/input or wake TV.
+        // No CEC device/deep-link parameters are replayed. The mounted overlay
+        // and fresh permission lease are already in place before this launch.
+        reloadStatus[input] = 'reopen_skipped';
+        if (!screenActive()) return;
+        var after = foreground();
+        if (after.some(function (id) { return id !== appId && id !== 'com.webos.app.home'; })) return;
+        reloadStatus[input] = 'reopen_failed';
+        call('com.webos.applicationManager/launch', {id: appId});
+        reloadStatus[input] = 'reopened';
+      } catch (error) { /* Retain which phase failed; the filter itself remains active. */ }
     });
   }
   function ensure(policy) {

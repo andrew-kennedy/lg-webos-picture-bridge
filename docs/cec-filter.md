@@ -153,10 +153,29 @@ and generated QML, including explicit Apple TV-style IDs and missing inventory.
 A full policy replaces the old one. `{enabled: false}` or `{enabled: true}` changes
 only the master state. `rules: []` with a full policy blocks nothing and removes the
 overlay. With an existing generic overlay, rule edits update its local permission
-file immediately: no HDMI restart or rebuild is needed. First installation or
-re-enabling after removal can close cached HDMI apps once to load the new code.
-No input is selected and no TV power or CEC power command is sent by that reload.
-`reload_status` reports requested/next-launch status, not proof of QML execution.
+file immediately: no HDMI restart or rebuild is needed. Installing a fresh overlay
+(including after a cold boot) can close cached HDMI apps once to load the new code.
+From 0.13.3, an active full-screen HDMI app is reopened immediately after that close.
+The bridge checks foreground apps and native power at reload time; it leaves existing
+Home previews/multiview alone and does not restore over another app/input or after
+the screen turns off. Failed foreground/power reads defer the disruptive operation.
+The reopen uses only the HDMI app ID, with the filter already mounted and its lease
+valid; it does not replay CEC device-selection parameters or send a power command.
+There is no recurring input-selection loop or Home Assistant recovery automation.
+`reload_status` distinguishes `requested`, `next_launch`, `reopened`, `reopen_skipped`
+and `reopen_failed`. These are API outcomes, not proof of QML execution.
+
+The 2026-10-28 G6 startup log showed HDMI 3 full-screen at 11:23:54.055, followed by
+the filter's close at 11:23:54.662. Home became foreground and reopened HDMI 3 as a
+preview. The bridge started picture management after that close, so the apparent
+picture-setting transition was coincidental. Regression tests cover all four HDMI
+inputs, existing Home/app/multiview focus, navigation/power changes during reload,
+failed API calls and silent lease renewal/rule changes.
+
+Live validation on firmware 43.21.69 confirmed the packaged 0.13.3 manager reopened
+HDMI 3 in its normal full-screen view, with filtering active and unchanged saved
+profiles/configuration. The user then slept Apple TV, waited for the TV to turn off,
+and woke Apple TV again; HDMI 3 stayed full-screen without using the LG remote.
 
 ## MQTT protocol and safety
 
