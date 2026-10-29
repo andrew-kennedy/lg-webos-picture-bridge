@@ -31,7 +31,9 @@
   var profileView = document.getElementById('profiles-view');
   document.getElementById('profiles-button').addEventListener('click', function () {
     profileView.hidden = false;
-    document.getElementById('profile-editor').configure({tvRemote:true,request:function (command) {
+    document.getElementById('profile-editor').configure({tvRemote:true,focusBack:function () {
+      document.getElementById('profiles-close').focus();
+    },request:function (command) {
       return new Promise(function (resolve,reject) {
         lunaCall(SERVICE_URI + 'profiles',command,function (error,response) { if(error)reject(error);else resolve(response.result); });
       });
@@ -328,7 +330,7 @@
   // Leave OK/Enter, Back, and pointer clicks to their native behavior.
   document.addEventListener('keydown', function (event) {
     if (profileView.hidden === false) {
-      if ((event.keyCode || event.which) === 461) {
+      if ((event.keyCode || event.which) === 461 || (event.keyCode || event.which) === 27) {
         profileView.hidden = true; document.getElementById('profiles-button').focus(); event.preventDefault();
       } else if ((event.keyCode || event.which) === 40 && document.activeElement.id === 'profiles-close') {
         var editor = document.getElementById('profile-editor');
