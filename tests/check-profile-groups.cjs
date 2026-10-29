@@ -2,33 +2,25 @@
 const assert=require('node:assert/strict');
 const path=require('node:path');
 const {chromium}=require('playwright');
-const fixture=structuredClone(require('./fixtures/profile-editor.cjs'));
-fixture.document.devices.pc='PC';
-fixture.document.banks.push(
-  // Deliberately unrelated IDs/names: grouping comes from scope, not naming.
-  {id:'pc_picture',name:'Old picture label',devices:['pc'],target:{category:'picture',dimension:{input:'hdmi1_pc',pictureMode:'game'}},settings:{color:50}},
-  {id:'motion_a',name:'Unrelated motion label',devices:['pc'],target:{category:'picture',dimension:{input:'hdmi1_pc',pictureMode:'game'},app_id:'com.webos.app.hdmi1'},settings:{truMotionMode:'off'}},
-  {id:'pc_hdr',name:'Old HDR label',devices:['pc'],target:{category:'picture',dimension:{input:'hdmi1_pc',pictureMode:'hdrGame'}},settings:{color:50}},
-  {id:'motion_b',name:'Another motion label',devices:['pc'],target:{category:'picture',dimension:{input:'hdmi1_pc',pictureMode:'hdrGame'},app_id:'com.webos.app.hdmi1'},settings:{truMotionMode:'off'}},
-  {id:'pc_mapping',name:'Raw mapping',devices:['pc'],target:{category:'picture',dimension:{input:'hdmi1_pc',dynamicRange:'sdrALLM'}},settings:{pictureMode:'game'}},
-  {id:'pc_sliders',name:'Raw sliders',devices:['pc'],target:{category:'other',dimension:{gameInput:'hdmi1',dynamicRange:'sdrALLM',gameGenre:'Standard'}},settings:{gameColorDepth:50}}
-);
+const fixture=require('./fixtures/profile-formats.cjs');
 (async()=>{
   const browser=await chromium.launch({headless:true});
   try {
     const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[];
     page.on('pageerror',e=>errors.push(e.message));
     await page.setContent('<style>html,body{height:100%;margin:0}lg-profile-editor{height:100%}</style><lg-profile-editor></lg-profile-editor>');
-    await page.addScriptTag({path:path.join(process.env.PROFILE_TEST_APP_ROOT||path.join(__dirname,'../app'),'profile-editor.js')});
+    const appRoot=process.env.PROFILE_TEST_APP_ROOT||path.join(__dirname,'../app');
+    for(const file of ['profile-view.js','profile-editor.js'])await page.addScriptTag({path:path.join(appRoot,file)});
     await page.evaluate(initial=>{
       window.fixture=initial;window.calls=[];
+      window.fixture.document.banks.find(b=>b.id==='pc_sdr_game').settings.gameColorDepth=55;
       document.querySelector('lg-profile-editor').configure({request:async command=>{
         window.calls.push(structuredClone(command));
         if(command.action==='get')return {state:structuredClone(window.fixture),status:{offline:!!window.offline}};
         const bank=window.fixture.document.banks.find(b=>b.id===(command.bank_id||command.scope));
         if(command.action==='inspect') {
           const controls={};
-          Object.entries(bank.settings).forEach(([key,value])=>{controls[key]=typeof value==='number'?{component:'number',min:0,max:100,step:1}:{component:'select',options:key==='truMotionMode'?['off','on']:[value,'on']};});
+          Object.entries(bank.settings).forEach(([key,value])=>{controls[key]=typeof value==='number'?{component:'number',min:0,max:100,step:1}:{component:'select',options:['truMotionMode','enableQFT'].includes(key)?['off','on']:[value]};});
           if(window.slowInspect===bank.id)await new Promise(resolve=>setTimeout(resolve,100));
           return {id:bank.id,settings:structuredClone(bank.settings),controls};
         }
@@ -44,67 +36,83 @@ fixture.document.banks.push(
         return {revision:window.fixture.revision};
       }});
     },fixture);
-    const profiles=page.getByLabel('Profile',{exact:true}),device=page.getByLabel('Device',{exact:true});
+    const formats=page.getByLabel('Format',{exact:true}),device=page.getByLabel('Device',{exact:true}),view=page.getByLabel('View',{exact:true});
+    const color=page.getByRole('spinbutton',{name:'Color depth',exact:true}),motion=page.getByRole('combobox',{name:'TruMotion',exact:true});
     const waitSaved=()=>page.getByText('Saved on the TV.',{exact:false}).waitFor();
-    const edits=()=>page.evaluate(()=>window.calls.filter(c=>c.action==='edit'));
-    await page.getByRole('combobox',{name:'TruMotion',exact:true}).waitFor();
-    assert.equal(await profiles.locator('option').count(),6,'Picture/motion pairs produce one choice each');
-    assert(await profiles.locator('option').evaluateAll(nodes=>nodes.every(n=>!n.textContent.includes('Old ')&&!n.textContent.includes('motion label'))));
+    const commands=action=>page.evaluate(action=>window.calls.filter(c=>c.action===action),action);
+    const revision=()=>page.evaluate(()=>window.fixture.revision);
+    await color.waitFor();
+    assert.equal(await formats.locator('option').count(),9,'Nine real format profiles replace native bank choices');
+    for(const id of ['pc','ps5','switch']) {
+      await device.selectOption(id);
+      assert.deepEqual(await formats.locator('option').allTextContents(),['SDR','HDR']);
+    }
     await device.selectOption('pc');
-    assert.deepEqual(await profiles.locator('option').allTextContents(),['SDR Game','HDR Game','SDR with ALLM · Preset selection','SDR with ALLM · Game Optimizer (Standard)']);
-    assert.equal(await profiles.inputValue(),'pc_picture');
-    await page.getByRole('spinbutton',{name:'Color depth',exact:true}).fill('51');
-    await page.getByRole('combobox',{name:'TruMotion',exact:true}).selectOption('on');
-    assert.equal((await edits()).length,0,'Drafts never apply just from browsing/editing');
+    await color.waitFor();
+    assert.equal(await color.count(),1);
+    assert.equal(await color.inputValue(),'','Unequal saved controls are visibly mixed, never silently synchronized');
+    assert(await page.getByRole('slider',{name:'Color depth',exact:true}).isHidden(),'A mixed slider must not imply an arbitrary value');
+    assert.equal((await commands('edit')).length,0);
+    await color.fill('50');await page.getByRole('button',{name:'Save standard',exact:true}).click();await waitSaved();
+    assert.deepEqual(await commands('edit'),[{action:'edit',bank_id:'pc_sdr_game',variant:'standard',settings:{gameColorDepth:50},revision:7}],'An explicit common value changes only the differing native setting');
+    const start=await revision();
+    await color.fill('51');await motion.selectOption('on');
     await page.getByRole('button',{name:'Save standard',exact:true}).click();await waitSaved();
-    assert.deepEqual(await edits(),[
-      {action:'edit',bank_id:'pc_picture',variant:'standard',settings:{color:51},revision:7},
-      {action:'edit',bank_id:'motion_a',variant:'standard',settings:{truMotionMode:'on'},revision:8}
+    assert.deepEqual((await commands('edit')).slice(-4),[
+      {action:'edit',bank_id:'pc_sdr',variant:'standard',settings:{color:51},revision:start},
+      {action:'edit',bank_id:'pc_sdr_motion',variant:'standard',settings:{truMotionMode:'on'},revision:start+1},
+      {action:'edit',bank_id:'pc_sdr_game',variant:'standard',settings:{gameColorDepth:51},revision:start+2},
+      {action:'edit',bank_id:'pc_sdrALLM_game',variant:'standard',settings:{gameColorDepth:51},revision:start+3}
     ]);
-    assert.deepEqual(await page.evaluate(()=>window.fixture.document.banks.filter(b=>['pc_hdr','motion_b'].includes(b.id)).map(b=>b.settings)),[{color:50},{truMotionMode:'off'}],'HDR stays independent');
-    await page.getByRole('spinbutton',{name:'Color depth',exact:true}).fill('52');
-    await page.getByRole('button',{name:'Save standard',exact:true}).click();await waitSaved();
-    assert.equal((await edits()).length,3,'Only the edited section is written');
+    assert.equal(await page.evaluate(()=>window.fixture.document.banks.find(b=>b.id==='pc_hdr').settings.color),50);
     await page.getByRole('button',{name:'Restore this profile',exact:true}).click();await waitSaved();
-    assert.deepEqual(await page.evaluate(()=>window.calls.filter(c=>c.action==='restore')),[{action:'restore',scope:'pc_picture'},{action:'restore',scope:'motion_a'}]);
+    const scopes=['pc_sdr','pc_sdr_motion','pc_sdr_game','pc_sdrALLM_game','pc_sdr_mapping','pc_sdrALLM_mapping'];
+    assert.deepEqual((await commands('restore')).map(c=>c.scope),scopes,'Restore covers picture, motion, optimizer and routing for SDR only');
+    const saveRevision=await revision();
     await page.getByRole('button',{name:'Keep current adjustments',exact:true}).click();await waitSaved();
-    assert.deepEqual(await page.evaluate(()=>window.calls.filter(c=>c.action==='save')),[{action:'save',scope:'pc_picture',revision:10},{action:'save',scope:'motion_a',revision:11}]);
-    // A failure in Motion must not claim the whole profile succeeded or discard
-    // its draft. A retry sends only the unconfirmed section at the new revision.
-    await page.getByRole('spinbutton',{name:'Color depth',exact:true}).fill('53');
-    await page.getByRole('combobox',{name:'TruMotion',exact:true}).selectOption('off');
-    await page.evaluate(()=>{window.failBank='motion_a';});
+    assert.deepEqual(await commands('save'),scopes.map((scope,i)=>({action:'save',scope,revision:saveRevision+i})));
+    // A partial save preserves drafts for all unconfirmed native targets.
+    await color.fill('52');await motion.selectOption('off');
+    await page.evaluate(()=>{window.failBank='pc_sdr_motion';});
     await page.getByRole('button',{name:'Save standard',exact:true}).click();
-    await page.getByText('1 of 2 sections confirmed.',{exact:false}).waitFor();
-    assert.equal(await page.getByRole('spinbutton',{name:'Color depth',exact:true}).inputValue(),'53');
-    assert.equal(await page.getByRole('combobox',{name:'TruMotion',exact:true}).inputValue(),'off');
-    assert.deepEqual(await page.evaluate(()=>document.querySelector('lg-profile-editor').draft),{motion_a:{truMotionMode:'off'}});
+    await page.getByText('1 of 4 updates confirmed.',{exact:false}).waitFor();
+    assert.equal(await color.inputValue(),'52');
+    assert.deepEqual(await page.evaluate(()=>Object.keys(document.querySelector('lg-profile-editor').draft).sort()),['pc_sdr_motion','pc_sdr_game','pc_sdrALLM_game'].sort());
+    const retryRevision=await revision();
     await page.getByRole('button',{name:'Save standard',exact:true}).click();await waitSaved();
-    assert.deepEqual((await edits()).at(-1),{action:'edit',bank_id:'motion_a',variant:'standard',settings:{truMotionMode:'off'},revision:14});
-    await page.getByLabel('Room variant',{exact:true}).selectOption('dark');
-    await page.getByRole('combobox',{name:'TruMotion',exact:true}).selectOption('on');
-    await page.getByRole('button',{name:'Save standard',exact:true}).click();await waitSaved();
-    assert.deepEqual((await edits()).at(-1),{action:'edit',bank_id:'motion_a',variant:'dark',settings:{truMotionMode:'on'},revision:15});
-    assert.equal(await page.evaluate(()=>window.fixture.document.banks.find(b=>b.id==='motion_a').settings.truMotionMode),'off','A room edit preserves the base standard');
-    // A response from an abandoned profile must not populate the newly chosen one.
+    assert.deepEqual((await commands('edit')).slice(-3).map(c=>[c.bank_id,c.revision]),[['pc_sdr_motion',retryRevision],['pc_sdr_game',retryRevision+1],['pc_sdrALLM_game',retryRevision+2]]);
+    // No stale description can bring an abandoned format's values into view.
     await page.evaluate(()=>{window.slowInspect='pc_hdr';});
-    await profiles.selectOption('pc_hdr');await profiles.selectOption('pc_picture');
-    await page.waitForTimeout(150);
-    assert.equal(await page.getByRole('combobox',{name:'TruMotion',exact:true}).inputValue(),'on');
-    assert.equal(await page.getByRole('spinbutton',{name:'Color depth',exact:true}).inputValue(),'53');
+    await formats.selectOption('pc_hdr');await formats.selectOption('pc_sdr');
+    await page.waitForTimeout(150);assert.equal(await color.inputValue(),'52');
     await device.selectOption('apple');
-    assert.equal(await profiles.locator('option').count(),1);
+    assert.deepEqual(await formats.locator('option').allTextContents(),['SDR','HDR','Dolby Vision']);
+    await formats.selectOption('movie_dolbyHdrCinema');
+    await page.getByLabel('Room variant',{exact:true}).selectOption('bright');
+    await page.getByText('Preset: Dolby Vision Cinema Home.',{exact:false}).waitFor();
+    await color.fill('54');await page.getByRole('button',{name:'Save standard',exact:true}).click();await waitSaved();
+    assert.equal((await commands('edit')).at(-1).bank_id,'movie_dolbyHdrCinemaBright');
+    assert.equal((await commands('edit')).at(-1).variant,'bright');
+    await page.getByLabel('Room variant',{exact:true}).selectOption('dark');
+    await page.getByText('Preset: Dolby Vision Cinema.',{exact:false}).waitFor();assert.equal(await color.inputValue(),'50');
     assert(await page.getByText('Shared by Apple TV and NVIDIA Shield.',{exact:false}).isVisible());
-    assert(await page.getByRole('heading',{name:'Motion',exact:true}).isVisible());
+    await view.selectOption('input');
+    assert.equal(await page.getByLabel('Input',{exact:true}).locator('option').count(),1,'Shared port options are visible from Apple TV too');
+    await page.getByRole('combobox',{name:'Quick frame transport',exact:true}).waitFor();
+    assert(await page.getByText('HDMI options apply across formats.',{exact:false}).isVisible());
+    await device.selectOption('switch');await view.selectOption('advanced');
+    const native=page.getByLabel('Native settings',{exact:true});
+    assert(await native.locator('option[value="switch_dv_unused_mapping"]').count());
+    await native.selectOption('switch_dv_unused_mapping');
+    assert.equal(await page.getByRole('combobox',{name:'Picture mode',exact:true}).inputValue(),'dolbyHdrGame','Dormant mappings stay accessible only in advanced settings');
+    await view.selectOption('profiles');
+    assert.deepEqual(await formats.locator('option').allTextContents(),['SDR','HDR']);
+    await color.waitFor();
     await page.evaluate(async()=>{window.offline=true;await document.querySelector('lg-profile-editor').refresh();});
     assert(await page.getByText('TV offline · saved backup',{exact:true}).isVisible());
     assert(await page.getByRole('button',{name:'Restore this profile',exact:true}).isDisabled());
-    assert(await page.getByRole('combobox',{name:'TruMotion',exact:true}).isDisabled());
-    // Different membership cannot be combined just because two native targets
-    // use the same input/preset. Each device filter must retain its own scope.
-    await page.evaluate(async()=>{window.fixture.document.banks.find(b=>b.id==='movie_motion').devices=['shield'];await document.querySelector('lg-profile-editor').refresh();});
-    assert.equal(await page.getByRole('heading',{name:'Motion',exact:true}).count(),0);
+    assert(await color.isDisabled());
     assert.deepEqual(errors,[]);
-    console.log('Profile groups: scope-based names, device filters, Picture/Motion routing, revisions, partial failure/retry, room variants, stale reads and offline display passed.');
+    console.log('Format profiles: SDR/HDR/DV choices, merged controls, mixed values, precise scoped writes, revisions/retry, room-selected DV, shared HDMI options, advanced access and offline display passed.');
   } finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1);});

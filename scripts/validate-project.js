@@ -21,6 +21,7 @@ var required = [
   'app/bridge/lib/profile-power.js',
   'app/bridge/lib/profile-store.js',
   'app/profile-editor.js',
+  'app/profile-view.js',
   'app/bridge/lib/command-server.js',
   'app/bridge/lib/luna-executor.js',
   'app/bridge/lib/picture-policy.js',
