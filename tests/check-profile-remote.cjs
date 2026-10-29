@@ -32,7 +32,7 @@ const appRoot=process.env.PROFILE_TEST_APP_ROOT||path.join(__dirname,'../app');
             if(window.delayInspect)await new Promise(resolve=>setTimeout(resolve,150));
             result={id:bank.id,settings:bank.settings,controls};
           }
-          if(command.action==='edit'){Object.assign(window.fixture.document.banks.find(b=>b.id===command.bank_id).settings,command.settings);window.fixture.revision++;}
+          if(command.action==='edit'){Object.assign(window.fixture.document.banks.find(b=>b.id===command.bank_id).settings,command.settings);window.fixture.revision++;result={revision:window.fixture.revision};}
           if(command.action==='set_enabled'){window.fixture.enabled=command.enabled;window.fixture.revision++;}
         }
         this.onservicecallback(JSON.stringify({returnValue:true,result,status:{configured:true,running:true,monitor_healthy:true,transport:'mqtt',mqtt_commands_enabled:true,mqtt:{state:'connected',commands_ready:true}}}));
@@ -70,8 +70,8 @@ const appRoot=process.env.PROFILE_TEST_APP_ROOT||path.join(__dirname,'../app');
     };
     await legacy(39);assert.equal((await focused()).label,'Import');
     await legacy(40);assert.equal((await focused()).label,'Device');
-    await page.keyboard.press('ArrowRight');assert.equal((await focused()).label,'Native profile');
-    assert.equal(await page.getByLabel('Native profile',{exact:true}).inputValue(),'movie','Navigation must not change a selector');
+    await page.keyboard.press('ArrowRight');assert.equal((await focused()).label,'Profile');
+    assert.equal(await page.getByLabel('Profile',{exact:true}).inputValue(),'movie','Navigation must not change a selector');
     await legacy(37);assert.equal((await focused()).label,'Device');
     await page.keyboard.press('Enter');await page.keyboard.press('ArrowRight');
     assert.equal(await page.getByLabel('Device',{exact:true}).inputValue(),'apple');
@@ -81,10 +81,13 @@ const appRoot=process.env.PROFILE_TEST_APP_ROOT||path.join(__dirname,'../app');
     assert.equal(await page.locator('#profiles-view').evaluate(n=>n.hidden),false);
     await page.keyboard.press('Enter');await page.keyboard.press('ArrowLeft');await page.keyboard.press('Enter');
     assert.equal(await page.getByLabel('Device',{exact:true}).inputValue(),'all');
-    await page.keyboard.press('ArrowRight');await page.keyboard.press('Enter');await page.keyboard.press('ArrowRight');await page.keyboard.press('Enter');
+    await walk('TruMotion');
+    assert.equal((await focused()).type,'select-one','Arrow navigation crosses from Picture into Motion');
+    await walk('Profile');
+    await page.keyboard.press('Enter');await page.keyboard.press('ArrowRight');await page.keyboard.press('Enter');
     await page.getByRole('slider',{name:'Game color depth',exact:true}).waitFor();
-    assert.equal(await page.getByLabel('Native profile',{exact:true}).inputValue(),'game');
-    assert.equal((await focused()).label,'Native profile');
+    assert.equal(await page.getByLabel('Profile',{exact:true}).inputValue(),'game');
+    assert.equal((await focused()).label,'Profile');
     await page.keyboard.press('ArrowRight');assert.equal((await focused()).label,'Room variant');
     assert(await page.locator('lg-profile-editor .body').evaluate(n=>n.clientHeight>100));
     const bounds=await page.getByRole('button',{name:'Automatic profiles: On'}).boundingBox();

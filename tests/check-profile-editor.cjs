@@ -20,24 +20,28 @@ const state=require('./fixtures/profile-editor.cjs');
             Object.entries(bank.settings).forEach(([k,v])=>{controls[k]=typeof v==='number'?{component:'number',min:k==='colorTemperature'?-50:0,max:k==='colorTemperature'?50:100,step:1}:{component:'select',options:[v,'on']};});
             return {id:bank.id,settings:bank.settings,controls};
           }
-          if(command.action==='edit'){Object.assign(window.fixture.document.banks.find(b=>b.id===command.bank_id).settings,command.settings);window.fixture.revision++;}
+          if(command.action==='edit'){Object.assign(window.fixture.document.banks.find(b=>b.id===command.bank_id).settings,command.settings);window.fixture.revision++;return {revision:window.fixture.revision};}
           return {};
         }});
       },state);
       await page.getByLabel('Color depth',{exact:true}).first().waitFor();
       assert(await page.getByText('Shared by Apple TV and NVIDIA Shield.',{exact:false}).isVisible());
+      assert.equal(await page.getByLabel('Profile',{exact:true}).locator('option').count(),2,'Motion belongs inside its picture profile');
+      await page.getByRole('combobox',{name:'TruMotion',exact:true}).waitFor();
+      assert(await page.getByRole('heading',{name:'Picture',exact:true}).isVisible());
+      assert(await page.getByRole('heading',{name:'Motion',exact:true}).isVisible());
       assert(await page.getByText('Temporary: 55').isVisible());
       const temperature=page.getByRole('spinbutton',{name:'Color temperature'});
       assert.equal(await temperature.getAttribute('min'),'-50');
       assert.equal(await temperature.getAttribute('max'),'50');
-      await page.getByLabel('Native profile',{exact:true}).selectOption('game');
+      await page.getByLabel('Profile',{exact:true}).selectOption('game');
       await page.getByRole('spinbutton',{name:'Game sharpness'}).fill('4');
       await page.getByRole('button',{name:'Save standard',exact:true}).click();
       await page.waitForFunction(()=>window.fixture.revision===8);
       await page.getByText('Saved on the TV.',{exact:false}).waitFor();
       const edits=await page.evaluate(()=>window.calls.filter(c=>c.action==='edit'));
       assert.deepEqual(edits,[{action:'edit',bank_id:'game',variant:'standard',settings:{gameSharpness:4},revision:7}]);
-      await page.getByLabel('Native profile',{exact:true}).selectOption('movie');
+      await page.getByLabel('Profile',{exact:true}).selectOption('movie');
       await page.getByRole('spinbutton',{name:'Color depth',exact:true}).waitFor();
       assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),viewport.height,'The page itself must not scroll');
       const body=page.locator('lg-profile-editor').locator('.body');
