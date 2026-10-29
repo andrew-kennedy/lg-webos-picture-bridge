@@ -177,6 +177,28 @@ HDMI 3 in its normal full-screen view, with filtering active and unchanged saved
 profiles/configuration. The user then slept Apple TV, waited for the TV to turn off,
 and woke Apple TV again; HDMI 3 stayed full-screen without using the LG remote.
 
+## Cold-start timing (0.13.4)
+
+The bridge runs in the background once Homebrew starts it. On the inspected G6,
+a cold boot launched HDMI around 12 seconds and produced a picture around 17
+seconds. Activity Manager, which starts Homebrew Channel, became ready around
+21 seconds. The Homebrew script began around 23 seconds; the bridge followed at
+30 seconds after another application's startup hook. Those timings describe the
+observed boot, not guaranteed deadlines.
+
+The bridge now installs `45-lg-picture-bridge`, ahead of the observed `50-*`
+privacy hook, instead of `55-lg-picture-bridge`. Pairing and normal script startup
+migrate the old owned link automatically; unchanged starts do not rewrite it.
+Clearing configuration removes either owned link. Homebrew's startup and failsafe
+behavior remain in control. This reduces avoidable waiting but does **not** install
+the RAM overlay before HDMI on a cold boot: its one-time reload can still blank
+the picture briefly. No firmware or system boot units are changed.
+
+Quick Start+ was off on the inspected G6. A warm resume may retain the process and
+RAM overlay and avoid a fresh installation; it needs separate live verification.
+The existing lease-expiry/recovery rules still apply during standby. Quick Start+
+does not remove the cold-start limitation after an actual reboot or power loss.
+
 ## MQTT protocol and safety
 
 Topics are `<topic_prefix>/lgpb_<device-hash>/cec/command` and `/cec/state`.

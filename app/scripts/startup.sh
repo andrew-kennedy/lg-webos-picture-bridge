@@ -37,6 +37,9 @@ start_bridge() {
         echo "Node.js was not found at $NODE_BIN" >&2
         return 1
     fi
+    # Also migrate upgrades started through the previous 55-* hook.
+    "$APP_ROOT/scripts/install-startup.sh" install ||
+        echo "LG Picture Bridge could not update its startup hook" >&2
     if is_running; then
         echo "LG Picture Bridge is already running"
         return 0

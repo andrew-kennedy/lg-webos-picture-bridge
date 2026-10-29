@@ -41,6 +41,7 @@ var required = [
   'app/bridge/lib/signal-monitor.js',
   'app/scripts/runner.sh',
   'app/scripts/install-security.sh',
+  'app/scripts/install-startup.sh',
   'app/scripts/setup.sh',
   'app/scripts/startup.sh',
   'app/security/io.github.andrewkennedy.lgpicturebridge.manifest.json',

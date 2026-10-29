@@ -1,14 +1,11 @@
 #!/usr/bin/env node
 'use strict';
 
-var fs = require('fs');
 var childProcess = require('child_process');
 
 var APP_ID = 'io.github.andrewkennedy.lgpicturebridge';
 var SERVICE_ID = APP_ID + '.service';
 var APP_ROOT = '/media/developer/apps/usr/palm/applications/' + APP_ID;
-var STARTUP_DIRECTORY = '/var/lib/webosbrew/init.d';
-var STARTUP_LINK = STARTUP_DIRECTORY + '/55-lg-picture-bridge';
 var Service = require('webos-service');
 var bridge = require(APP_ROOT + '/bridge/bridge');
 var appInfo = require(APP_ROOT + '/appinfo.json');
@@ -53,17 +50,7 @@ function appIsAuthorized(message) {
 
 function ensureStartupLink() {
   childProcess.execFileSync(APP_ROOT + '/scripts/install-security.sh', ['install']);
-  try {
-    fs.mkdirSync(STARTUP_DIRECTORY, 493); // 0755
-  } catch (error) {
-    if (error.code !== 'EEXIST') throw error;
-  }
-  try {
-    fs.unlinkSync(STARTUP_LINK);
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-  }
-  fs.symlinkSync(APP_ROOT + '/scripts/startup.sh', STARTUP_LINK);
+  childProcess.execFileSync(APP_ROOT + '/scripts/install-startup.sh', ['install']);
 }
 
 function pairingEvent(config) {
