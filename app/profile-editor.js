@@ -154,10 +154,10 @@
       const choices=visible.map(g=>[g.id,label(g)+(visible.filter(other=>label(other)===label(g)).length>1?' · '+model.inputName(g.input):'')]);
       toolbar.append(this.select(this.view==='profiles'?'Format':this.view==='input'?'Input':'Native settings',choices,this.bankId,v=>{this.bankId=v;this.draft={};this.live=null;this.render();this.inspect();}));
       toolbar.append(this.select('Room variant',[['standard','Base standard'],['bright','Bright room'],['dark','Dark room']],this.variant,v=>{this.variant=v;this.draft={};this.live=null;this.render();this.inspect();}));
-      toolbar.append(this.select('View',[['profiles','Picture profiles'],['input','HDMI options'],['advanced','Advanced native settings']],this.view,v=>{this.view=v;this.draft={};this.live=null;this.render();this.inspect();}));frame.append(toolbar);
+      toolbar.append(this.select('View',[['profiles','Picture profiles'],['input','HDMI options'],['advanced','Advanced picture settings']],this.view,v=>{this.view=v;this.draft={};this.live=null;this.render();this.inspect();}));frame.append(toolbar);
       const group=this.group(),names=((group && group.devices)||[]).map(d=>doc.devices[d]);
       const stateLine=el('div',undefined,'top');
-      const hint=this.view==='input'?'HDMI options apply across formats.':this.view==='advanced'?'Edit individual saved settings.':group&&group.presets&&group.presets.length?'Preset: '+group.presets.map(p=>model.modes[p]||p).join(' / ')+'.':'Saved picture settings.';
+      const hint=this.view==='input'?'HDMI options apply across formats.':this.view==='advanced'?'Edit individual presets and automatic preset selection.':group&&group.presets&&group.presets.length?'Preset: '+group.presets.map(p=>model.modes[p]||p).join(' / ')+'.':'Saved picture settings.';
       stateLine.append(el('p',(names.length>1?'Shared by '+names.join(' and ')+'. ':'')+(group?model.inputName(group.input)+'. ':'')+hint,'notice'));
       const ack=this.status.backup_acknowledged===this.status.backup_sequence && this.status.backup_sequence;
       stateLine.append(el('span',this.status.offline?'TV offline · saved backup':ack?'Backup confirmed in HA':'TV owns standards','badge'));frame.append(stateLine);
@@ -176,7 +176,7 @@
     renderRows() {
       if(!this.rows)return;const focus=this.captureFocus();this.rows.replaceChildren();
       const group=this.group(),summarize=values=>[...new Set(values.map(display))].join(' / ');
-      if(group&&group.missingPreset)this.rows.append(el('p','A selected preset has no picture values in this collection. Use Advanced native settings to review preset selection.','empty notice'));
+      if(group&&group.missingPreset)this.rows.append(el('p','A selected preset has no picture values in this collection. Use Advanced picture settings to review preset selection.','empty notice'));
       for(const part of model.rows(group)) {
         const section=el('section',undefined,'section'),title=el('h3',part.name);
         title.id='section-'+part.name.replace(/ /g,'-');section.setAttribute('aria-labelledby',title.id);section.append(title);
@@ -223,7 +223,7 @@
         }
         this.rows.append(section);
       }
-      if(!this.banks().length)this.rows.append(el('p','No saved settings in this view. Check HDMI options or Advanced native settings.','empty'));
+      if(!this.banks().length)this.rows.append(el('p','No saved settings in this view. Check HDMI options or Advanced picture settings.','empty'));
       this.saveButton.disabled=!!this.status.offline||!this.banks().some(b=>Object.keys(this.draft[b.id]||{}).length);
       this.lockControls();
       this.restoreFocus(focus);

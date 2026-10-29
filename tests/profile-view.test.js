@@ -24,7 +24,9 @@ module.exports=()=>{
   const inputs=view.groups(state,'standard','input');
   assert.equal(inputs.length,3);
   assert.deepEqual(inputs.find(g=>g.id==='switch_port').devices,['switch','apple','shield'],'Physical HDMI options are shared by downstream devices');
-  assert.equal(view.groups(state,'standard','advanced').length,state.document.banks.length,'Every native bank stays accessible');
+  const advanced=view.groups(state,'standard','advanced');
+  assert(!advanced.some(g=>inputs.some(p=>p.id===g.id)),'Detailed picture settings must not duplicate the HDMI options view');
+  assert.deepEqual([...advanced,...inputs].map(g=>g.id).sort(),state.document.banks.map(b=>b.id).sort(),'Every native bank stays accessible in exactly one detailed view');
   assert.equal(JSON.stringify(state),before,'Presentation must never modify stored standards');
   const live={};
   color.bindings.forEach(({bank,key})=>{live[bank.id]={controls:{[key]:{component:'number',min:0,max:100,step:1}}};});

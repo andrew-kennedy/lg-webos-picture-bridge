@@ -39,7 +39,9 @@
   function groups(state,variant,view) {
     const doc=state.document;
     if(!doc)return [];
-    if(view==='advanced'||view==='input')return doc.banks.filter(bank=>view==='advanced'||!format(bank)).map(bank=>({
+    // Keep the two detailed views disjoint so changing View cannot leave the
+    // same HDMI bank selected with identical controls under a different name.
+    if(view==='advanced'||view==='input')return doc.banks.filter(bank=>view==='input'?!format(bank):!!format(bank)).map(bank=>({
       id:bank.id,name:nativeName(bank),devices:view==='input'?[...new Set(doc.banks.filter(b=>physical(input(b))===input(bank)).flatMap(b=>b.devices||[]))]:bank.devices||[],banks:[bank],scopeBanks:[bank],format:format(bank),input:input(bank),view
     }));
     const groups=[];
