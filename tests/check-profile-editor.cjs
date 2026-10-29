@@ -26,6 +26,8 @@ const state=require('./fixtures/profile-editor.cjs');
         }});
       },state);
       await page.getByLabel('Color depth',{exact:true}).first().waitFor();
+      assert(await page.getByRole('button',{name:'Import',exact:true}).isVisible(),'Browser hosts retain file import');
+      assert(await page.getByRole('button',{name:'Download backup',exact:true}).isVisible(),'Browser hosts retain backup downloads');
       assert(await page.getByText('Shared by Apple TV and NVIDIA Shield.',{exact:false}).isVisible());
       assert.equal(await page.getByLabel('Format',{exact:true}).locator('option').count(),2,'Motion belongs inside its picture profile');
       await page.getByRole('combobox',{name:'TruMotion',exact:true}).waitFor();

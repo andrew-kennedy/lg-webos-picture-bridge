@@ -31,7 +31,7 @@
   var profileView = document.getElementById('profiles-view');
   document.getElementById('profiles-button').addEventListener('click', function () {
     profileView.hidden = false;
-    document.getElementById('profile-editor').configure({tvRemote:true,focusBack:function () {
+    document.getElementById('profile-editor').configure({tvRemote:true,fileTransfer:false,focusBack:function () {
       document.getElementById('profiles-close').focus();
     },request:function (command) {
       return new Promise(function (resolve,reject) {

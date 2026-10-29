@@ -140,11 +140,15 @@
       const frame=el('div',undefined,'frame'),top=el('div',undefined,'top'),heading=el('div');
       heading.append(el('h2','Picture profiles'),el('p',this.state.enabled?'Standards live on your TV. Everyday adjustments reset after a power cycle.':'Standards live on your TV. Automatic picture management is paused.','muted'));top.append(heading);
       const topActions=el('div',undefined,'actions');topActions.append(this.button('Refresh',()=>this.refresh()));
-      topActions.append(this.button('Download backup',async()=>{try{this.download(await this.request({action:'backup'}),'lg-picture-backup.json');}catch(e){this.error(e.message);}}));
-      const file=el('input');file.type='file';file.accept='.json,application/json';file.hidden=true;file.onchange=async()=>{try{const selected=file.files[0];if(!selected || selected.size>1000000)throw new Error('Choose a JSON profile or backup file smaller than 1 MB');const data=JSON.parse(await selected.text());if(!window.confirm('Replace saved picture standards with this file? Historical temporary adjustments will not be applied.'))return;await this.mutate(data.format==='lg-picture-bridge-backup'?{action:'restore_backup',backup:data,revision:this.state.revision}:{action:this.state.document?'import':'initialize',document:data,revision:this.state.revision,enabled:true,room:this.state.room});}catch(e){this.error(e.message);}};
-      const importButton=this.button('Import',()=>file.click());importButton.disabled=!!this.status.offline;topActions.append(importButton,file);top.append(topActions);frame.append(top);
+      const fileTransfer=this.adapter.fileTransfer!==false;
+      if(fileTransfer) {
+        topActions.append(this.button('Download backup',async()=>{try{this.download(await this.request({action:'backup'}),'lg-picture-backup.json');}catch(e){this.error(e.message);}}));
+        const file=el('input');file.type='file';file.accept='.json,application/json';file.hidden=true;file.onchange=async()=>{try{const selected=file.files[0];if(!selected || selected.size>1000000)throw new Error('Choose a JSON profile or backup file smaller than 1 MB');const data=JSON.parse(await selected.text());if(!window.confirm('Replace saved picture standards with this file? Historical temporary adjustments will not be applied.'))return;await this.mutate(data.format==='lg-picture-bridge-backup'?{action:'restore_backup',backup:data,revision:this.state.revision}:{action:this.state.document?'import':'initialize',document:data,revision:this.state.revision,enabled:true,room:this.state.room});}catch(e){this.error(e.message);}};
+        const importButton=this.button('Import',()=>file.click());importButton.disabled=!!this.status.offline;topActions.append(importButton,file);
+      }
+      top.append(topActions);frame.append(top);
       const doc=this.state.document;
-      if(!doc){frame.append(el('p','Import a profile collection to get started. Existing Home Assistant standards migrate automatically when both components are updated.','empty'),el('div',this.status.error || 'No collection yet.','message'));root.append(frame);this.lockControls();this.restoreFocus(focus);return;}
+      if(!doc){frame.append(el('p',(fileTransfer?'Import a profile collection to get started.':'Import a profile collection using LG Picture Profiles in Home Assistant.')+' Existing Home Assistant standards migrate automatically when both components are updated.','empty'),el('div',this.status.error || 'No collection yet.','message'));root.append(frame);this.lockControls();this.restoreFocus(focus);return;}
       if(this.device!=='all'&&!Object.hasOwn(doc.devices,this.device))this.device='all';
       const visible=this.groups().filter(g=>this.device==='all'||g.devices.includes(this.device));
       if(!visible.some(g=>g.id===this.bankId))this.bankId=visible[0]&&visible[0].id;

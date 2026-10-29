@@ -40,7 +40,7 @@ Backups are emitted after changes (at most twice per second during adjustment bu
 
 HA commits the envelope using its native atomic Store, then publishes a non-retained acknowledgement on `<base>/profiles/backup/ack` with `owner_id`, `instance_id`, `sequence`, and `sha256`. Only the current snapshot's matching acknowledgement marks it backed up. Duplicate snapshots are acknowledged without rewriting HA storage. Old sequences and snapshots from a different non-live process cannot replace the saved copy. HA also keeps the last five standard revisions, plus the complete legacy HA-owned document during migration.
 
-**Download backup** exports the complete envelope. Importing a backup deliberately restores its standards and preferences and queues verified native restoration; historical temporary deviations are not replayed into a new viewing session. They remain available in the backup for inspection. Download/upload and the HA `export_profiles`/`import_profiles` actions also support the schema 1 standard document; the HA actions additionally accept/export YAML.
+In the Home Assistant panel, **Download backup** exports the complete envelope. The TV app omits file import/download controls because its browser file handling is unsupported; automatic MQTT backups continue independently. Importing a backup deliberately restores its standards and preferences and queues verified native restoration; historical temporary deviations are not replayed into a new viewing session. They remain available in the backup for inspection. Download/upload and the HA `export_profiles`/`import_profiles` actions also support the schema 1 standard document; the HA actions additionally accept/export YAML.
 
 ## Migration
 

@@ -47,6 +47,9 @@ const appRoot=process.env.PROFILE_TEST_APP_ROOT||path.join(__dirname,'../app');
     assert.equal(await page.evaluate(()=>document.activeElement.id),'profiles-button');
     await page.keyboard.press('Enter');
     await page.getByRole('spinbutton',{name:'Color depth',exact:true}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'Import',exact:true}).count(),0);
+    assert.equal(await page.getByRole('button',{name:'Download backup',exact:true}).count(),0);
+    assert.equal(await page.locator('lg-profile-editor input[type=file]').count(),0);
     assert.equal(await page.evaluate(()=>document.activeElement.id),'profiles-close');
     await page.keyboard.press('ArrowDown');
     const focused=()=>page.evaluate(()=>{
@@ -55,7 +58,7 @@ const appRoot=process.env.PROFILE_TEST_APP_ROOT||path.join(__dirname,'../app');
     });
     assert.equal((await focused()).label,'Refresh');
     await page.keyboard.press('ArrowRight');
-    assert.equal((await focused()).label,'Download backup','Right must escape Refresh inside the shadow root');
+    assert.equal((await focused()).label,'Device','Right must move directly from Refresh to the device selector');
     const legacy=code=>page.evaluate(code=>{
       const root=document.querySelector('#profile-editor').shadowRoot;
       (root.activeElement||document.activeElement).dispatchEvent(new KeyboardEvent('keydown',{key:'Unidentified',keyCode:code,which:code,bubbles:true,composed:true,cancelable:true}));
@@ -68,9 +71,9 @@ const appRoot=process.env.PROFILE_TEST_APP_ROOT||path.join(__dirname,'../app');
       }
       assert.fail('Remote cannot reach '+label+' '+(type||''));
     };
-    await legacy(39);assert.equal((await focused()).label,'Import');
-    await legacy(40);assert.equal((await focused()).label,'Device');
-    await page.keyboard.press('ArrowRight');assert.equal((await focused()).label,'Format');
+    await legacy(39);assert.equal((await focused()).label,'Format');
+    await legacy(37);assert.equal((await focused()).label,'Device');
+    await legacy(40);assert.equal((await focused()).label,'Format');
     assert.equal(await page.getByLabel('Format',{exact:true}).inputValue(),'movie','Navigation must not change a selector');
     await legacy(37);assert.equal((await focused()).label,'Device');
     await page.keyboard.press('Enter');await page.keyboard.press('ArrowRight');
@@ -146,9 +149,10 @@ const appRoot=process.env.PROFILE_TEST_APP_ROOT||path.join(__dirname,'../app');
     // The empty/offline view has no body or footer, but its header still works.
     await page.evaluate(()=>{window.fixture.document=null;window.offline=true;});
     await page.keyboard.press('Enter');await page.getByText('No collection yet.',{exact:true}).waitFor();
+    assert(await page.getByText('Import a profile collection using LG Picture Profiles in Home Assistant.',{exact:false}).isVisible());
     await page.keyboard.press('ArrowDown');assert.equal((await focused()).label,'Refresh');
-    await page.keyboard.press('ArrowRight');assert.equal((await focused()).label,'Download backup');
-    await page.keyboard.press('ArrowDown');assert.equal((await focused()).label,'Refresh','Skip disabled import and hidden file input');
+    await page.keyboard.press('ArrowRight');assert.equal((await focused()).label,'Refresh');
+    await page.keyboard.press('ArrowDown');assert.equal((await focused()).label,'Refresh','Only Refresh remains in the empty TV view');
     await page.keyboard.press('ArrowUp');assert.equal(await page.evaluate(()=>document.activeElement.id),'profiles-close');
     await legacy(461);assert.equal(await page.locator('#profiles-view').evaluate(n=>n.hidden),true);
     assert.deepEqual(errors,[]);
