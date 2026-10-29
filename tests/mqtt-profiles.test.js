@@ -21,6 +21,11 @@ module.exports = async function () {
   assert.equal(calls.length,1);
   channel.receive(JSON.stringify(envelope),{retain:false});
   assert.equal(calls.length,1,'MQTT retries never repeat manager mutations');
+  const batch={...envelope,request_id:'batch',policy:{action:'edit_many',revision:4,edits:[{bank_id:'movie',variant:'standard',settings:{color:50}}],preferences:{}}};
+  channel.receive(JSON.stringify(batch),{retain:false});await new Promise(resolve=>setImmediate(resolve));
+  channel.receive(JSON.stringify(batch),{retain:false});
+  assert.deepEqual(calls[1],batch.policy,'The complete reviewed batch reaches the TV manager exactly once');
+  assert.equal(calls.length,2);
   channel.receive(JSON.stringify({...envelope,request_id:'legacy',policy:{action:'apply',banks:[{id:'mapping',target:{category:'picture',dimension:{input:'hdmi3',dynamicRange:'sdr'}},settings:{pictureMode:'game'},expected:{pictureMode:'filmMaker'}}]}}),{retain:false});
   const rejected=messages.findLast(m=>m.topic.endsWith('/status')).value.results.legacy;
   assert.equal(rejected.ok,false);

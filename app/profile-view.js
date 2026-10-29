@@ -1,4 +1,4 @@
-/* Presentation of native settings as device/format profiles. No reads or writes. */
+/* Pure scope/grouping model for native settings. No reads or writes. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.LGProfileView = factory();
@@ -7,7 +7,6 @@
   const formats = {sdr:'SDR',hdr:'HDR',dolbyHdr:'Dolby Vision'};
   const modes = {game:'SDR Game',hdrGame:'HDR Game',filmMaker:'SDR Filmmaker',hdrFilmMaker:'HDR Filmmaker',dolbyHdrGame:'Dolby Vision Game',dolbyHdrCinema:'Dolby Vision Cinema',dolbyHdrCinemaBright:'Dolby Vision Cinema Home'};
   const gameKeys = {gameColorDepth:'color',gameSharpness:'sharpness',gameAdjustContrast:'contrast',gameBlackLevel:'brightness'};
-  const membership = bank => JSON.stringify([...(bank.devices||[])].sort());
   const physical = input => String(input||'').replace(/_pc$/,'');
   const input = bank => bank.target.dimension.input||bank.target.dimension.gameInput;
   const isGame = mode => /game$/i.test(mode||'');
@@ -25,76 +24,6 @@
   }
   function inputName(bank) {
     return String(typeof bank==='string'?bank:input(bank)||'').replace(/^hdmi([1-4])(_pc)?$/,(_,n,pc)=>'HDMI '+n+(pc?' (PC)':''));
-  }
-  function sectionName(bank) {
-    const d=bank.target.dimension;
-    return bank.target.category==='picture'?(d.pictureMode?(bank.target.app_id?'Motion':'Picture'):'Preset selection'):(d.gameGenre?'Game Optimizer':'HDMI port settings');
-  }
-  function nativeName(bank) {
-    const d=bank.target.dimension;
-    if(d.pictureMode)return (modes[d.pictureMode]||d.pictureMode)+(bank.target.app_id?' · Motion':' · Picture');
-    if(d.dynamicRange)return formats[format(bank)]+(/ALLM$/.test(d.dynamicRange)?' with ALLM':'')+' · '+(d.gameGenre?'Game Optimizer ('+d.gameGenre+')':'Preset selection');
-    return inputName(bank)+' · HDMI port settings';
-  }
-  function groups(state,variant,view) {
-    const doc=state.document;
-    if(!doc)return [];
-    // Keep the two detailed views disjoint so changing View cannot leave the
-    // same HDMI bank selected with identical controls under a different name.
-    if(view==='advanced'||view==='input')return doc.banks.filter(bank=>view==='input'?!format(bank):!!format(bank)).map(bank=>({
-      id:bank.id,name:nativeName(bank),devices:view==='input'?[...new Set(doc.banks.filter(b=>physical(input(b))===input(bank)).flatMap(b=>b.devices||[]))]:bank.devices||[],banks:[bank],scopeBanks:[bank],format:format(bank),input:input(bank),view
-    }));
-    const groups=[];
-    // A range mapping alone is not a usable picture profile. For example a
-    // dormant Dolby Vision ALLM mapping must not advertise Switch DV support.
-    for(const bank of doc.banks.filter(b=>b.target.dimension.pictureMode&&!b.target.app_id)) {
-      const family=format(bank),port=input(bank),members=membership(bank);
-      let group=groups.find(g=>g.format===family&&g.input===port&&g.members===members);
-      if(!group){group={id:bank.id,name:formats[family],devices:bank.devices||[],format:family,input:port,members,candidates:[],view:'profiles'};groups.push(group);}
-      group.candidates.push(bank);
-    }
-    for(const bank of doc.banks.filter(b=>b.target.app_id)) {
-      const group=groups.find(g=>g.format===format(bank)&&g.input===input(bank)&&g.members===membership(bank));
-      if(group)group.candidates.push(bank);
-    }
-    // Optimizer-only collections are supported too. Prefer an existing picture
-    // input (including its PC dimension), but never combine ambiguous inputs.
-    for(const bank of doc.banks.filter(b=>b.target.dimension.gameGenre)) {
-      const matches=groups.filter(g=>g.format===format(bank)&&physical(g.input)===input(bank)&&g.members===membership(bank));
-      if(matches.length===1)matches[0].candidates.push(bank);
-      else if(!matches.length)groups.push({id:bank.id,name:formats[format(bank)],devices:bank.devices||[],format:format(bank),input:input(bank),members:membership(bank),candidates:[bank],view:'profiles'});
-    }
-    for(const group of groups) {
-      const mappings=doc.banks.filter(b=>b.target.category==='picture'&&b.target.dimension.dynamicRange&&
-        input(b)===group.input&&format(b)===group.format&&membership(b)===group.members);
-      const ports=doc.banks.filter(b=>!format(b)&&input(b)===physical(group.input));
-      const genre=ports.length===1?(values(ports[0],state,variant).gameGenre||'Standard'):'Standard';
-      const selected=new Set(mappings.map(b=>values(b,state,variant).pictureMode));
-      group.banks=group.candidates.filter(bank=>{
-        const d=bank.target.dimension;
-        if(d.pictureMode)return !selected.size||selected.has(d.pictureMode);
-        const mapping=mappings.find(b=>b.target.dimension.dynamicRange===d.dynamicRange);
-        return d.gameGenre===genre&&(!mapping||isGame(values(mapping,state,variant).pictureMode));
-      });
-      group.scopeBanks=[...group.banks,...mappings];
-      group.presets=[...new Set(group.banks.map(b=>b.target.dimension.pictureMode).filter(Boolean))];
-      group.missingPreset=[...selected].some(mode=>!group.banks.some(b=>b.target.dimension.pictureMode===mode));
-    }
-    return groups;
-  }
-  function rows(group) {
-    const sections=new Map();
-    if(!group)return [];
-    for(const bank of group.banks)for(const key of Object.keys(bank.settings)) {
-      const alias=group.view==='profiles'&&gameKeys[key],name=alias||key;
-      const section=alias?'Picture':sectionName(bank);
-      if(!sections.has(section))sections.set(section,new Map());
-      const entries=sections.get(section),id=group.view==='profiles'?name:bank.id+':'+key;
-      if(!entries.has(id))entries.set(id,{id:group.id+':'+section+':'+id,key:name,bindings:[]});
-      entries.get(id).bindings.push({bank,key});
-    }
-    const order=['Picture','Game Optimizer','Motion','Preset selection','HDMI port settings'];
-    return [...sections].sort((a,b)=>order.indexOf(a[0])-order.indexOf(b[0])).map(([name,entries])=>({name,rows:[...entries.values()]}));
   }
   function same(a,b) {
     if(a&&b&&typeof a==='object'&&typeof b==='object')return Object.keys(a).sort().join()===Object.keys(b).sort().join()&&Object.keys(a).every(k=>same(a[k],b[k]));
@@ -118,5 +47,72 @@
     const label=first.label&&controls.every(c=>c.label===first.label)?{label:first.label}:{};
     return options.length?{component:'select',options,...label}:null;
   }
-  return {groups,rows,values,control,same,inputName,sectionName,modes};
+  const categories={picture:'Picture',motion:'Motion',game:'Gaming',port:'HDMI connection',selection:'Preset selection'};
+  const motionKeys=new Set(['realCinema','truMotionMode','truMotionJudder','truMotionBlur','motionProOLED','motionPro']);
+  function records(state,variant='standard') {
+    const doc=state.document;if(!doc)return [];
+    const mappings=doc.banks.filter(b=>b.target.category==='picture'&&b.target.dimension.dynamicRange);
+    const mappedModes=b=>[b.settings.pictureMode,...Object.values(b.variants||{}).map(v=>v.pictureMode)].filter(Boolean);
+    const result=[];
+    for(const bank of doc.banks) {
+      const d=bank.target.dimension,port=physical(input(bank)),family=format(bank),nativePreset=d.pictureMode;
+      const matching=mappings.filter(m=>physical(input(m))===port&&format(m)===family&&(!d.dynamicRange||m.target.dimension.dynamicRange===d.dynamicRange));
+      const mappedPreset=d.gameGenre&&matching.length===1?values(matching[0],state,variant).pictureMode:null;
+      const preset=nativePreset||(isGame(mappedPreset)?mappedPreset:null);
+      const signals=d.dynamicRange?[/ALLM$/.test(d.dynamicRange)?'on':'off']:[...new Set(matching.filter(m=>input(m)===input(bank)&&mappedModes(m).includes(nativePreset)).map(m=>/ALLM$/.test(m.target.dimension.dynamicRange)?'on':'off'))];
+      const deviceIds=!family?[...new Set(doc.banks.filter(b=>physical(input(b))===port).flatMap(b=>b.devices||[]))]:bank.devices||[];
+      for(const key of Object.keys(bank.settings)) {
+        const category=motionKeys.has(key)?'motion':bank.target.category==='picture'?(d.dynamicRange?'selection':'picture'):
+          gameKeys[key]?'picture':d.gameGenre||['gameGenre','inputOptimization'].includes(key)?'game':'port';
+        const preference=key==='backlight'&&bank.brightness_role?(bank.brightness_role==='game_sdr'?'game_sdr':variant==='standard'?null:'movie_'+variant):null;
+        result.push({id:bank.id+':'+key,bank,key,alias:gameKeys[key]||key,category,port,format:family,preset,
+          family:d.gameGenre?'game':preset?(isGame(preset)?'game':'movie'):d.dynamicRange?(isGame(values(bank,state,variant).pictureMode)?'game':'movie'):null,
+          genre:d.gameGenre||null,signals:signals.length?signals:['off','on'],devices:deviceIds,
+          preference,brightnessRole:key==='backlight'?bank.brightness_role:null,
+          locked:key==='backlight'&&bank.brightness_role==='movie_sdr'&&variant==='standard',
+          value:values(bank,state,variant)[key]});
+      }
+    }
+    return result;
+  }
+  function options(all) {
+    const unique=(key,order)=>[...new Set(all.map(r=>r[key]).filter(Boolean))].sort((a,b)=>order?order.indexOf(a)-order.indexOf(b):a.localeCompare(b));
+    return {port:unique('port'),format:unique('format',['sdr','hdr','dolbyHdr']),family:unique('family',['game','movie']),
+      preset:unique('preset'),genre:unique('genre'),allm:['off','on']};
+  }
+  function matches(record,scope={}) {
+    for(const key of ['port','format','family','preset','genre']) if(record[key]&&Array.isArray(scope[key])&&!scope[key].includes(record[key]))return false;
+    return !Array.isArray(scope.allm)||record.signals.some(v=>scope.allm.includes(v));
+  }
+  function factor(record,key) {
+    if(record.preference)return record.preference==='game_sdr'?'All SDR game profiles':'All SDR movie profiles';
+    if(key==='port')return inputName(record.port);
+    if(key==='format')return formats[record.format]||'All formats';
+    if(key==='family')return record.family==='game'?'Gaming':record.family==='movie'?'Movies':'All presets';
+    if(key==='preset')return modes[record.preset]||record.preset||'All presets';
+    if(key==='genre')return record.genre||'All genres';
+    if(key==='allm')return record.signals.length>1?'Shared across ALLM':record.signals[0]==='on'?'ALLM on':'ALLM off';
+  }
+  function scopeRows(all,scope,category,split) {
+    const selected=all.filter(r=>r.category===category&&matches(r,scope)),rows=new Map();
+    for(const record of selected) {
+      // Shared SDR preferences must never masquerade as independent per-port
+      // values. Resolve their full affected set even under a narrow filter.
+      const id=record.alias+(record.brightnessRole?':'+record.brightnessRole:''),cellParts=record.preference?[factor(record,'port')]:split.map(k=>factor(record,k));
+      if(!rows.has(id))rows.set(id,{id,key:record.alias,brightnessRole:record.brightnessRole,cells:new Map()});
+      const row=rows.get(id),cellKey=JSON.stringify(cellParts);
+      if(!row.cells.has(cellKey))row.cells.set(cellKey,{id:id+':'+cellKey,label:cellParts.length?cellParts.join(' · '):'All selected values',records:[]});
+      const cell=row.cells.get(cellKey);
+      for(const item of record.preference?all.filter(r=>r.preference===record.preference):[record])if(!cell.records.some(r=>r.id===item.id))cell.records.push(item);
+    }
+    return [...rows.values()].map(row=>({...row,cells:[...row.cells.values()]}));
+  }
+  function storedScope(record) {
+    const bank=record.bank,d=bank.target.dimension;
+    const detail=d.pictureMode?(modes[d.pictureMode]||d.pictureMode)+' · '+(bank.target.app_id?'Motion':'Picture'):
+      d.dynamicRange?(formats[record.format]||record.format)+(d.dynamicRange.endsWith('ALLM')?' + ALLM':' without ALLM')+' · '+(d.gameGenre?'Game Optimizer / '+d.gameGenre:'Preset selection'):'Shared port settings';
+    return inputName(input(bank))+' · '+detail;
+  }
+  function combinedControl(cell,live) { return control({bindings:cell.records.map(r=>({bank:r.bank,key:r.key}))},live); }
+  return {values,control,same,inputName,modes,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl};
 });

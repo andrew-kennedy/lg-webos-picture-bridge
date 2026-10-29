@@ -46,6 +46,11 @@ module.exports = async function () {
   assert.throws(function(){banks.normalize({action:'apply',banks:[{id:'x',target:target,settings:{gameSharpness:0}}]});},/expected/);
   assert.throws(function(){banks.target({category:'picture',dimension:{input:'hdmi1_pc',pictureMode:'game'},app_id:'com.webos.app.hdmi3'});},/app/);
   assert.throws(function(){banks.target({category:'other',dimension:{gameInput:'hdmi1_pc'}});});
+  var pictureTarget = {category:'picture',dimension:{input:'hdmi3',pictureMode:'filmMaker'}};
+  assert(banks.target(pictureTarget).allowed.includes('truMotionJudder'));
+  assert(banks.target(pictureTarget).allowed.includes('truMotionBlur'));
+  assert(!banks.target(pictureTarget).allowed.includes('truMotionMode'));
+  assert.deepStrictEqual(banks.target({...pictureTarget,app_id:'com.webos.app.hdmi3'}).allowed,['truMotionMode'],'Only the M database setting is scoped to the HDMI app');
   assert.throws(function(){banks.normalize({action:'read',banks:Array(9).fill({id:'x',target:target,keys:['gameSharpness']})});});
   assert.throws(function(){banks.normalize({action:'read',banks:[{id:'constructor',target:target,keys:['gameSharpness']}]});});
   await assert.rejects(banks.run(service,command('read',{keys:['gameSharpness']}),function(){throw Error('expired');}),/expired/);

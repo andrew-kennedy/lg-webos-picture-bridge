@@ -71,7 +71,7 @@ function create(options) {
       migration_id:saved && saved.migration_id || null,context:model.clone(context),created_at:new Date(clock()).toISOString()};
   }
   function status() {
-    return {configured:!!saved,owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
+    return {configured:!!saved,editor_api:3,owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
       enabled:!!(saved && saved.enabled),room,power,context,temporary_count:Object.values(overrides).reduce((n,v) => n + Object.keys(v).length,0),
       pending_restore:Object.keys(journal.restore).length > 0,applying,changed_count:changedCount,
       error:loadError || lastError,backup_sequence:latestBackup ? sequence : null,backup_acknowledged:acknowledged,
@@ -124,6 +124,12 @@ function create(options) {
       return document().banks.filter(b => model.active(b,context));
     }
     return [bankById(scope)];
+  }
+  function selectedKeys(input, fallback) {
+    if (!Object.hasOwn(input,'selection')) return Object.fromEntries(selected(input.scope || fallback).map(b=>[b.id,Object.keys(b.settings)]));
+    validateScopes(input.selection);
+    if (!Object.keys(input.selection).length || Object.values(input.selection).some(keys=>!keys.length || new Set(keys).size!==keys.length)) throw new Error('Choose explicit settings to change');
+    return model.clone(input.selection);
   }
   function observe(items) {
     latestObservations = items || [];
@@ -343,6 +349,58 @@ function create(options) {
         saved.document = doc; overrides = {}; journal.dirty = {}; journal.restore = allKeys();
         persistStandards(); await reconcile(); return status();
       }
+      if (input.action === 'edit_many') {
+        guard(); checkRevision(input);
+        const edits = input.edits === undefined ? [] : input.edits, prefPatch = input.preferences === undefined ? {} : input.preferences;
+        const candidate = model.clone(saved), seen = new Set(), prefValues = {}, inspected = new Map(), epoch = powerEpoch;
+        const check = () => { externalGuard(); guard(); checkRevision(input); if (epoch !== powerEpoch) throw new Error('TV power session changed'); };
+        if (!prefPatch || typeof prefPatch !== 'object' || Array.isArray(prefPatch)) throw new Error('Invalid brightness preferences');
+        if (!Array.isArray(edits) || edits.length > 300 || (!edits.length && !Object.keys(prefPatch).length)) throw new Error('Choose settings to edit');
+        candidate.preferences = model.preferences({...candidate.preferences,...prefPatch});
+        Object.assign(prefValues,prefPatch);
+        for (const edit of edits) {
+          if (!edit || typeof edit !== 'object' || Array.isArray(edit)) throw new Error('Invalid bank edit');
+          const original = bankById(edit.bank_id), bank = candidate.document.banks.find(b=>b.id===original.id), variant = edit.variant || 'standard', patch = edit.settings;
+          if (!['standard','bright','dark'].includes(variant) || !patch || typeof patch !== 'object' || Array.isArray(patch) || !Object.keys(patch).length || Object.keys(patch).some(k=>!Object.hasOwn(bank.settings,k))) throw new Error('Invalid bank edit');
+          if (!inspected.has(bank.id)) inspected.set(bank.id,await inspect(original));
+          check();
+          const live = inspected.get(bank.id);
+          for (const [key,value] of Object.entries(patch)) {
+            const identity = bank.id+'/'+variant+'/'+key;
+            if (seen.has(identity)) throw new Error('Duplicate setting in batch');
+            seen.add(identity);
+            const encoded = banks.encode(key,value,live.settings[key],(live.descriptions || []).find(d=>d.key===key),bank);
+            if (key==='backlight' && bank.brightness_role) {
+              if (bank.brightness_role==='movie_sdr' && variant==='standard') throw new Error('Choose Bright or Dark to edit shared movie SDR brightness');
+              const role = bank.brightness_role==='game_sdr'?'game_sdr':'movie_'+variant;
+              if (Object.hasOwn(prefValues,role) && !model.same(prefValues[role],encoded)) throw new Error('Conflicting shared brightness values');
+              prefValues[role] = Number(encoded); candidate.preferences[role] = Number(encoded);
+            } else {
+              const previous = variant==='standard'?bank.settings[key]:Object.assign({},bank.settings,(bank.variants || {})[variant])[key];
+              if (model.same(previous,encoded)) continue;
+              if (variant==='standard') bank.settings[key]=encoded;
+              else { bank.variants=bank.variants || {}; bank.variants[variant]=bank.variants[variant] || {}; bank.variants[variant][key]=encoded; }
+            }
+          }
+          check();
+        }
+        model.validate(candidate.document); model.preferences(candidate.preferences);
+        check();
+        if (model.canonical(candidate.document)===model.canonical(saved.document) && model.canonical(candidate.preferences)===model.canonical(saved.preferences)) return status();
+        const affected = {};
+        // Resolve shared preferences and inactive room variants before committing.
+        // The whole standard document is validated and persisted once; native
+        // writes remain journaled, compared and retried by the existing engine.
+        for (const bank of candidate.document.banks) {
+          const before = model.desired(bankById(bank.id),room,saved.preferences), after = model.desired(bank,room,candidate.preferences);
+          const keys = Object.keys(after).filter(k=>!model.same(before[k],after[k]));
+          if (keys.length) affected[bank.id]=keys;
+        }
+        saved=candidate;
+        for (const [id,keys] of Object.entries(affected)) for (const key of keys) if (overrides[id]) delete overrides[id][key];
+        mergeScopes(journal.restore,affected); journal.dirty=dirtyScopes(); persistStandards();
+        queueSync(); return status();
+      }
       if (input.action === 'edit') {
         checkRevision(input);
         const original = bankById(input.bank_id), candidate = model.clone(saved);
@@ -369,24 +427,42 @@ function create(options) {
         journal.dirty = dirtyScopes(); persistStandards(); await reconcile(); return status();
       }
       if (input.action === 'restore') {
-        const selection = selected(input.scope || 'all');
-        for (const bank of selection) journal.restore[bank.id] = Object.keys(bank.settings);
+        if (Object.hasOwn(input,'selection')) { guard(); checkRevision(input); }
+        if (input.selection && input.room !== room) throw new Error('Room changed; review the selected settings again');
+        const selection = selectedKeys(input,'all');
+        mergeScopes(journal.restore,selection);
         writeJournal(); changed(true); return reconcile();
       }
       if (input.action === 'save') {
-        guard(); checkRevision(input); await recover();
-        const selection = selected(input.scope || 'active'), candidate = model.clone(saved);
-        for (const original of selection) {
-          const bank = candidate.document.banks.find(b => b.id === original.id);
+        guard(); checkRevision(input); const epoch = powerEpoch; await recover();
+        externalGuard(); guard(); checkRevision(input);
+        if (epoch !== powerEpoch) throw new Error('TV power session changed');
+        if (input.selection && input.room !== room) throw new Error('Room changed; review the selected settings again');
+        const selection = selectedKeys(input,'active'), candidate = model.clone(saved), prefValues = {};
+        for (const [id,keys] of Object.entries(selection)) {
+          const bank = candidate.document.banks.find(b => b.id === id);
           for (const [k,v] of Object.entries(overrides[bank.id] || {})) {
-            if (k === 'backlight' && bank.brightness_role) candidate.preferences[bank.brightness_role === 'movie_sdr' ? 'movie_' + room : 'game_sdr'] = Number(v);
+            if (!keys.includes(k)) continue;
+            if (input.selection && (!input.expected || !input.expected[id] || !model.same(input.expected[id][k],v))) throw new Error('Temporary adjustments changed; review them again');
+            if (k === 'backlight' && bank.brightness_role) {
+              const role=bank.brightness_role === 'movie_sdr' ? 'movie_' + room : 'game_sdr';
+              if (Object.hasOwn(prefValues,role) && !model.same(prefValues[role],v)) throw new Error('Conflicting temporary values for shared brightness');
+              prefValues[role]=Number(v); candidate.preferences[role]=Number(v);
+            }
             else if (model.environmentKeys(bank).includes(k) && bank.variants) { bank.variants[room] = bank.variants[room] || {}; bank.variants[room][k] = v; }
             else bank.settings[k] = v;
           }
         }
+        if (input.selection) for (const [id,keys] of Object.entries(selection)) for (const key of keys) {
+          if (!input.expected || !input.expected[id] || !Object.hasOwn(input.expected[id],key) || !model.same(input.expected[id][key],(overrides[id] || {})[key])) throw new Error('Temporary adjustments changed; review them again');
+        }
         model.validate(candidate.document); model.preferences(candidate.preferences); saved = candidate;
-        for (const bank of selection) { delete overrides[bank.id]; delete journal.restore[bank.id]; }
-        journal.dirty = dirtyScopes(); persistStandards(); return status();
+        for (const [id,keys] of Object.entries(selection)) {
+          for (const key of keys) if (overrides[id]) delete overrides[id][key];
+          if (overrides[id] && !Object.keys(overrides[id]).length) delete overrides[id];
+          if (journal.restore[id]) { journal.restore[id]=journal.restore[id].filter(k=>!keys.includes(k)); if (!journal.restore[id].length) delete journal.restore[id]; }
+        }
+        journal.dirty = dirtyScopes(); persistStandards(); queueSync(); return status();
       }
       if (input.action === 'reconcile') return reconcile();
       throw new Error('Unknown profile action');

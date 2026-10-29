@@ -9,7 +9,7 @@ var PRESETS = ['filmMaker', 'hdrFilmMaker', 'game', 'hdrGame', 'dolbyHdrGame',
 var RANGES = ['sdr', 'sdrALLM', 'hdr', 'hdrALLM', 'dolbyHdr', 'dolbyHdrALLM'];
 var PICTURE = ('backlight contrast brightness color tint sharpness colorTemperature colorGamut gamma gammaLevel ' +
   'peakBrightness hdrDynamicToneMapping expressionEnhancer dynamicContrast dynamicColor superResolution ' +
-  'noiseReduction mpegNoiseReduction smoothGradation realCinema motionEyeCare motionProOLED ' +
+  'noiseReduction mpegNoiseReduction smoothGradation realCinema truMotionJudder truMotionBlur motionEyeCare motionProOLED ' +
   'aiHdrRemastering ambientLightCompensation filmmakerAmbientLight dolbyPrecisionDetail nearBlackDetail blackLevel').split(' ');
 var GAME = ['gameAdjustContrast', 'gameBlackLevel', 'gameColorDepth', 'gameSharpness',
   'blackStabilizer', 'whiteStabilizer', 'lowLevelAdjustment'];
@@ -29,7 +29,7 @@ function target(source) {
   if (source.category === 'picture') {
     if (!/^hdmi[1-4](_pc)?$/.test(d.input || '')) throw fail('Invalid picture input');
     if (names === 'input,pictureMode' && PRESETS.includes(d.pictureMode)) {
-      allowed = source.app_id ? ['truMotionMode', 'truMotionJudder', 'truMotionBlur'] : PICTURE;
+      allowed = source.app_id ? ['truMotionMode'] : PICTURE;
       if (source.app_id && source.app_id !== 'com.webos.app.' + d.input.replace(/_pc$/, '')) throw fail('Wrong app binding');
     } else if (names === 'dynamicRange,input' && RANGES.includes(d.dynamicRange) && !source.app_id) allowed = ['pictureMode'];
   } else if (source.category === 'other' && /^hdmi[1-4]$/.test(d.gameInput || '') && !source.app_id) {

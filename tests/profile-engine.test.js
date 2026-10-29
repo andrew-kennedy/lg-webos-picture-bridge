@@ -10,14 +10,19 @@ const doc = {schema:1,name:'Test G6',devices:{switch_2:'Switch 2',apple:'Apple T
   {id:'mapping',name:'SDR movie mapping',target:{category:'picture',dimension:{input:'hdmi3',dynamicRange:'sdr'}},settings:{pictureMode:'filmMaker'},devices:['apple','shield']},
   {id:'port',name:'HDMI 3 game capability',target:{category:'other',dimension:{gameInput:'hdmi3'}},settings:{enableALLM:'on'},devices:['switch_2']}
 ]};
-function fixture() {
-  const files = {}, writes = [], operations = [], values = Object.fromEntries(doc.banks.map(b => [b.id,clone(b.settings)]));
-  let milliseconds = Date.now(), hooks = null, bootId = 'boot1';
+function fixture(collection = doc) {
+  const files = {}, writes = [], operations = [], inspections = [], values = Object.fromEntries(collection.banks.map(b => [b.id,clone(b.settings)]));
+  let milliseconds = Date.now(), hooks = null, inspectHook = null, bootId = 'boot1';
   const timers = new Set();
   const store = {read:n => files[n] ? clone(files[n]) : null,write:(n,v) => { files[n] = clone(v); writes.push(n); }};
   function create() {
     return engine.create({store,bootId,now:() => ++milliseconds,setTimeout:fn => {timers.add(fn);return fn;},clearTimeout:fn => timers.delete(fn),
-      inspect:async bank => ({settings:clone(values[bank.id]),descriptions:Object.keys(bank.settings).map(key => ({key,dimension:Object.keys(bank.target.dimension),dataType:'int',vtype:'Range',values:{range:{min:0,max:100,interval:1}}}))}),
+      inspect:async bank => {
+        inspections.push(bank.id);if (inspectHook) await inspectHook(bank);
+        return {settings:clone(values[bank.id]),descriptions:Object.keys(bank.settings).map(key => typeof bank.settings[key]==='number'?
+          {key,dimension:Object.keys(bank.target.dimension),dataType:'int',vtype:'Range',values:{range:{min:0,max:100,interval:1}}}:
+          {key,dimension:Object.keys(bank.target.dimension),dataType:'string',vtype:'Array',values:{array:['off','on','filmMaker','game']}})};
+      },
       runBanks:async (command,guard) => {
         guard(); operations.push(clone(command));
         const results = [];
@@ -35,9 +40,9 @@ function fixture() {
   }
   function observe(e,id,key,value) {
     values[id][key] = value;
-    e.observe([{target:doc.banks.find(b => b.id === id).target,key,value,observed_at:new Date(++milliseconds).toISOString()}]);
+    e.observe([{target:collection.banks.find(b => b.id === id).target,key,value,observed_at:new Date(++milliseconds).toISOString()}]);
   }
-  return {files,writes,operations,values,create,observe,timers,setBoot:v => {bootId=v;},hook:fn => {hooks=fn;}};
+  return {files,writes,operations,inspections,values,create,observe,timers,setBoot:v => {bootId=v;},hook:fn => {hooks=fn;},inspectHook:fn => {inspectHook=fn;}};
 }
 module.exports = async function () {
   const f = fixture(); let e = f.create();
@@ -127,3 +132,5 @@ module.exports = async function () {
   assert.equal(power.classify({state:'Request Power Off'}),null);
   assert.equal(power.classify({returnValue:false}),null);
 };
+module.exports.fixture = fixture;
+module.exports.doc = doc;
