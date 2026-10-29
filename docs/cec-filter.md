@@ -194,10 +194,14 @@ behavior remain in control. This reduces avoidable waiting but does **not** inst
 the RAM overlay before HDMI on a cold boot: its one-time reload can still blank
 the picture briefly. No firmware or system boot units are changed.
 
-Quick Start+ was off on the inspected G6. A warm resume may retain the process and
-RAM overlay and avoid a fresh installation; it needs separate live verification.
-The existing lease-expiry/recovery rules still apply during standby. Quick Start+
-does not remove the cold-start limitation after an actual reboot or power loss.
+Quick Start+ was off on the inspected G6 and was enabled for a live test on
+2026-10-28. After approximately 110 seconds off, waking Apple TV retained the same
+TV boot ID, bridge process/start time, CEC mount generation, and HDMI process.
+The filter remained active in HA; HDMI 3 returned full-screen in SDR Filmmaker
+with brightness 3. The user confirmed no delayed black flash or dimming.
+This verifies that short standby cycle, not an overnight suspend. The existing
+lease-expiry/recovery rules still apply. Quick Start+ does not remove the
+cold-start limitation after an actual reboot or power loss.
 
 ## MQTT protocol and safety
 
