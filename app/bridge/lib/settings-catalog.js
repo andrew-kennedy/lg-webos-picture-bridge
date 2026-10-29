@@ -22,10 +22,15 @@ var names = {
   backlight: 'OLED pixel brightness', brightness: 'Black level', color: 'Color depth',
   hdrDynamicToneMapping: 'HDR tone mapping', gameOptimization: 'VRR and G-Sync',
   enableALLM: 'Auto low latency', uhdDeepColor: 'HDMI Deep Color', qmsVrr: 'Quick Media Switching',
+  enable144HzBooster: 'Refresh rate boost',
   soundOutputDigital: 'Digital sound output',
   truMotionJudder: 'TruMotion de-judder', truMotionBlur: 'TruMotion de-blur'
 };
-function label(key) {
+function label(key, description) {
+  // LG retains the old key on 165 Hz panels. Only advertise a rate confirmed
+  // by this TV's description; the key itself does not identify the limit.
+  var rate = description && description.condition && String(description.condition.panelOutputFrameRate);
+  if (key === 'enable144HzBooster' && ['144', '165'].indexOf(rate) !== -1) return rate + ' Hz boost';
   return names[key] || key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/HDMI(\d)/g, 'HDMI $1')
     .replace(/^./, function (s) { return s.toUpperCase(); });
 }
@@ -48,4 +53,4 @@ var retiredIds = [];
 Object.keys(retired).forEach(function (category) {
   retired[category].split(' ').forEach(function (key) { retiredIds.push(category + '_' + key); });
 });
-module.exports = {entries: entries, groups: groups, retiredIds: retiredIds};
+module.exports = {entries: entries, groups: groups, retiredIds: retiredIds, label: label};

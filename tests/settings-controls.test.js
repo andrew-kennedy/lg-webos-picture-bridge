@@ -5,6 +5,18 @@ var catalog = require('../app/bridge/lib/settings-catalog');
 var mqtt = require('../app/bridge/lib/mqtt-settings');
 var EventEmitter = require('events').EventEmitter;
 module.exports = async function () {
+  var boostEntry = catalog.entries.find(e => e.key === 'enable144HzBooster');
+  var boostDesc = {dataType:'string',vtype:'ArrayExt',dimension:['gameInput'],
+    ui:{visible:true,active:true},values:{arrayExt:[{value:'off',visible:true,active:true},{value:'on',visible:true,active:true}]}};
+  ['165','144',undefined].forEach(function (rate) {
+    var control = controls.describe(boostEntry,Object.assign({},boostDesc,{condition:{panelOutputFrameRate:rate}}),'off');
+    var label = rate ? rate+' Hz boost' : 'Refresh rate boost';
+    assert.strictEqual(control.label,label);
+    var discovery = mqtt.discovery({device_name:'TV',mqtt:{topic_prefix:'lg',discovery_prefix:'homeassistant'}},'test','session',
+      {context_id:'a'.repeat(24),controls:{[control.id]:control}})[0].payload;
+    assert.strictEqual(discovery.name,'Gaming / HDMI: '+label);
+    assert.strictEqual(discovery.unique_id,'test_setting_other_enable144HzBooster','Rate labels must not rename entity identities');
+  });
   var context = {input: 'hdmi3', mode: 'filmMaker', range: 'sdr', ready: true};
   var value = '3', writes = [], failWrite = false, ignoreWrite = false, delayed = null, reportedInput = null;
   var desc = {key: 'backlight', category: 'picture', dataType: 'string', vtype: 'Range', dbtype: 'G',

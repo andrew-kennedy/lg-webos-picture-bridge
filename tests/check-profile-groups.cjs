@@ -21,6 +21,7 @@ const fixture=require('./fixtures/profile-formats.cjs');
         if(command.action==='inspect') {
           const controls={};
           Object.entries(bank.settings).forEach(([key,value])=>{controls[key]=typeof value==='number'?{component:'number',min:0,max:100,step:1}:{component:'select',options:['truMotionMode','enableQFT'].includes(key)?['off','on']:[value]};});
+          if(controls.enable144HzBooster)controls.enable144HzBooster.label='165 Hz boost';
           if(window.slowInspect===bank.id)await new Promise(resolve=>setTimeout(resolve,100));
           return {id:bank.id,settings:structuredClone(bank.settings),controls};
         }
@@ -99,6 +100,8 @@ const fixture=require('./fixtures/profile-formats.cjs');
     await view.selectOption('input');
     assert.equal(await page.getByLabel('Input',{exact:true}).locator('option').count(),1,'Shared port options are visible from Apple TV too');
     await page.getByRole('combobox',{name:'Quick frame transport',exact:true}).waitFor();
+    await page.getByRole('combobox',{name:'165 Hz boost',exact:true}).waitFor();
+    assert(await page.getByText('Last TV read: off',{exact:true}).count());
     assert(await page.getByText('HDMI options apply across formats.',{exact:false}).isVisible());
     await device.selectOption('switch');await view.selectOption('advanced');
     const native=page.getByLabel('Native settings',{exact:true});
@@ -112,6 +115,7 @@ const fixture=require('./fixtures/profile-formats.cjs');
     assert(await page.getByText('TV offline · saved backup',{exact:true}).isVisible());
     assert(await page.getByRole('button',{name:'Restore this profile',exact:true}).isDisabled());
     assert(await color.isDisabled());
+    assert.equal(await page.getByText('Last TV read:',{exact:false}).count(),0,'Offline metadata must not present an old read as current');
     assert.deepEqual(errors,[]);
     console.log('Format profiles: SDR/HDR/DV choices, merged controls, mixed values, precise scoped writes, revisions/retry, room-selected DV, shared HDMI options, advanced access and offline display passed.');
   } finally {await browser.close();}

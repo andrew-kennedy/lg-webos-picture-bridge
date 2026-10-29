@@ -113,7 +113,8 @@
       return {component:'number',min,max,step};
     }
     const options=first.options.filter(v=>controls.every(c=>c.options.includes(v)));
-    return options.length?{component:'select',options}:null;
+    const label=first.label&&controls.every(c=>c.label===first.label)?{label:first.label}:{};
+    return options.length?{component:'select',options,...label}:null;
   }
   return {groups,rows,values,control,same,inputName,sectionName,modes};
 });

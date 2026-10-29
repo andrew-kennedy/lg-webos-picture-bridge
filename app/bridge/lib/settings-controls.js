@@ -27,6 +27,10 @@ function call(service, method, params, callback) {
 function describe(entry, description, value) {
   if (!description || value === undefined || value === null || typeof value === 'object') return null;
   var d = description, values = d.values || {}, result = Object.assign({}, entry);
+  if (entry.key === 'enable144HzBooster') {
+    result.label = catalog.label(entry.key, d);
+    if (result.name) result.name = result.name.replace(catalog.label(entry.key), result.label);
+  }
   if (['', 'string', 'int', 'boolean'].indexOf(d.dataType) === -1) return null;
   result.dimensions = d.dimension || [];
   result.current_app = d.dbtype === 'M';

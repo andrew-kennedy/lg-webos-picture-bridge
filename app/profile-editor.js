@@ -2,6 +2,7 @@
 (function () {
   'use strict';
   const titles = {backlight:'OLED pixel brightness',contrast:'Contrast',brightness:'Black level',color:'Color depth',sharpness:'Sharpness',blackLevel:'HDMI RGB range',colorTemperature:'Color temperature',gameColorDepth:'Game color depth',gameSharpness:'Game sharpness',gameAdjustContrast:'Game contrast',gameBlackLevel:'Game black level',lowLevelAdjustment:'Fine tune dark areas',blackStabilizer:'Black stabilizer',whiteStabilizer:'White stabilizer',hdrDynamicToneMapping:'HDR tone mapping',pictureMode:'Picture mode',truMotionMode:'TruMotion',enableALLM:'Auto low latency mode',enableQFT:'Quick frame transport'};
+  titles.enable144HzBooster='Refresh rate boost';
   const pretty = key => titles[key] || key.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase());
   const display = value => typeof value === 'object' ? [...new Set(Object.values(value || {}))].join(' / ') : String(value === undefined || value === null ? '—' : value);
   const el = (tag,text,cls) => {const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
@@ -184,14 +185,14 @@
             const saved=model.values(bank,this.state,this.variant)[key],draft=this.draft[bank.id]||{};
             return {bank,key,saved,value:Object.hasOwn(draft,key)?draft[key]:saved};
           });
-          const key=item.key,value=records[0].value;
+          const key=item.key,value=records[0].value,control=model.control(item,this.live),label=control&&control.label||pretty(key);
           const mixed=records.some(r=>!model.same(r.value,value))||(key==='blackLevel'&&new Set(Object.values(value)).size>1);
-          const row=el('div',undefined,'row'),name=el('div');name.append(el('strong',pretty(key)));
+          const row=el('div',undefined,'row'),name=el('div');name.append(el('strong',label));
           const brightness=records.find(r=>r.key==='backlight'&&r.bank.brightness_role);
           if(brightness)name.append(el('p',brightness.bank.brightness_role==='game_sdr'?'Shared SDR game brightness':this.variant==='standard'?'Choose Bright or Dark to edit shared movie brightness':'Shared SDR movie brightness','muted'));
           if(mixed)name.append(el('p','Saved values differ. Choose a value to use for this format.','muted'));
           row.append(name);
-          const control=model.control(item,this.live),disabled=!!this.status.offline||!!(brightness&&brightness.bank.brightness_role==='movie_sdr'&&this.variant==='standard');let input;
+          const disabled=!!this.status.offline||!!(brightness&&brightness.bank.brightness_role==='movie_sdr'&&this.variant==='standard');let input;
           const update=v=>{
             for(const r of records) {
               const next=r.key==='blackLevel'?Object.fromEntries(Object.keys(r.saved).map(k=>[k,v])):v;
@@ -203,19 +204,21 @@
           };
           if(control&&control.component==='number') {
             input=el('div',undefined,'range');const slider=el('input'),number=el('input');slider.type='range';number.type='number';
-            [slider,number].forEach(n=>{n.min=control.min;n.max=control.max;n.step=control.step;n.value=mixed?'':value;n.setAttribute('aria-label',pretty(key));n.dataset.focus='setting:'+item.id+':'+n.type;n.disabled=disabled;});
+            [slider,number].forEach(n=>{n.min=control.min;n.max=control.max;n.step=control.step;n.value=mixed?'':value;n.setAttribute('aria-label',label);n.dataset.focus='setting:'+item.id+':'+n.type;n.disabled=disabled;});
             slider.hidden=mixed;number.placeholder='Mixed';
             slider.oninput=()=>{number.value=slider.value;update(Number(slider.value));};
             number.oninput=()=>{slider.hidden=number.value==='';if(number.value!=='')slider.value=number.value;update(number.value===''?undefined:Number(number.value));};input.append(slider,number);
           } else if(control&&control.options) {
-            input=el('select');input.setAttribute('aria-label',pretty(key));input.dataset.focus='setting:'+item.id;
+            input=el('select');input.setAttribute('aria-label',label);input.dataset.focus='setting:'+item.id;
             if(mixed){const option=el('option','Mixed');option.value='';option.disabled=true;input.append(option);}
             control.options.forEach(v=>{const option=el('option',v);option.value=v;input.append(option);});input.value=mixed?'':display(value);input.disabled=disabled;input.onchange=()=>update(input.value);
           } else input=el('span',mixed?'Mixed: '+summarize(records.map(r=>r.value)):display(value));
           row.append(input);
           const temporary=records.filter(r=>Object.hasOwn((this.state.overrides||{})[r.bank.id]||{},r.key)).map(r=>this.state.overrides[r.bank.id][r.key]);
           const observed=records.map(r=>this.live&&this.live[r.bank.id]?this.live[r.bank.id].settings[r.key]:undefined);
-          row.append(el('span',temporary.length?'Temporary: '+summarize(temporary):observed.every(v=>v!==undefined)?'TV: '+summarize(observed):this.status.offline?'Last saved standard':'Reading TV ranges…',temporary.length?'observed temporary':'observed'));
+          const comparison=el('span',temporary.length?'Temporary: '+summarize(temporary):this.status.offline?'Last saved standard':observed.every(v=>v!==undefined)?'Last TV read: '+summarize(observed):'Reading TV ranges…',temporary.length?'observed temporary':'observed');
+          comparison.title=this.status.offline?'Values from the saved backup.':temporary.length?'Tracked adjustment for this viewing session.':'Value read from this TV profile when opened or refreshed. The HDMI input need not be active.';
+          row.append(comparison);
           section.append(row);
         }
         this.rows.append(section);

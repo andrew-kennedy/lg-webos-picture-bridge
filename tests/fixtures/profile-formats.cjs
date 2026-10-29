@@ -6,7 +6,7 @@ function add(id,devices,category,dimension,settings,extra={}) {
 }
 for(const [device,input] of [['pc','hdmi1_pc'],['ps5','hdmi4'],['switch','hdmi3']]) {
   const physical=input.replace(/_pc$/,'');
-  add(device+'_port',[device],'other',{gameInput:physical},{gameGenre:'Standard',enableQFT:'off'});
+  add(device+'_port',[device],'other',{gameInput:physical},{gameGenre:'Standard',enableQFT:'off',enable144HzBooster:'off'});
   for(const range of ['sdr','hdr']) {
     const mode=range==='sdr'?'game':'hdrGame',contrast=range==='sdr'?95:100;
     add(device+'_'+range,[device],'picture',{input,pictureMode:mode},{color:50,sharpness:0,contrast,brightness:50,backlight:range==='sdr'?80:100});
