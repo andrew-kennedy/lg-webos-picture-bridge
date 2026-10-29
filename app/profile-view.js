@@ -28,13 +28,13 @@
   }
   function sectionName(bank) {
     const d=bank.target.dimension;
-    return bank.target.category==='picture'?(d.pictureMode?(bank.target.app_id?'Motion':'Picture'):'Preset selection'):(d.gameGenre?'Game Optimizer':'HDMI options');
+    return bank.target.category==='picture'?(d.pictureMode?(bank.target.app_id?'Motion':'Picture'):'Preset selection'):(d.gameGenre?'Game Optimizer':'HDMI port settings');
   }
   function nativeName(bank) {
     const d=bank.target.dimension;
     if(d.pictureMode)return (modes[d.pictureMode]||d.pictureMode)+(bank.target.app_id?' · Motion':' · Picture');
     if(d.dynamicRange)return formats[format(bank)]+(/ALLM$/.test(d.dynamicRange)?' with ALLM':'')+' · '+(d.gameGenre?'Game Optimizer ('+d.gameGenre+')':'Preset selection');
-    return inputName(bank)+' · HDMI options';
+    return inputName(bank)+' · HDMI port settings';
   }
   function groups(state,variant,view) {
     const doc=state.document;
@@ -93,7 +93,7 @@
       if(!entries.has(id))entries.set(id,{id:group.id+':'+section+':'+id,key:name,bindings:[]});
       entries.get(id).bindings.push({bank,key});
     }
-    const order=['Picture','Game Optimizer','Motion','Preset selection','HDMI options'];
+    const order=['Picture','Game Optimizer','Motion','Preset selection','HDMI port settings'];
     return [...sections].sort((a,b)=>order.indexOf(a[0])-order.indexOf(b[0])).map(([name,entries])=>({name,rows:[...entries.values()]}));
   }
   function same(a,b) {

@@ -131,11 +131,12 @@
         button{cursor:pointer}button:disabled{opacity:.45;cursor:default}button:hover:not(:disabled){background:#304965}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #6ee7e5;outline-offset:2px}
         [data-editing]{outline:3px solid #ffd695!important;outline-offset:2px}.remote-help{margin:0}
         .primary{background:#91e4d4;color:#091c23;border-color:#91e4d4;font-weight:650}.primary:hover:not(:disabled){background:#b8f3e8}
+        .scope-help{margin:0;padding:12px 20px;border-bottom:1px solid #34445b;color:#c2cde0;font-size:14px}.scope-copy{margin:0}.scope-more{display:none}.scope-more summary{cursor:pointer}.scope-more p{margin:8px 0 0}
         .frame{height:100%;display:flex;flex-direction:column;padding:24px;gap:16px;overflow:hidden}.top,.toolbar,.actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.top h2{font-size:26px;margin:0;font-weight:650;letter-spacing:-.5px}.muted{color:#a9b7cb;font-size:14px;margin:4px 0}.badge{font-size:12px;border:1px solid #487165;border-radius:20px;padding:4px 10px;color:#9be2cd}
         .actions{justify-content:flex-start}.choice{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1}.choice span{font-size:12px;font-weight:600;color:#acbad0;letter-spacing:.05em;text-transform:uppercase}select{width:100%;text-overflow:ellipsis}.toolbar{flex-wrap:nowrap}.toolbar .choice:first-child{flex:1.3}
         .body{min-height:0;flex:1;overflow:auto;border:1px solid #34445b;border-radius:12px}.section h3{font-size:inherit;margin:0;padding:12px 20px;background:#1c2b40;border-bottom:1px solid #34445b;color:#9be2cd}.section+.section{border-top:1px solid #34445b}.row{display:grid;grid-template-columns:minmax(150px,1fr) minmax(180px,1.3fr) minmax(100px,.7fr);gap:18px;align-items:center;padding:15px 20px;border-bottom:1px solid #2b3a4e}.row:last-child{border:0}.row strong{font-size:15px}.range{display:flex;align-items:center;gap:12px}input[type=range]{accent-color:#91e4d4;min-width:70px;flex:1;width:100%}input[type=number]{width:84px}.observed{font-size:13px;color:#a9b7cb}.temporary{color:#ffd695}.message{min-height:22px;color:#a9b7cb;font-size:14px}.error{color:#ffb0b8}.footer{display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}.empty{padding:20px}.notice{font-size:14px;margin:0;color:#c2cde0}
-        @media(min-width:1500px){:host{font-size:22px}.top h2{font-size:34px}.muted,.notice,.message,.row strong{font-size:20px}.choice span,.observed{font-size:17px}.row{padding:19px 24px}.frame{padding:28px;gap:20px}button,select,input[type=number]{min-height:52px}.badge{font-size:17px}}
-        @media(max-width:650px){.frame{padding:14px;gap:12px}.top h2{font-size:23px}.toolbar{flex-wrap:wrap}.toolbar .choice,.toolbar .choice:first-child{flex:1 1 42%}.row{grid-template-columns:1fr;gap:8px;padding:14px}.footer .actions{width:100%}.top .actions{gap:6px}button{padding:8px}.observed{font-size:12px}}
+        @media(min-width:1500px){:host{font-size:22px}.top h2{font-size:34px}.muted,.notice,.scope-help,.message,.row strong{font-size:20px}.choice span,.observed{font-size:17px}.row{padding:19px 24px}.frame{padding:28px;gap:20px}button,select,input[type=number]{min-height:52px}.badge{font-size:17px}}
+        @media(max-width:650px){.frame{padding:14px;gap:12px}.top h2{font-size:23px}.toolbar{flex-wrap:wrap}.toolbar .choice,.toolbar .choice:first-child{flex:1 1 42%}.row{grid-template-columns:1fr;gap:8px;padding:14px}.footer .actions{width:100%}.top .actions{gap:6px}button{padding:8px}.observed{font-size:12px}.scope-help{padding:8px 14px}.scope-copy{display:none}.scope-more{display:block}}
       </style>`;
       const frame=el('div',undefined,'frame'),top=el('div',undefined,'top'),heading=el('div');
       heading.append(el('h2','Picture profiles'),el('p',this.state.enabled?'Standards live on your TV. Everyday adjustments reset after a power cycle.':'Standards live on your TV. Automatic picture management is paused.','muted'));top.append(heading);
@@ -156,13 +157,14 @@
       toolbar.append(this.select('Device',[['all','All devices'],...Object.entries(doc.devices)],this.device,v=>{this.device=v;this.draft={};this.live=null;this.render();this.inspect();}));
       const label=g=>(this.device==='all'?(g.devices.map(d=>doc.devices[d]).join(' / ')||model.inputName(g.input))+' · ':'')+g.name;
       const choices=visible.map(g=>[g.id,label(g)+(visible.filter(other=>label(other)===label(g)).length>1?' · '+model.inputName(g.input):'')]);
-      toolbar.append(this.select(this.view==='profiles'?'Format':this.view==='input'?'Input':'Native settings',choices,this.bankId,v=>{this.bankId=v;this.draft={};this.live=null;this.render();this.inspect();}));
+      toolbar.append(this.select(this.view==='profiles'?'Format':this.view==='input'?'HDMI port':'Native settings',choices,this.bankId,v=>{this.bankId=v;this.draft={};this.live=null;this.render();this.inspect();}));
       toolbar.append(this.select('Room variant',[['standard','Base standard'],['bright','Bright room'],['dark','Dark room']],this.variant,v=>{this.variant=v;this.draft={};this.live=null;this.render();this.inspect();}));
-      toolbar.append(this.select('View',[['profiles','Picture profiles'],['input','HDMI options'],['advanced','Advanced picture settings']],this.view,v=>{this.view=v;this.draft={};this.live=null;this.render();this.inspect();}));frame.append(toolbar);
+      toolbar.append(this.select('View',[['profiles','Picture profiles'],['input','HDMI port settings'],['advanced','Advanced picture settings']],this.view,v=>{this.view=v;this.draft={};this.live=null;this.render();this.inspect();}));frame.append(toolbar);
       const group=this.group(),names=((group && group.devices)||[]).map(d=>doc.devices[d]);
       const stateLine=el('div',undefined,'top');
-      const hint=this.view==='input'?'HDMI options apply across formats.':this.view==='advanced'?'Edit individual presets and automatic preset selection.':group&&group.presets&&group.presets.length?'Preset: '+group.presets.map(p=>model.modes[p]||p).join(' / ')+'.':'Saved picture settings.';
-      stateLine.append(el('p',(names.length>1?'Shared by '+names.join(' and ')+'. ':'')+(group?model.inputName(group.input)+'. ':'')+hint,'notice'));
+      const hint=this.view==='input'?'One shared set of port options.':this.view==='advanced'?'Individual stored values behind Picture profiles.':group&&group.presets&&group.presets.length?'Preset: '+group.presets.map(p=>model.modes[p]||p).join(' / ')+'.':'Saved picture settings.';
+      const shared=names.length>2?names.slice(0,-1).join(', ')+', and '+names[names.length-1]:names.join(' and ');
+      stateLine.append(el('p',(names.length>1?'Shared by '+shared+'. ':'')+(group?model.inputName(group.input)+'. ':'')+hint,'notice'));
       const ack=this.status.backup_acknowledged===this.status.backup_sequence && this.status.backup_sequence;
       stateLine.append(el('span',this.status.offline?'TV offline · saved backup':ack?'Backup confirmed in HA':'TV owns standards','badge'));frame.append(stateLine);
       this.rows=el('div',undefined,'body');this.rows.setAttribute('aria-label','Profile settings');frame.append(this.rows);
@@ -180,6 +182,24 @@
     renderRows() {
       if(!this.rows)return;const focus=this.captureFocus();this.rows.replaceChildren();
       const group=this.group(),summarize=values=>[...new Set(values.map(display))].join(' / ');
+      if(group&&group.banks.length) {
+        const bank=group.banks[0],dimension=bank.target.dimension;
+        let help;
+        if(this.view==='input')help='Saved for the physical HDMI port, shared across all connected devices and picture formats. The Device selector only filters which ports are listed.';
+        else if(this.view==='advanced') {
+          if(dimension.gameGenre)help='Game Optimizer stores its own values by input, signal format, ALLM status and game genre. Edits here affect only this group.';
+          else if(dimension.dynamicRange)help='Chooses the preset LG uses for this input, signal format and ALLM status. Picture profiles edits the values in that selected preset.';
+          else help='Individual '+(bank.target.app_id?'Motion':'Picture')+' values for this input and preset. Edits here affect only this group; Picture profiles combines the matching groups.';
+        } else {
+          const picture=group.banks.some(b=>b.target.dimension.pictureMode),game=group.banks.some(b=>b.target.dimension.gameGenre);
+          help=picture?'Picture values are saved by input, format and preset.':'Game Optimizer values are saved by input, signal format and game genre.';
+          if(picture&&game)help+=' Saving a combined control updates its matching Picture and Game Optimizer values together.';
+          if(group.devices.length>1)help+=' Devices listed as shared use the same saved values.';
+        }
+        const description=el('div',undefined,'scope-help'),more=el('details',undefined,'scope-more'),summary=el('summary','How these settings are shared');
+        summary.dataset.focus='scope-help';more.open=!!this.scopeHelpOpen;more.ontoggle=()=>{this.scopeHelpOpen=more.open;};more.append(summary,el('p',help));
+        description.append(el('p',help,'scope-copy'),more);this.rows.append(description);
+      }
       if(group&&group.missingPreset)this.rows.append(el('p','A selected preset has no picture values in this collection. Use Advanced picture settings to review preset selection.','empty notice'));
       for(const part of model.rows(group)) {
         const section=el('section',undefined,'section'),title=el('h3',part.name);
@@ -227,7 +247,7 @@
         }
         this.rows.append(section);
       }
-      if(!this.banks().length)this.rows.append(el('p','No saved settings in this view. Check HDMI options or Advanced picture settings.','empty'));
+      if(!this.banks().length)this.rows.append(el('p','No saved settings in this view. Check HDMI port settings or Advanced picture settings.','empty'));
       this.saveButton.disabled=!!this.status.offline||!this.banks().some(b=>Object.keys(this.draft[b.id]||{}).length);
       this.lockControls();
       this.restoreFocus(focus);
