@@ -2,7 +2,7 @@
 
 LG Picture Bridge connects a **rooted 2026 LG G6 (webOS 11)** to Home Assistant. It reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision through MQTT discovery, and applies picture profiles without notification dialogs.
 
-Version **0.14.0** replaces the Device/Format/View dropdowns with a scope editor shared with Home Assistant companion **0.5.0**. Select ports, formats and preset families, then choose Picture, Motion, Gaming, HDMI connection or Preset selection. Split controls by the factors you want to edit separately, or combine them to apply one value more widely. Unequal standards show **Mixed**. **Real Cinema** is under Motion. Every edit has an exact target preview before saving; shared brightness preferences list all affected profiles. A batch validates completely and saves the standards document once. Native TV writes are verified and recoverable.
+Version **0.14.1** replaces the Device/Format/View dropdowns with a scope editor shared with Home Assistant companion **0.5.1**. Select ports, formats and preset families, then choose Picture, Motion, Gaming, HDMI connection or Preset selection. Split controls by the factors you want to edit separately, or combine them to apply one value more widely. Unequal standards show **Mixed**. **Real Cinema** is under Motion. SDR, HDR and Dolby Vision OLED brightness appear together in one row; shared SDR preferences remain separate from native HDR/Dolby Vision values. Every edit has an exact target preview before saving; shared brightness preferences list all affected profiles. A batch validates completely and saves the standards document once. Native TV writes are verified and recoverable.
 
 The bridge uses native subscriptions, cached descriptions, RAM diagnostics and a five-minute recovery check. Its input-only CEC policy keeps selecting an LG input from waking downstream devices. Quick Start+ can preserve the running service across normal standby; cold boots start the bridge through Homebrew. Updates preserve the active HDMI input, saved standards and CEC configuration. The verified TV is an OLED77G6WUA on **43.21.69 / webOS 11.2.0**, with Homebrew Channel 0.8.0 and Node 20.12.2. Installing the app does not update TV firmware. Older C9 firmware is no longer supported.
 
@@ -22,7 +22,7 @@ For manual installation, download the IPK from [Releases](https://github.com/and
 
 ```sh
 luna-send-pub -i luna://com.webos.appInstallService/dev/install \
-  '{"id":"com.ares.defaultName","ipkUrl":"/home/root/io.github.andrewkennedy.lgpicturebridge_0.14.0_all.ipk","subscribe":true}'
+  '{"id":"com.ares.defaultName","ipkUrl":"/home/root/io.github.andrewkennedy.lgpicturebridge_0.14.1_all.ipk","subscribe":true}'
 ```
 
 Wait for `state: installed`, then interrupt the subscription. Homebrew Channel must already be elevated. No system partition flashing is involved.

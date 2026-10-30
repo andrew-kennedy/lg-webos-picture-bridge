@@ -184,13 +184,15 @@
       if(!this.settings||this.review)return;const focus=this.captureFocus();this.settings.replaceChildren();
       for(const row of this.selectedRows()) {
         const section=el('section',undefined,'row'),name=el('div'),cells=el('div',undefined,'cells');name.append(el('h3',pretty(row.key)));
-        if(row.brightnessRole)name.append(el('p',row.brightnessRole==='game_sdr'?'Shared SDR game brightness':this.variant==='standard'?'Choose Bright or Dark under More factors to edit shared movie brightness':'Shared SDR movie brightness','muted'));
+        if(row.key==='backlight')name.append(el('p','Brightness for the selected formats','muted'));
         if(row.key==='realCinema')name.append(el('p','Stored per input and picture preset','muted'));
         section.append(name,cells);
         for(const cell of row.cells) {
           const group=el('div',undefined,'cell'),ready=cell.records.every(r=>this.live[r.bank.id]&&Object.hasOwn(this.live[r.bank.id].settings,r.key)),control=ready?model.combinedControl(cell,this.live):null;
           const label=(control&&control.label)||pretty(row.key),fieldLabel=label+' · '+cell.label,vals=cell.records.map(r=>this.draftValue(r)),unique=[...new Set(vals.map(display))],mixed=unique.length>1||vals.some(v=>v&&typeof v==='object'&&new Set(Object.values(v)).size>1);
-          group.append(el('span',cell.label,'cell-label'));const disabled=!this.writable()||cell.records.some(r=>r.locked);let input;
+          group.append(el('span',cell.label,'cell-label'));
+          if(cell.brightnessRole)group.append(el('p',cell.brightnessRole==='game_sdr'?'Shared SDR game brightness':this.variant==='standard'?'Choose Bright or Dark under More factors to edit shared movie brightness':'Shared SDR movie brightness','muted'));
+          const disabled=!this.writable()||cell.records.some(r=>r.locked);let input;
           const update=value=>{this.stage(cell,value);const comparison=group.querySelector('.comparison');if(comparison)comparison.textContent=value===undefined?'Edit cleared; saved values retained.':'Draft · '+display(value);};
           if(control&&control.component==='number') {
             input=el('div',undefined,'range');const slider=el('input'),number=el('input');slider.type='range';number.type='number';

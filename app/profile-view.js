@@ -98,14 +98,27 @@
     for(const record of selected) {
       // Shared SDR preferences must never masquerade as independent per-port
       // values. Resolve their full affected set even under a narrow filter.
-      const id=record.alias+(record.brightnessRole?':'+record.brightnessRole:''),cellParts=record.preference?[factor(record,'port')]:split.map(k=>factor(record,k));
-      if(!rows.has(id))rows.set(id,{id,key:record.alias,brightnessRole:record.brightnessRole,cells:new Map()});
-      const row=rows.get(id),cellKey=JSON.stringify(cellParts);
-      if(!row.cells.has(cellKey))row.cells.set(cellKey,{id:id+':'+cellKey,label:cellParts.length?cellParts.join(' · '):'All selected values',records:[]});
+      const id=record.alias,cellParts=record.preference?[factor(record,'port')]:split.map(k=>factor(record,k));
+      if(!rows.has(id))rows.set(id,{id,key:record.alias,cells:new Map()});
+      // Brightness is one visible setting. Shared SDR preferences still need
+      // distinct cells so a combined edit cannot retarget HDR or another role.
+      const row=rows.get(id),cellKey=JSON.stringify(record.brightnessRole?[record.brightnessRole,...cellParts]:cellParts);
+      if(!row.cells.has(cellKey))row.cells.set(cellKey,{id:id+':'+cellKey,label:record.locked?'SDR movie profiles':cellParts.length?cellParts.join(' · '):'All selected values',brightnessRole:record.brightnessRole,records:[]});
       const cell=row.cells.get(cellKey);
       for(const item of record.preference?all.filter(r=>r.preference===record.preference):[record])if(!cell.records.some(r=>r.id===item.id))cell.records.push(item);
     }
-    return [...rows.values()].map(row=>({...row,cells:[...row.cells.values()]}));
+    return [...rows.values()].map(row=>{
+      const cells=[...row.cells.values()];
+      if(row.key==='backlight') {
+        const order=['sdr','hdr','dolbyHdr'],rank=c=>Math.min(...c.records.map(r=>order.indexOf(r.format)));
+        cells.sort((a,b)=>rank(a)-rank(b));
+        for(const cell of cells)if(!cell.brightnessRole&&!split.includes('format')) {
+          const ranges=[...new Set(cell.records.map(r=>r.format))].sort((a,b)=>order.indexOf(a)-order.indexOf(b)).map(f=>formats[f]||f).join(' / ');
+          cell.label=ranges+(split.length?' · '+cell.label:'');
+        }
+      }
+      return {...row,cells};
+    });
   }
   function storedScope(record) {
     const bank=record.bank,d=bank.target.dimension;

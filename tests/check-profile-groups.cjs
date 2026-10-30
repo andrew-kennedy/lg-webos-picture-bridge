@@ -23,7 +23,18 @@ const fixture=require('./fixtures/profile-formats.cjs');
       await page.getByRole('button',{name:/^Review (\d+ changes|against latest)$/}).click();
       await button('Save standards').click();await page.getByText('Saved on the TV.',{exact:false}).waitFor();
     };
-    await ready();await setScope('port',['hdmi1']);await setScope('format',['sdr']);await color.waitFor();
+    await ready();
+    assert.equal(await page.getByRole('heading',{name:'OLED pixel brightness',exact:true}).count(),1,'SDR, HDR and DV brightness must appear together');
+    const hdrBrightness=control('spinbutton','OLED pixel brightness · HDR'),dvBrightness=control('spinbutton','OLED pixel brightness · Dolby Vision');
+    assert(await hdrBrightness.isEnabled());assert(await dvBrightness.isEnabled());
+    assert.equal(await hdrBrightness.inputValue(),'100');assert.equal(await hdrBrightness.getAttribute('min'),'0');assert.equal(await hdrBrightness.getAttribute('max'),'100');
+    await hdrBrightness.fill('99');await button('Review 4 changes').click();
+    assert.deepEqual(await page.evaluate(()=>document.querySelector('lg-profile-editor').review.entries.map(e=>({bank:e.bank_id,key:e.key,preference:e.preference||null}))),[
+      {bank:'pc_hdr',key:'backlight',preference:null},{bank:'ps5_hdr',key:'backlight',preference:null},{bank:'switch_hdr',key:'backlight',preference:null},{bank:'movie_hdrFilmMaker',key:'backlight',preference:null}
+    ],'Editing HDR brightness cannot change shared SDR preferences or Dolby Vision');
+    await button('Back to editing').click();await button('Discard edits').click();
+    assert.equal(await hdrBrightness.inputValue(),'100');assert.equal((await calls('edit_many')).length,0);
+    await setScope('port',['hdmi1']);await setScope('format',['sdr']);await color.waitFor();
     assert.equal(await color.inputValue(),'','Unequal native standards display Mixed');
     assert(await control('slider','Color depth · SDR').isHidden(),'Mixed must not imply a slider value');
     const readCount=(await calls('inspect')).length;

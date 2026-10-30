@@ -16,9 +16,16 @@ module.exports=()=>{
   assert.equal(cells({format:['sdr'],family:['movie']},'motion').find(r=>r.key==='realCinema').cells[0].records.length,1);
   assert.equal(cells({port:['hdmi1'],format:['sdr'],allm:['off']}).find(r=>r.key==='color').cells[0].records.length,2);
   assert.equal(cells({port:['hdmi1'],format:['sdr'],allm:['on']}).find(r=>r.key==='color').cells[0].records.length,2);
-  const brightness=cells({port:['hdmi1'],format:['sdr']}).find(r=>r.brightnessRole==='game_sdr').cells[0];
+  const brightness=cells({port:['hdmi1'],format:['sdr']}).find(r=>r.key==='backlight').cells.find(c=>c.brightnessRole==='game_sdr');
   assert.equal(brightness.records.length,3,'A narrowed port filter still previews the full shared preference');
   assert.equal(brightness.label,'All SDR game profiles');
+  const brightnessRows=cells({}).filter(r=>r.key==='backlight');
+  assert.equal(brightnessRows.length,1,'All formats share one visible OLED brightness heading');
+  assert.deepEqual(brightnessRows[0].cells.map(c=>c.label),['All SDR game profiles','SDR movie profiles','HDR','Dolby Vision']);
+  assert(brightnessRows[0].cells.filter(c=>!c.brightnessRole).every(c=>c.records.every(r=>!r.locked&&!r.preference)),'HDR and DV remain ordinary editable per-profile standards');
+  const combinedBrightness=cells({},'picture',[]).find(r=>r.key==='backlight').cells;
+  assert.deepEqual(combinedBrightness.map(c=>c.label),['All SDR game profiles','SDR movie profiles','HDR / Dolby Vision']);
+  assert.equal(combinedBrightness[2].records.length,6,'Collapsing formats keeps HDR/DV separate from shared SDR preferences');
   const ports=cells({},'port',['format']).find(r=>r.key==='enableQFT');
   assert.equal(ports.cells.length,1,'Connection options do not invent format-specific native values');
   assert.equal(ports.cells[0].records.length,3);
