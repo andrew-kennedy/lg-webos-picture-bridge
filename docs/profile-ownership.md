@@ -6,6 +6,10 @@ The TV stores and restores standards. Home Assistant 0.3 supplies day/night cont
 
 Open **Picture profiles** in the TV app or the HA sidebar. Select any combination of ports, formats and preset families. **More factors** offers exact presets, ALLM, configured game genres and Base/Bright/Dark room variants. These filters select existing managed settings; they do not change the TV input, create new native banks or apply anything.
 
+**Preset family** is an editor grouping: **Gaming** contains the Game presets, while **Movies** contains Filmmaker, Cinema and Cinema Home. **Exact preset** means one LG picture mode, such as HDR Game, HDR Filmmaker or Dolby Vision Cinema. Each exact preset retains its own picture settings for an input. For example, Movies + Dolby Vision includes Cinema and Cinema Home; selecting the exact Cinema preset narrows that selection to one mode. Format (SDR/HDR/Dolby Vision) and room variant (Base/Bright/Dark) are separate factors.
+
+In **Show separate controls by**, Preset family separates Gaming from Movies, while Exact preset separates individual LG picture modes. Scope filters choose which settings to include; grouping factors choose which included values share a control.
+
 Choose a settings category:
 
 | Category | What it contains |

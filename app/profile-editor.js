@@ -157,16 +157,20 @@
       if(this.review)this.renderReview();else {
         const all=this.records(),opts=model.options(all),filters=el('div',undefined,'filters');
         filters.append(this.chips('Select ports','port',opts.port,v=>model.inputName(v)));
-        const filterGrid=el('div',undefined,'filter-grid');filterGrid.append(this.chips('Select formats','format',opts.format,v=>model.formats[v]),this.chips('Preset family','family',opts.family,v=>v==='game'?'Gaming':'Movies'));filters.append(filterGrid);
-        const more=el('div',undefined,'filters');more.append(this.chips('Exact presets','preset',opts.preset,v=>model.modes[v]||v),this.chips('ALLM signal','allm',opts.allm,v=>v==='on'?'On':'Off'));
+        const family=this.chips('Preset family','family',opts.family,v=>v==='game'?'Gaming':'Movies');
+        family.append(el('p','Editor groups: Gaming contains Game presets; Movies contains Filmmaker, Cinema and Cinema Home.','scope-note'));
+        const filterGrid=el('div',undefined,'filter-grid');filterGrid.append(this.chips('Select formats','format',opts.format,v=>model.formats[v]),family);filters.append(filterGrid);
+        const presets=this.chips('Exact presets','preset',opts.preset,v=>model.modes[v]||v);
+        presets.append(el('p','A specific LG picture mode, such as HDR Game or Dolby Vision Cinema. Choose a family for a broad selection, or an exact preset to narrow it.','scope-note'));
+        const more=el('div',undefined,'filters');more.append(presets,this.chips('ALLM signal','allm',opts.allm,v=>v==='on'?'On':'Off'));
         if(opts.genre.length>1)more.append(this.chips('Game genres','genre',opts.genre,v=>v));else if(opts.genre.length)more.append(el('p','Managed game genre: '+opts.genre.join(', '),'muted'));
         more.append(this.select('Room variant',[['standard','Base standard'],['bright','Bright room'],['dark','Dark room']],this.variant,v=>this.changeView(()=>{this.variant=v;})));
         filters.append(this.details('More factors · '+(this.variant==='standard'?'Base standard':this.variant+' room'),'more-factors',more));this.rows.append(filters);
         const categories=el('nav',undefined,'categories');categories.setAttribute('aria-label','Settings categories');
         for(const [key,label] of Object.entries(model.categories))categories.append(this.toggle(label,this.category===key,()=>this.changeView(()=>{this.category=key;}),'category:'+key));this.rows.append(categories);
         const grouping=el('div',undefined,'grouping'),field=el('fieldset'),chips=el('div',undefined,'chips');field.append(el('legend','Show separate controls by'));
-        for(const [key,label] of [['port','Port'],['format','Format'],['family','Preset family'],['preset','Preset'],['genre','Genre'],['allm','ALLM']])if(key!=='genre'||opts.genre.length>1)chips.append(this.toggle(label,this.split.includes(key),()=>this.changeView(()=>{this.split=this.split.includes(key)?this.split.filter(k=>k!==key):[...this.split,key];}),'split:'+key));
-        field.append(chips);grouping.append(field,el('p',this.category==='port'?'Connection settings are shared by every device and format on each port.':this.category==='selection'?'Choose which preset LG uses for each input and signal. Preset and genre filters do not split these mappings.':'Mixed values stay separate until you explicitly edit a combined control.','scope-note'));this.rows.append(grouping);
+        for(const [key,label] of [['port','Port'],['format','Format'],['family','Preset family'],['preset','Exact preset'],['genre','Genre'],['allm','ALLM']])if(key!=='genre'||opts.genre.length>1)chips.append(this.toggle(label,this.split.includes(key),()=>this.changeView(()=>{this.split=this.split.includes(key)?this.split.filter(k=>k!==key):[...this.split,key];}),'split:'+key));
+        field.append(chips);grouping.append(field,el('p',this.category==='port'?'Connection settings are shared by every device and format on each port.':this.category==='selection'?'Choose which preset LG uses for each input and signal. Exact preset and genre filters do not split these mappings.':'Preset family separates Gaming and Movies. Exact preset separates individual LG picture modes. Mixed values stay separate until you explicitly edit a combined control.','scope-note'));this.rows.append(grouping);
         this.settings=el('div');this.rows.append(this.settings);
       }
       const footer=el('div',undefined,'footer'),footerActions=el('div',undefined,'actions');this.counts=el('span',undefined,'counts');
