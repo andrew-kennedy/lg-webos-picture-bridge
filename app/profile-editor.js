@@ -3,6 +3,51 @@
   'use strict';
   const titles = {backlight:'OLED pixel brightness',contrast:'Contrast',brightness:'Black level',color:'Color depth',sharpness:'Sharpness',blackLevel:'HDMI RGB range',colorTemperature:'Color temperature',gameColorDepth:'Game color depth',gameSharpness:'Game sharpness',gameAdjustContrast:'Game contrast',gameBlackLevel:'Game black level',lowLevelAdjustment:'Fine tune dark areas',blackStabilizer:'Black stabilizer',whiteStabilizer:'White stabilizer',hdrDynamicToneMapping:'HDR tone mapping',pictureMode:'Picture mode',realCinema:'Real Cinema',truMotionMode:'TruMotion',enableALLM:'Auto low latency mode',enableQFT:'Quick frame transport'};
   titles.enable144HzBooster='Refresh rate boost';
+  Object.assign(titles,{dolbyPrecisionDetail:'Dolby Precision Detail',expressionEnhancer:'Expression Enhancer',gammaLevel:'Gamma fine adjustment',dynamicContrast:'Auto Dynamic Contrast',dynamicColor:'Dynamic color',mpegNoiseReduction:'MPEG noise reduction',gameOptimization:'VRR & G-Sync',inputOptimization:'Prevent input delay',uhdDeepColor:'HDMI Deep Color',freesync:'AMD FreeSync',truMotionJudder:'TruMotion de-judder',truMotionBlur:'TruMotion de-blur',motionProOLED:'OLED Motion'});
+  // Plain-language help, checked against the G6's own Settings/Game Optimizer
+  // help and value labels. See docs/setting-help.md for sources and caveats.
+  // Keep this local: rendering help requires no TV reads or persistent writes.
+  const descriptions = {
+    backlight:'Sets how much light the OLED panel emits. SDR movie brightness uses the Bright and Dark room values; HDR and Dolby Vision have their own saved values.',
+    contrast:'Adjusts the difference between light and dark areas. Raising it can make bright shades harder to distinguish.',
+    brightness:'Adjusts how dark the picture’s black and shadow areas appear. Too high can make black look gray; too low can hide shadow detail.',
+    color:'Adjusts color intensity. Higher values make colors more saturated; this does not change the HDMI signal’s bit depth.',
+    tint:'Shifts the balance between red and green. Zero leaves this balance centered.',
+    sharpness:'Emphasizes outlines to make edges look crisper. Higher values can add halos; they cannot recover missing source detail.',
+    colorTemperature:'Shifts whites toward warm/red or cool/blue. Negative values are warmer (−40 means Warm 40); positive values are cooler.',
+    colorGamut:'Chooses the range of colors the TV uses. Auto follows the content; forcing a wider gamut can make ordinary colors look oversaturated.',
+    gamma:'Controls the brightness of SDR midtones. Lower gamma makes them lighter; higher gamma makes them darker. HDR uses a different brightness curve.',
+    gammaLevel:'Fine adjustment for LG’s adjustable 2.2 gamma option (mediumHavingLevel). Other gamma options do not use this offset.',
+    peakBrightness:'Controls the panel’s maximum brightness level, including bright highlights. It is separate from overall OLED pixel brightness.',
+    hdrDynamicToneMapping:'Fits HDR highlights into the TV’s brightness range. On adapts to the scene; HGiG is intended for games calibrated to the display. Off disables the dynamic adjustment.',
+    expressionEnhancer:'Processes HDR contrast to make foregrounds, backgrounds and objects stand out. Detail emphasizes detail; highlight is LG’s Brightness option. Off skips this enhancement.',
+    dolbyPrecisionDetail:'Extra clarity and contrast processing for Dolby Vision, making fine textures more visible. Turning it off still allows normal Dolby Vision playback.',
+    nearBlackDetail:'Adjusts how detail just above black is rendered. This is a picture-preset control, separate from Game Optimizer’s Fine tune dark areas.',
+    dynamicContrast:'Automatically changes contrast according to the picture. This can make scenes look punchier, while changing how shadows and highlights are shown.',
+    dynamicColor:'Adds color enhancement to make colors more vivid. This can change their appearance from the source.',
+    superResolution:'Processes image edges and textures to make soft material appear more detailed. Stronger settings can make the picture look artificial.',
+    noiseReduction:'Smooths visible noise or grain. Stronger filtering can also soften fine texture.',
+    mpegNoiseReduction:'Reduces compression artifacts, such as blocks and noise around edges. Stronger filtering can soften detail.',
+    smoothGradation:'Smooths visible steps between similar shades, such as bands in a sky. Stronger smoothing can reduce subtle texture.',
+    blackLevel:'Matches the source’s RGB signal range: high is Full, low is Limited, and auto detects it. A mismatch can wash out blacks or hide dark and bright detail.',
+    realCinema:'Handles the original frame cadence of film content for more even motion. TruMotion is the separate control for motion smoothing.',
+    truMotionMode:'Smooths movement using motion processing. Stronger smoothing can make films look like live video; User Selection enables the individual adjustments.',
+    truMotionJudder:'Adjusts smoothing for the stepping motion visible in low-frame-rate content. Used with TruMotion’s User Selection mode.',
+    truMotionBlur:'Adjusts TruMotion’s reduction of motion blur. Used with TruMotion’s User Selection mode.',
+    motionProOLED:'Uses dark intervals between displayed frames to improve motion clarity. This can dim the picture and make flicker visible.',
+    lowLevelAdjustment:'Fine-tunes dark game areas when variable refresh rate is enabled. It adjusts shadow visibility separately from the normal black-level control.',
+    blackStabilizer:'Adjusts visibility in dark game scenes, helping objects stand out in shadows. Changes can also alter the intended contrast.',
+    whiteStabilizer:'Adjusts visibility in bright game scenes, helping objects stand out in highlights. It is separate from the panel’s Peak brightness setting.',
+    gameGenre:'Selects LG’s game tuning bank, such as Standard or FPS. Switching genre can recall different saved Game Optimizer adjustments.',
+    inputOptimization:'Selects LG’s input-lag treatment: auto means Standard; on means Boost. Boost applies when using the Game Optimizer picture mode.',
+    gameOptimization:'Enables variable refresh rate, including NVIDIA G-Sync compatibility, to reduce tearing and stutter from a supported source.',
+    freesync:'Enables AMD FreeSync variable refresh rate for compatible sources, reducing tearing and stutter. It is separate from the VRR & G-Sync switch.',
+    enableALLM:'Allows a supported source to request low-latency processing automatically while gaming. Some picture processing is unavailable while ALLM is active.',
+    enableQFT:'Reduces video transport delay with a source that supports Quick Frame Transport. Enabling it can restrict resolutions and Dolby Vision on this port.',
+    enable144HzBooster:'Enables the TV’s higher refresh-rate mode, up to 165 Hz on this G6. The source must support and output that rate.',
+    uhdDeepColor:'Enables the HDMI port’s higher-bandwidth 4K signal modes. The source and cable must support the chosen format.',
+    pictureMode:'Chooses which LG picture preset is recalled for the selected input and signal format, including its ALLM state. Each preset has its own saved picture values.'
+  };
   const pretty = key => titles[key] || key.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase());
   const display = value => typeof value === 'object' ? [...new Set(Object.values(value || {}))].join(' / ') : String(value === undefined || value === null ? '—' : value);
   const el = (tag,text,cls) => {const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
@@ -188,8 +233,7 @@
       if(!this.settings||this.review)return;const focus=this.captureFocus();this.settings.replaceChildren();
       for(const row of this.selectedRows()) {
         const section=el('section',undefined,'row'),name=el('div'),cells=el('div',undefined,'cells');name.append(el('h3',pretty(row.key)));
-        if(row.key==='backlight')name.append(el('p','Brightness for the selected formats','muted'));
-        if(row.key==='realCinema')name.append(el('p','Stored per input and picture preset','muted'));
+        if(descriptions[row.key]){const help=el('p',descriptions[row.key],'muted setting-help');help.id='help-'+row.key;name.append(help);}
         section.append(name,cells);
         for(const cell of row.cells) {
           const group=el('div',undefined,'cell'),ready=cell.records.every(r=>this.live[r.bank.id]&&Object.hasOwn(this.live[r.bank.id].settings,r.key)),control=ready?model.combinedControl(cell,this.live):null;
@@ -208,6 +252,7 @@
             for(const value of control.options){const option=el('option',value);option.value=value;input.append(option);}input.value=mixed?'':unique[0];input.disabled=disabled;input.onchange=()=>update(input.value);
           } else input=el('span',mixed?'Mixed: '+unique.join(' / '):unique[0],mixed?'mixed':'');
           group.append(input);
+          if(descriptions[row.key])group.querySelectorAll('input,select').forEach(node=>node.setAttribute('aria-describedby','help-'+row.key));
           if(!ready&&!this.status.offline)group.append(el('p','Reading TV ranges…','muted'));else if(!control&&!this.status.offline)group.append(el('p','No common writable control. Split by Format or Preset to edit separately.','muted'));
           const temporary=cell.records.filter(r=>Object.hasOwn((this.state.overrides||{})[r.bank.id]||{},r.key)).map(r=>this.state.overrides[r.bank.id][r.key]);
           const observed=cell.records.map(r=>(this.live[r.bank.id]||{settings:{}}).settings[r.key]);
