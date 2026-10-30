@@ -128,6 +128,11 @@ function describe(key, bank, info, options) {
   }
   let description = active ? info.live : info.factory;
   if (!description) return unknown('LG applicability has not been verified for this profile.');
+  // The G6 runtime replaces the factory Gamma choices (including whether
+  // adjustable 2.2 is offered). Its dependent fine control needs the same
+  // confirmation; a stored mediumHavingLevel value is not that confirmation.
+  if (!active && ['gamma','gammaLevel'].includes(key))
+    return unknown('LG updates Gamma choices at runtime; activate this SDR profile to verify its Gamma controls.');
   // Runtime-only controls must be confirmed in the actual target context. A
   // hidden factory baseline is not a reliable hardware-support declaration.
   if (!active && ['dolbyPrecisionDetail','expressionEnhancer','ambientLightCompensation','aiHdrRemastering','motionEyeCare','inputOptimization'].includes(key))

@@ -18,6 +18,22 @@ The native controller's `pq_ux_setBasicPictureMenuInfoToDB` explicitly disables 
 
 Precision Detail and Expression Enhancer cannot be declared supported from a saved value or their hidden factory baseline. An explicit model capability denial excludes Precision Detail for every preset; otherwise it requires a live applicability check in the exact target profile. Expression Enhancer and the port’s Prevent Input Delay control also require that live check. Unverified combinations remain excluded, with an explanation. This is a report of LG's control applicability, not a claim to have proven every physical image-processing effect.
 
+Gamma also requires a live check in the target SDR profile, including its dependent fine adjustment. The 2026-10-30 comparison found that inactive factory metadata offered `low`, `medium`, `high1`, and `high2`, while the live G6 offered only `high2` and `mediumHavingLevel`. The native `pq_ux_setGammaInfoToDB` controller updates its description at runtime. Keeping an existing adjustable-2.2 value does not validate the obsolete factory choices. HDR/Dolby Vision Gamma remains inapplicable, and existing saved Gamma standards are preserved.
+
+## Remaining verification
+
+Storage dimensions have been checked against native descriptions for the 47 managed banks. That establishes which settings share storage, rather than proving processing support under every signal condition. Inactive rows marked `native_rules` use reviewed factory and controller rules; `live` rows additionally use current native visibility/activity. The main remaining live matrix is:
+
+- Expression Enhancer in HDR Game on HDMI 1/3/4 and HDR Filmmaker on HDMI 3.
+- Prevent Input Delay with representative 60 Hz, high-refresh, ALLM and VRR signals on the gaming inputs.
+- Gamma choices in each SDR Game input, plus movie Gamma under relevant input-processing conditions.
+- Real Cinema and TruMotion at 24/50/60 Hz, with low latency, PC processing and VRR/QMS where applicable.
+- Fine Tune Dark Areas with actual VRR output, and 165 Hz boost/QFT with source support, including their effects on accepted formats.
+- HLG versus HDR10 processing restrictions. The collection currently shares their HDR preset banks; common storage does not prove identical processing choices.
+- Filmmaker ambient-light behavior and its dependencies across SDR/HDR/Dolby Vision if that control is added to the managed collection. It is not currently a saved standard.
+
+These checks should record actual signal telemetry and native availability, restore any temporary changes, and avoid treating successful storage as proof of an image-processing effect. Physical latency, transfer-curve and sensor behavior require suitable test material or measurement in addition to API flags.
+
 ## Selecting the right context
 
 Factory metadata is resolved for the **target** bank, not whichever source is currently playing. Metadata for a current SDR movie must not enable HDR gamma, disable an inactive HDR brightness control, or offer movie-only choices in Game.

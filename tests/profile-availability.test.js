@@ -29,7 +29,9 @@ module.exports = async function () {
   }
   assert.equal(check('gamma','hdrGame','medium').editable,false);
   assert.equal(check('gamma','dolbyHdrCinema','medium').editable,false);
-  assert.equal(check('gamma','filmMaker','medium').editable,true,'An inactive valid SDR profile must not inherit the active HDR lock');
+  assert.equal(check('gamma','filmMaker','medium').state,'unverified','Inactive SDR Gamma cannot inherit stale factory choices');
+  assert.equal(check('backlight','filmMaker','medium').editable,true,'Other inactive valid SDR controls must not inherit the active HDR lock');
+  assert.equal(check('gammaLevel','filmMaker',0,{settings:{gamma:'mediumHavingLevel'}}).state,'unverified','A saved adjustable Gamma value does not establish that the inactive profile offers it');
   assert.equal(check('gammaLevel','filmMaker','medium',{settings:{gamma:'high2'}}).editable,false);
   assert.equal(check('gamma','filmMaker','medium',{options:{reviewed:false}}).state,'unverified');
   for (const key of ['contrast','brightness','sharpness','color']) assert.equal(check(key,'hdrGame','medium').state,'unavailable');
@@ -48,7 +50,13 @@ module.exports = async function () {
   assert.equal(check('gamma','filmMaker','medium',{info:{current:{...active,settings:{brightnessActive:false}}},options:{context:ctx}}).editable,false,'LG settings-group locks apply even when the individual description is enabled');
   assert.equal(check('gamma','filmMaker','medium',{info:{current:{...active,settings:{isfMode:{filmMaker:'locked'}}}},options:{context:ctx}}).editable,false,'The editor cannot bypass the native calibration lock');
   assert.equal(check('gamma','filmMaker','medium',{info:{current:{...active,settings:{isfMode:{filmMaker:'locked'}}}}}).editable,false,'A preset calibration lock also protects that inactive preset');
-  assert.equal(check('gamma','filmMaker','medium',{info:{current:active},options:{context:{...ctx,ready:false}}}).source,'native_rules','A stale or absent signal cannot supply live applicability');
+  assert.equal(check('gamma','filmMaker','medium',{info:{current:active},options:{context:{...ctx,ready:false}}}).state,'unverified','A stale or absent signal cannot supply Gamma choices');
+  const currentGamma={...base,values:{arrayExt:['low','medium','high1','high2','mediumHavingLevel'].map(value=>({value,active:true,visible:['high2','mediumHavingLevel'].includes(value)}))}};
+  const confirmedGamma=check('gamma','filmMaker','mediumHavingLevel',{info:{current:active,live:currentGamma},options:{context:ctx}});
+  assert.deepEqual(confirmedGamma.control.options,['high2','mediumHavingLevel'],'Active Gamma exposes only the choices actually offered by the G6');
+  const gammaBank={id:'sdr_movie',target:{category:'picture',dimension:{input:'hdmi3',pictureMode:'filmMaker'}},settings:{gamma:'mediumHavingLevel'}};
+  assert.throws(()=>availability.assertEditable('gamma','medium',gammaBank,{settings:gammaBank.settings,factory_descriptions:{gamma:base}},
+    {reviewed:true,document:{banks:[gammaBank]},values:b=>b.settings}),/activate this SDR profile/,'The save path also rejects unverified factory Gamma choices');
   assert.equal(availability.matchesActive({category:'picture',dimension:{input:'hdmi1_pc',pictureMode:'game'}},
     {ready:true,input:'hdmi1',mode:'game',range:'sdr'},{dimension:{input:'hdmi1_pc',pictureMode:'game'}}),false,'PC and ordinary HDMI are distinct native inputs');
   assert.equal(availability.matchesActive({category:'picture',dimension:{input:'hdmi3',pictureMode:'filmMaker'},app_id:'com.webos.app.hdmi3'},
