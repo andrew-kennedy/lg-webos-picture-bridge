@@ -74,4 +74,23 @@ module.exports = async function () {
   var invalidFamily = banks.normalize({action:'apply',banks:[{id:'dv',target:mapping,settings:{pictureMode:'hdrGame'},expected:{pictureMode:'dolbyHdrCinemaBright'}}]});
   await assert.rejects(banks.run(onHome,invalidFamily,function(){}),/does not match range/);
   assert.equal(mappingWrites.length,1,'Skipping native visibility checks cannot admit an invalid preset family');
+
+  const motionBank={id:'movie_motion',target:{category:'picture',dimension:{input:'hdmi3',pictureMode:'dolbyHdrCinemaBright'},app_id:'com.webos.app.hdmi3'},settings:{truMotionMode:'off'}};
+  const motionService={call(uri,params,callback){
+    let response={returnValue:true};
+    if(uri.endsWith('getSystemSettingDesc')){
+      assert.equal(params.app_id,motionBank.target.app_id,'Motion descriptions must use the target HDMI app, as LG Settings does');
+      response.results=[{key:'truMotionMode',dbtype:'M',dimension:['input','pictureMode'],dataType:'string',vtype:'ArrayExt',ui:{visible:true,active:true},values:{arrayExt:[{value:'off',visible:true,active:true}]}}];
+    }
+    else if(uri.endsWith('getConfigs'))response.configs={'tv.model.dolbyVisionPrecisionDetail':false};
+    else if(params.dimension || params.current_app){
+      assert.deepStrictEqual(params.keys,['truMotionMode'],'An app-scoped query must not mix in global settings');
+      Object.assign(response,{app_id:motionBank.target.app_id,dimension:motionBank.target.dimension,settings:{truMotionMode:'off'}});
+    } else Object.assign(response,{dimension:{input:'hdmi3'},settings:{clarityActive:true,isfMode:{dolbyHdrCinemaBright:'day'}}});
+    callback({payload:response});return {cancel(){}};
+  }};
+  const motion=await banks.inspect(motionService,motionBank,()=>{},()=>({ready:true,input:'hdmi3',mode:'dolbyHdrCinemaBright',range:'dolbyHdr'}),{reviewed:true,document:{banks:[motionBank]},values:b=>b.settings});
+  assert.deepStrictEqual(motion.active_values.dimension,motionBank.target.dimension,'Global lock reads must preserve the app value binding');
+  assert.equal(motion.availability.truMotionMode.editable,false);
+  assert.match(motion.availability.truMotionMode.reason,/calibration/,'App-scoped controls still respect the preset calibration lock');
 };

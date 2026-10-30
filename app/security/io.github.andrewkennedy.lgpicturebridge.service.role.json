@@ -13,6 +13,7 @@
       "outbound": [
         "com.webos.service.videooutput",
         "com.webos.settingsservice",
+        "com.webos.service.config",
         "com.webos.applicationManager",
         "com.webos.service.extinputs.hdmi",
         "com.webos.service.eim",

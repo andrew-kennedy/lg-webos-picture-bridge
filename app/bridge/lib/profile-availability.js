@@ -23,6 +23,26 @@ const groups = {
 // marketing version or from the existence of a database key.
 const reviewedHash = '21f216519afd0db4dc7a57e0a086217634835afc3a74e094a4cc392a07709589';
 let platform;
+const capabilityRequests=new WeakMap();
+function loadCapabilities(service) {
+  if (capabilityRequests.has(service)) return capabilityRequests.get(service);
+  const pending = new Promise(resolve => {
+    let complete=false, request;
+    const finish = payload => {
+      if (complete) return;
+      complete=true; clearTimeout(timer);
+      const value=payload && payload.returnValue === true && payload.configs ? payload.configs['tv.model.dolbyVisionPrecisionDetail'] : undefined;
+      resolve(typeof value === 'boolean' ? {dolbyPrecisionDetail:value} : {});
+    };
+    const timer=setTimeout(()=>{finish(null);if(request && request.cancel){try{request.cancel();}catch(_){}}},5000);
+    try {
+      request=service.call('luna://com.webos.service.config/getConfigs',
+        {configNames:['tv.model.dolbyVisionPrecisionDetail']},message=>finish(message && message.payload || message));
+    } catch (_) {finish(null);}
+  });
+  capabilityRequests.set(service,pending);
+  return pending;
+}
 function reviewedPlatform() {
   if (platform !== undefined) return platform;
   try {
@@ -95,6 +115,8 @@ function restrictions(key, bank, options) {
 function describe(key, bank, info, options) {
   const reviewed = options.reviewed === undefined ? reviewedPlatform().reviewed : options.reviewed;
   if (!reviewed) return unknown('This TV software has not been verified for profile applicability.');
+  if (key === 'dolbyPrecisionDetail' && options.capabilities && options.capabilities.dolbyPrecisionDetail === false)
+    return unavailable('LG disables Dolby Precision Detail in this TV model configuration, for every preset.');
   const restriction = reviewed && restrictions(key,bank,options);
   if (restriction) return restriction;
   const active = matchesActive(bank.target,options.context,info.current);
@@ -108,7 +130,7 @@ function describe(key, bank, info, options) {
   if (!description) return unknown('LG applicability has not been verified for this profile.');
   // Runtime-only controls must be confirmed in the actual target context. A
   // hidden factory baseline is not a reliable hardware-support declaration.
-  if (!active && ['dolbyPrecisionDetail','expressionEnhancer','ambientLightCompensation','aiHdrRemastering','motionEyeCare'].includes(key))
+  if (!active && ['dolbyPrecisionDetail','expressionEnhancer','ambientLightCompensation','aiHdrRemastering','motionEyeCare','inputOptimization'].includes(key))
     return unknown('This control depends on the live signal; activate this profile to verify availability.');
   if (!active && /_pc$/.test(bank.target.dimension.input || '') && ['realCinema','truMotionJudder','truMotionBlur'].includes(key))
     return unknown('PC motion processing depends on the live signal; activate this profile to verify availability.');
@@ -136,7 +158,8 @@ function describe(key, bank, info, options) {
 
 function assertEditable(key, value, bank, inspection, options) {
   const result = describe(key,bank,{live:(inspection.descriptions || []).find(d=>d.key===key),
-    factory:(inspection.factory_descriptions || {})[key],current:inspection.active_values,value:inspection.settings[key]},options);
+    factory:(inspection.factory_descriptions || {})[key],current:inspection.active_values,value:inspection.settings[key]},
+    {...options,capabilities:inspection.capabilities || options.capabilities});
   if (!result.editable) {
     const error = new Error(key+': '+result.reason);error.code='profile_setting_unavailable';throw error;
   }
@@ -147,4 +170,4 @@ function assertEditable(key, value, bank, inspection, options) {
   return controls.encode(result.control,value);
 }
 
-module.exports = {describe,assertEditable,restrictions,matchesActive,reviewedPlatform,format};
+module.exports = {describe,assertEditable,restrictions,matchesActive,reviewedPlatform,loadCapabilities,format};

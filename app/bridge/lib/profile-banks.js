@@ -178,15 +178,25 @@ module.exports = {normalize:normalize, target:target, run:run, same:same,
       id:bank.id,target:bank.target,keys:Object.keys(bank.settings)}]}),guard,context)).banks[0];
     guard();
     var captured = JSON.stringify(context && context());
-    var desc = await request(service,'getSystemSettingDesc',{category:bank.target.category,keys:Object.keys(bank.settings)});
+    var descriptionParams = {category:bank.target.category,keys:Object.keys(bank.settings)};
+    if (bank.target.app_id) descriptionParams.app_id = bank.target.app_id;
+    var desc = await request(service,'getSystemSettingDesc',descriptionParams);
     result.descriptions = desc.results || [];
     var activeParams = {category:bank.target.category,keys:Object.keys(bank.settings)};
+    var lockKeys = ['brightnessActive','colorActive','clarityActive','isfMode'];
     if (bank.target.app_id) activeParams.current_app = true;
-    if (bank.target.category === 'picture') activeParams.keys = [...new Set(activeParams.keys.concat(['brightnessActive','colorActive','clarityActive','isfMode']))];
+    if (bank.target.category === 'picture' && !bank.target.app_id) activeParams.keys = [...new Set(activeParams.keys.concat(lockKeys))];
     result.active_values = await request(service,'getSystemSettings',activeParams);
+    // LG's app-scoped read rejects global group/calibration keys. Read those
+    // separately while keeping the motion value's app binding and dimensions.
+    if (bank.target.app_id) {
+      var locks = await request(service,'getSystemSettings',{category:'picture',keys:lockKeys});
+      result.active_values.settings = Object.assign({},result.active_values.settings,locks.settings);
+    }
     guard();
     if (captured !== JSON.stringify(context && context())) throw fail('TV signal changed while checking availability', 'stale_context');
     var factory = await factoryDescriptions.load(PICTURE.concat(GAME,PORT,['pictureMode','truMotionMode']));
+    result.capabilities = await availability.loadCapabilities(service);
     result.factory_descriptions = {};
     result.availability = {};
     result.controls = {};
@@ -194,7 +204,7 @@ module.exports = {normalize:normalize, target:target, run:run, same:same,
       var d = result.descriptions.find(v => v.key === key);
       result.factory_descriptions[key] = factory.resolve(key,bank.target);
       var applicable = availability.describe(key,bank,{live:d,factory:result.factory_descriptions[key],
-        current:result.active_values,value:result.settings[key]},Object.assign({context:context && context(),values:b=>b.settings},editor));
+        current:result.active_values,value:result.settings[key]},Object.assign({context:context && context(),values:b=>b.settings,capabilities:result.capabilities},editor));
       if (applicable.control) result.controls[key] = applicable.control;
       delete applicable.control;
       result.availability[key] = applicable;

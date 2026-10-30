@@ -50,6 +50,7 @@ module.exports = function () {
   assert.deepStrictEqual(role.permissions[0].outbound, [
     'com.webos.service.videooutput',
     'com.webos.settingsservice',
+    'com.webos.service.config',
     'com.webos.applicationManager',
     'com.webos.service.extinputs.hdmi',
     'com.webos.service.eim',

@@ -9,7 +9,7 @@ module.exports = async function () {
   const index=native.create({panelType:'OLED',boardTypeStr:'_O26_'},new Set(['gamma']));
   index.accept(base,false);
   index.accept({key:'gamma@picture$hdmi3.hdrGame.x',ui:{active:false}},true);
-  index.accept({key:'gamma@picture$hdmi3.hdrGame.x',condition:{boardTypeStr:'_O22_'},ui:{active:true}},true);
+  index.accept({key:'gamma@picture$hdmi3.hdrGame.x',condition:{boardTypeStr:'_O22_',panelType:'OLED'},ui:{active:true}},true);
   const target={category:'picture',dimension:{input:'hdmi3',pictureMode:'hdrGame'}};
   assert.equal(index.resolve('gamma',target).ui.active,false,'A different board cannot enable an HDR gamma control');
   assert.equal(index.resolve('gamma',{...target,dimension:{input:'hdmi3',pictureMode:'filmMaker'}}).ui.active,true);
@@ -36,6 +36,12 @@ module.exports = async function () {
   assert.equal(check('realCinema','game','medium').editable,false);
   assert.equal(check('peakBrightness','game','medium').editable,false);
   assert.equal(check('dolbyPrecisionDetail','dolbyHdrCinemaBright','medium').state,'unverified','Saving a Precision Detail value cannot prove support');
+  for (const preset of ['dolbyHdrCinema','dolbyHdrCinemaBright','dolbyHdrStandard','dolbyHdrVivid','dolbyHdrGame','dolbyHdrPersonalized'])
+    assert.equal(check('dolbyPrecisionDetail',preset,'medium',{options:{capabilities:{dolbyPrecisionDetail:false}}}).state,'unavailable','An explicit model capability denial applies in every preset');
+  assert.equal(check('dolbyPrecisionDetail','dolbyHdrCinemaBright','medium',{options:{capabilities:{dolbyPrecisionDetail:true}}}).state,'unverified','Hardware support alone cannot prove support in an inactive preset');
+  const port={id:'port',target:{category:'other',dimension:{gameInput:'hdmi1'}},settings:{inputOptimization:'auto'}};
+  const portDescription={...base,key:'inputOptimization',dimension:['gameInput'],values:{arrayExt:[{value:'auto',visible:true,active:true},{value:'on',visible:true,active:true}]}};
+  assert.equal(availability.describe('inputOptimization',port,{factory:portDescription,value:'auto'},{reviewed:true,values:b=>b.settings,context:{ready:false}}).state,'unverified','The hidden factory baseline cannot establish a port runtime gaming control');
   const active={dimension:{input:'hdmi3',pictureMode:'filmMaker'}};
   const ctx={ready:true,input:'hdmi3',mode:'filmMaker',range:'sdr'};
   assert.equal(check('gamma','filmMaker','medium',{info:{current:active,live:{...base,ui:{active:false,visible:true}}},options:{context:ctx}}).editable,false,'A live native lock takes precedence over factory rules');
@@ -56,4 +62,13 @@ module.exports = async function () {
   const options={reviewed:true,document:{banks:[bank]},values:b=>b.settings};
   assert.equal(availability.assertEditable('hdrDynamicToneMapping','off',bank,inspection,options),'off');
   assert.throws(()=>availability.assertEditable('hdrDynamicToneMapping','HGIG',bank,inspection,options),/unavailable/,'Correcting a historical value does not permit saving it again');
+  let requests=0;
+  const service={call(uri,params,callback){
+    requests++;assert.equal(uri,'luna://com.webos.service.config/getConfigs');
+    assert.deepEqual(params,{configNames:['tv.model.dolbyVisionPrecisionDetail']});
+    callback({payload:{returnValue:true,configs:{'tv.model.dolbyVisionPrecisionDetail':false}}});
+  }};
+  assert.deepEqual(await availability.loadCapabilities(service),{dolbyPrecisionDetail:false});
+  await availability.loadCapabilities(service);assert.equal(requests,1,'Model capabilities are read once on demand, without polling');
+  assert.deepEqual(await availability.loadCapabilities({call(uri,params,callback){callback({payload:{returnValue:false}});}}),{},'A failed capability read is unknown, not a model-level denial');
 };
