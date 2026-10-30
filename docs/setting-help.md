@@ -39,7 +39,7 @@ Read-only inspection of `/etc/palm/description.json` and `/etc/palm/override.jso
 
 | Setting | Native rule and its limits |
 | --- | --- |
-| Dolby Precision Detail | The explicit preset whitelist is conditional on the older `_O22_` board. It enables Cinema Home/Standard/Vivid and shows Cinema/Game as inactive. It cannot establish availability on this O26 G6. Our 2026-10-27 live 4K/24 Dolby Vision audit reported the control hidden and inactive in `dolbyHdrCinema` (now correctly labeled Filmmaker). Other G6 Dolby presets remain unverified. |
+| Dolby Precision Detail | The explicit preset whitelist is conditional on `_O22_`. It enables Cinema Home/Standard/Vivid and shows Cinema/Game as inactive. The actual Settings Service environment must be checked before applying that compatibility condition to this O26 G6. Our 2026-10-27 live 4K/24 Dolby Vision audit reported the control hidden and inactive in `dolbyHdrCinema` (now correctly labeled Filmmaker). The captured G6 preset list contains six selectable Dolby presets, including Personalized Picture; see the [verification matrix](setting-availability.md#dolby-vision-precision-detail-verification). |
 | Filmmaker Ambient Light Compensation | For platform version 11, the static rules expose it in `filmMaker`, `hdrFilmMaker` and `dolbyHdrCinema`; other presets retain a hidden/inactive baseline. Dynamic conditions can restrict this further. |
 | Real Cinema | The static rules disable it in SDR, HDR and Dolby Vision Game presets. The native controller also consults scan type, frame rate, low-latency state and VRR/QMS. |
 | Peak Brightness | OLED rules show but lock it in SDR Game, while permitting HDR Game. The controller additionally checks ALLM and the current input/preset. |
