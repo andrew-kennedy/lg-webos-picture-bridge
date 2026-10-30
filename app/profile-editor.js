@@ -18,10 +18,10 @@
     colorGamut:'Chooses the range of colors the TV uses. Auto follows the content; forcing a wider gamut can make ordinary colors look oversaturated.',
     gamma:'Controls the brightness of SDR midtones. Lower gamma makes them lighter; higher gamma makes them darker. HDR uses a different brightness curve.',
     gammaLevel:'Fine adjustment for LG’s adjustable 2.2 gamma option (mediumHavingLevel). Other gamma options do not use this offset.',
-    peakBrightness:'Controls the panel’s maximum brightness level, including bright highlights. It is separate from overall OLED pixel brightness.',
+    peakBrightness:'Controls the panel’s maximum brightness level, including bright highlights. LG locks this control in SDR Game; HDR Game has a separate value.',
     hdrDynamicToneMapping:'Fits HDR highlights into the TV’s brightness range. On adapts to the scene; HGiG is intended for games calibrated to the display. Off disables the dynamic adjustment.',
     expressionEnhancer:'Processes HDR contrast to make foregrounds, backgrounds and objects stand out. Detail emphasizes detail; highlight is LG’s Brightness option. Off skips this enhancement.',
-    dolbyPrecisionDetail:'Extra clarity and contrast processing for Dolby Vision, making fine textures more visible. Turning it off still allows normal Dolby Vision playback.',
+    dolbyPrecisionDetail:'Extra Dolby Vision clarity and contrast processing on supported models. LG hides this control in Dolby Vision Filmmaker on this G6; support in other presets is unverified. Saving a value does not establish support.',
     nearBlackDetail:'Adjusts how detail just above black is rendered. This is a picture-preset control, separate from Game Optimizer’s Fine tune dark areas.',
     dynamicContrast:'Automatically changes contrast according to the picture. This can make scenes look punchier, while changing how shadows and highlights are shown.',
     dynamicColor:'Adds color enhancement to make colors more vivid. This can change their appearance from the source.',
@@ -30,7 +30,7 @@
     mpegNoiseReduction:'Reduces compression artifacts, such as blocks and noise around edges. Stronger filtering can soften detail.',
     smoothGradation:'Smooths visible steps between similar shades, such as bands in a sky. Stronger smoothing can reduce subtle texture.',
     blackLevel:'Matches the source’s RGB signal range: high is Full, low is Limited, and auto detects it. A mismatch can wash out blacks or hide dark and bright detail.',
-    realCinema:'Handles the original frame cadence of film content for more even motion. TruMotion is the separate control for motion smoothing.',
+    realCinema:'Handles the original frame cadence of film content for more even motion. LG disables this control in Game presets; signal conditions can restrict it further. TruMotion controls motion smoothing separately.',
     truMotionMode:'Smooths movement using motion processing. Stronger smoothing can make films look like live video; User Selection enables the individual adjustments.',
     truMotionJudder:'Adjusts smoothing for the stepping motion visible in low-frame-rate content. Used with TruMotion’s User Selection mode.',
     truMotionBlur:'Adjusts TruMotion’s reduction of motion blur. Used with TruMotion’s User Selection mode.',
@@ -203,10 +203,10 @@
         const all=this.records(),opts=model.options(all),filters=el('div',undefined,'filters');
         filters.append(this.chips('Select ports','port',opts.port,v=>model.inputName(v)));
         const family=this.chips('Preset family','family',opts.family,v=>v==='game'?'Gaming':'Movies');
-        family.append(el('p','Editor groups: Gaming contains Game presets; Movies contains Filmmaker, Cinema and Cinema Home.','scope-note'));
+        family.append(el('p','Editor groups: Gaming contains Game presets; Movies contains Filmmaker and Cinema Home.','scope-note'));
         const filterGrid=el('div',undefined,'filter-grid');filterGrid.append(this.chips('Select formats','format',opts.format,v=>model.formats[v]),family);filters.append(filterGrid);
         const presets=this.chips('Exact presets','preset',opts.preset,v=>model.modes[v]||v);
-        presets.append(el('p','A specific LG picture mode, such as HDR Game or Dolby Vision Cinema. Choose a family for a broad selection, or an exact preset to narrow it.','scope-note'));
+        presets.append(el('p','A specific LG picture mode, such as HDR Game or Dolby Vision Filmmaker. Choose a family for a broad selection, or an exact preset to narrow it.','scope-note'));
         const more=el('div',undefined,'filters');more.append(presets,this.chips('ALLM signal','allm',opts.allm,v=>v==='on'?'On':'Off'));
         if(opts.genre.length>1)more.append(this.chips('Game genres','genre',opts.genre,v=>v));else if(opts.genre.length)more.append(el('p','Managed game genre: '+opts.genre.join(', '),'muted'));
         more.append(this.select('Room variant',[['standard','Base standard'],['bright','Bright room'],['dark','Dark room']],this.variant,v=>this.changeView(()=>{this.variant=v;})));

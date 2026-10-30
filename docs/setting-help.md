@@ -28,3 +28,24 @@ Public references corroborate the picture-processing descriptions: [LG's brightn
 | `enable144HzBooster` | The native key retains its old name; the G6 supports a 165 Hz mode. The source must support the corresponding rate. |
 
 The descriptions deliberately make no unverified claims about exact input-lag savings, measured brightness, Dolby processing algorithms or which numeric near-black adjustment is optimal. Native keys, option values, profile targets and write behavior remain unchanged.
+
+## Availability audit on 2026-10-30
+
+LG's Settings UI takes `ui.visible` and `ui.active` from `getSystemSettingDesc`, then applies additional conditions such as the ISF calibration lock. The description is for the current context. Our saved-bank editor deliberately expands that control metadata to allow editing inactive banks; successful storage/readback is not proof that a processing feature is effective on the hardware. Keep these separate when adding availability indicators.
+
+The TV reports board `O26_ATSC_US`, firmware 43.21.69 and SDK 11.2.0. Its native Settings app renames `dolbyHdrCinema` to **FILMMAKER MODE** when `tv.hw.turnkeyVersion` is `LG` and `tv.hw.panelResolution` is `UD` or `8K`. Both conditions match this G6 (`LG` / `UD`). The editor therefore labels that existing bank **Dolby Vision Filmmaker**; no bank ID, mapping or saved value changes.
+
+Read-only inspection of `/etc/palm/description.json` and `/etc/palm/override.json` found:
+
+| Setting | Native rule and its limits |
+| --- | --- |
+| Dolby Precision Detail | The explicit preset whitelist is conditional on the older `_O22_` board. It enables Cinema Home/Standard/Vivid and shows Cinema/Game as inactive. It cannot establish availability on this O26 G6. Our 2026-10-27 live 4K/24 Dolby Vision audit reported the control hidden and inactive in `dolbyHdrCinema` (now correctly labeled Filmmaker). Other G6 Dolby presets remain unverified. |
+| Filmmaker Ambient Light Compensation | For platform version 11, the static rules expose it in `filmMaker`, `hdrFilmMaker` and `dolbyHdrCinema`; other presets retain a hidden/inactive baseline. Dynamic conditions can restrict this further. |
+| Real Cinema | The static rules disable it in SDR, HDR and Dolby Vision Game presets. The native controller also consults scan type, frame rate, low-latency state and VRR/QMS. |
+| Peak Brightness | OLED rules show but lock it in SDR Game, while permitting HDR Game. The controller additionally checks ALLM and the current input/preset. |
+| Gamma fine adjustment | The Settings UI displays the fine slider only when `gamma` is `mediumHavingLevel` (adjustable 2.2). |
+| Expression Enhancer | The static baseline is hidden. The current native controller updates its visibility/activity using HDR type and input dimension, so the static table alone is insufficient. |
+
+The controller observations come from read-only inspection of exported functions in `/usr/lib/libpqc-ux-plugin.so.1.0.0`, including `pq_ux_setExpressionEnhancerMenuInfoToDB`, `pq_ux_setRealCinemaMenuInfoToDB` and `pq_ux_setPeakBrightnessMenuInfoToDB`. This identifies UI dependencies, not a complete specification of the picture-processing algorithms. No modes or picture values were changed to obtain these findings.
+
+[Dolby's technical explanation](https://professionalsupport.dolby.com/s/article/Dolby-Vision-IQ-Content-Type-Metadata-L11) identifies **Light Sense** as Dolby Vision IQ's ambient-sensor adaptation. That does not by itself establish that LG's separate Precision Detail toggle requires the sensor or AI Brightness to be enabled. The G6 UI code we inspected does not express such a dependency; the full processing path remains unverified.

@@ -5,7 +5,7 @@
 })(typeof window === 'object' ? window : this, function () {
   'use strict';
   const formats = {sdr:'SDR',hdr:'HDR',dolbyHdr:'Dolby Vision'};
-  const modes = {game:'SDR Game',hdrGame:'HDR Game',filmMaker:'SDR Filmmaker',hdrFilmMaker:'HDR Filmmaker',dolbyHdrGame:'Dolby Vision Game',dolbyHdrCinema:'Dolby Vision Cinema',dolbyHdrCinemaBright:'Dolby Vision Cinema Home'};
+  const modes = {game:'SDR Game',hdrGame:'HDR Game',filmMaker:'SDR Filmmaker',hdrFilmMaker:'HDR Filmmaker',dolbyHdrGame:'Dolby Vision Game',dolbyHdrCinema:'Dolby Vision Filmmaker',dolbyHdrCinemaBright:'Dolby Vision Cinema Home'};
   const gameKeys = {gameColorDepth:'color',gameSharpness:'sharpness',gameAdjustContrast:'contrast',gameBlackLevel:'brightness'};
   const physical = input => String(input||'').replace(/_pc$/,'');
   const input = bank => bank.target.dimension.input||bank.target.dimension.gameInput;
