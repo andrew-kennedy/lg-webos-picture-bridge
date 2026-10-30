@@ -119,14 +119,16 @@
     configure(adapter) { this.adapter=adapter;this.refresh(true); }
     request(command) { return this.adapter.request(command); }
     records() { return this.state?model.records(this.state,this.variant):[]; }
-    selectedRows() { return model.scopeRows(this.records(),this.scope,this.category,this.split); }
+    selectedRows() { return model.scopeRows(model.partition(this.records(),this.live).visible,this.scope,this.category,this.split); }
     selectedRecords() { return [...new Map(this.selectedRows().flatMap(row=>row.cells.flatMap(cell=>cell.records)).map(r=>[r.id,r])).values()]; }
-    writable() { return !this.status.offline&&this.status.editor_api>=3; }
+    excludedRecords() {return model.partition(this.records(),this.live).excluded.filter(r=>r.category===this.category&&model.matches(r,this.scope));}
+    writable() { return !this.status.offline&&this.status.editor_api>=4; }
     async refresh(force=false) {
       const epoch=++this.epoch,focus=this.captureFocus();
       try {
         const result=await this.request({action:'get'});if(epoch!==this.epoch)return false;
-        if(force||!this.state||this.state.instance_id!==result.state.instance_id)this.live={};
+        if(force||!this.state||this.state.instance_id!==result.state.instance_id||this.state.revision!==result.state.revision||
+          JSON.stringify(this.state.context)!==JSON.stringify(result.state.context)||this.state.room!==result.state.room)this.live={};
         this.state=result.state;this.status=result.status||{};
         const banks=(this.state.document||{}).banks||[];
         for(const id of Object.keys(this.live))if(!banks.some(b=>b.id===id&&JSON.stringify(b.target)===JSON.stringify(this.live[id].target)))delete this.live[id];
@@ -135,11 +137,13 @@
     }
     async inspect(force=false) {
       if(!this.state||this.status.offline)return;
-      const epoch=++this.epoch,banks=[...new Map(this.selectedRecords().map(r=>[r.bank.id,r.bank])).values()];
+      const epoch=++this.epoch,all=this.records(),unfiltered=model.scopeRows(all,this.scope,this.category,this.split);
+      const records=unfiltered.flatMap(row=>row.cells.flatMap(cell=>cell.records)),shared=new Set(records.filter(r=>r.preference).map(r=>r.preference));
+      const banks=[...new Map(records.concat(all.filter(r=>shared.has(r.preference))).map(r=>[r.bank.id,r.bank])).values()];
       for(const bank of banks) {
         if(this.live[bank.id]&&!force)continue;
         try {
-          const result=await this.request({action:'inspect',bank_id:bank.id});if(epoch!==this.epoch)return;
+          const result=await this.request({action:'inspect',bank_id:bank.id,variant:this.variant});if(epoch!==this.epoch)return;
           this.live[bank.id]={...result,target:bank.target};if(!this.review)this.renderRows();
         } catch(error){if(epoch!==this.epoch)return;this.error(model.inputName(bank)+': '+error.message);}
       }
@@ -209,7 +213,7 @@
         presets.append(el('p','A specific LG picture mode, such as HDR Game or Dolby Vision Filmmaker. Choose a family for a broad selection, or an exact preset to narrow it.','scope-note'));
         const more=el('div',undefined,'filters');more.append(presets,this.chips('ALLM signal','allm',opts.allm,v=>v==='on'?'On':'Off'));
         if(opts.genre.length>1)more.append(this.chips('Game genres','genre',opts.genre,v=>v));else if(opts.genre.length)more.append(el('p','Managed game genre: '+opts.genre.join(', '),'muted'));
-        more.append(this.select('Room variant',[['standard','Base standard'],['bright','Bright room'],['dark','Dark room']],this.variant,v=>this.changeView(()=>{this.variant=v;})));
+        more.append(this.select('Room variant',[['standard','Base standard'],['bright','Bright room'],['dark','Dark room']],this.variant,v=>this.changeView(()=>{this.variant=v;this.live={};})));
         filters.append(this.details('More factors · '+(this.variant==='standard'?'Base standard':this.variant+' room'),'more-factors',more));this.rows.append(filters);
         const categories=el('nav',undefined,'categories');categories.setAttribute('aria-label','Settings categories');
         for(const [key,label] of Object.entries(model.categories))categories.append(this.toggle(label,this.category===key,()=>this.changeView(()=>{this.category=key;}),'category:'+key));this.rows.append(categories);
@@ -224,7 +228,7 @@
       const manage=this.button(this.state.enabled?'Automatic profiles: On':'Automatic profiles: Off',()=>this.mutate({action:'set_enabled',enabled:!this.state.enabled}),undefined,'management');manage.disabled=!this.writable();manage.setAttribute('aria-pressed',String(this.state.enabled));
       footerActions.append(this.reviewButton,this.discardButton,this.restoreButton,this.keepButton,manage);footer.append(this.counts,footerActions);frame.append(footer);
       const ack=this.status.backup_sequence&&this.status.backup_sequence===this.status.backup_acknowledged;
-      frame.append(el('p',this.status.offline?'TV offline · showing saved backup':this.status.editor_api<3||!this.status.editor_api?'Update LG Picture Bridge to 0.14.0 or newer to use this editor.':this.state.enabled?'Automatic profiles apply day/night settings and restore temporary adjustments after a power cycle.':'Automatic profiles are paused; current TV settings stay in place.','muted'));
+      frame.append(el('p',this.status.offline?'TV offline · showing saved backup':this.status.editor_api<4||!this.status.editor_api?'Update LG Picture Bridge to 0.15.0 or newer to verify which controls apply to each profile.':this.state.enabled?'Automatic profiles apply day/night settings and restore temporary adjustments after a power cycle.':'Automatic profiles are paused; current TV settings stay in place.','muted'));
       frame.append(el('p',this.status.error||('Current room: '+this.state.room+' · '+(ack?'Backup confirmed in HA':'TV owns standards')),'message'));
       if(this.adapter.tvRemote)frame.append(el('p',undefined,'remote-help'));root.append(frame);
       if(!this.review)this.renderRows();this.updateFooter();this.lockControls();this.restoreFocus(focus);this.editing(root.activeElement&&this.editingKey===root.activeElement.dataset.focus?root.activeElement:null);
@@ -253,7 +257,7 @@
           } else input=el('span',mixed?'Mixed: '+unique.join(' / '):unique[0],mixed?'mixed':'');
           group.append(input);
           if(descriptions[row.key])group.querySelectorAll('input,select').forEach(node=>node.setAttribute('aria-describedby','help-'+row.key));
-          if(!ready&&!this.status.offline)group.append(el('p','Reading TV ranges…','muted'));else if(!control&&!this.status.offline)group.append(el('p','No common writable control. Split by Format or Preset to edit separately.','muted'));
+          if(!ready&&!this.status.offline)group.append(el('p','Checking TV applicability and ranges…','muted'));else if(!control&&!this.status.offline)group.append(el('p','No common verified control. Split by Format or Preset to inspect separately.','muted'));
           const temporary=cell.records.filter(r=>Object.hasOwn((this.state.overrides||{})[r.bank.id]||{},r.key)).map(r=>this.state.overrides[r.bank.id][r.key]);
           const observed=cell.records.map(r=>(this.live[r.bank.id]||{settings:{}}).settings[r.key]);
           group.append(el('p',temporary.length?'Temporary: '+[...new Set(temporary.map(display))].join(' / '):this.status.offline?'Saved backup':ready?'Last TV read: '+[...new Set(observed.map(display))].join(' / '):'Limits must be read before editing.','comparison'+(temporary.length?' temporary':'')));
@@ -266,15 +270,22 @@
         }
         this.settings.append(section);
       }
-      if(!this.settings.childElementCount)this.settings.append(el('p','No saved settings match this selection.','empty'));
+      const excluded=this.excludedRecords();
+      if(!this.settings.childElementCount)this.settings.append(el('p',excluded.length?'No verified editable settings match this selection.':'No saved settings match this selection.','empty'));
+      if(excluded.length) {
+        const content=el('div',undefined,'grouping'),list=el('ul',undefined,'targets');
+        content.append(el('p','These stored values are preserved, but excluded from edits because LG disables them or their applicability is unverified.','muted'));
+        for(const r of excluded)list.append(el('li',pretty(r.alias)+' · '+model.storedScope(r)+' — '+r.availability.reason));
+        content.append(list);this.settings.append(this.details(excluded.length+' unavailable or unverified values','excluded-settings',content));
+      }
       this.updateFooter();this.lockControls();this.restoreFocus(focus);
     }
     updateFooter() {
       if(!this.reviewButton)return;const entries=Object.values(this.draft),shown=new Set(this.selectedRecords().map(r=>this.entryId(r))),outside=entries.filter(e=>!shown.has(e.id)).length;
       const stale=entries.length&&this.draftRevision!==this.state.revision;
-      this.counts.textContent=this.selectedRecords().length+' stored values · '+entries.length+' staged changes'+(outside?' ('+outside+' outside this selection)':'');
+      this.counts.textContent=this.selectedRecords().length+' selected values · '+this.excludedRecords().length+' excluded · '+entries.length+' staged changes'+(outside?' ('+outside+' outside this selection)':'');
       this.reviewButton.textContent=stale?'Review against latest':entries.length?'Review '+entries.length+' changes':'Review changes';this.reviewButton.disabled=!this.writable()||!entries.length||!!this.review;
-      this.discardButton.disabled=!entries.length||!!this.review;this.restoreButton.disabled=!this.writable()||!shown.size||!!entries.length||!!this.review;this.keepButton.disabled=this.restoreButton.disabled;
+      this.discardButton.disabled=!entries.length||!!this.review;this.restoreButton.disabled=!this.writable()||!shown.size||this.selectedRecords().some(r=>!(r.availability||model.applicability(r,this.live)).editable)||!!entries.length||!!this.review;this.keepButton.disabled=this.restoreButton.disabled;
     }
     openEditReview() {
       try {

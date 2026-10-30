@@ -2,7 +2,7 @@
 
 The shared TV/Home Assistant editor displays short explanations beneath setting names. They explain what a control changes, distinguish similar controls, and mention relevant tradeoffs. The text is bundled with the editor and requires no extra TV requests, subscriptions, logging or storage writes. Each input references its row's explanation with `aria-describedby`; the explanations add no remote-navigation stops.
 
-The descriptions do not recommend or change standards. The existing native metadata still determines writable values and ranges. A saved setting may be editable for an inactive bank even when its effect requires a particular signal or another setting to be enabled.
+The descriptions do not recommend or change standards. The editor now checks [profile applicability](setting-availability.md) as well as native writable values and ranges. Inapplicable and unverified combinations are excluded from editable controls; their saved values remain in the backup.
 
 ## Sources and verified meanings
 
@@ -31,7 +31,7 @@ The descriptions deliberately make no unverified claims about exact input-lag sa
 
 ## Availability audit on 2026-10-30
 
-LG's Settings UI takes `ui.visible` and `ui.active` from `getSystemSettingDesc`, then applies additional conditions such as the ISF calibration lock. The description is for the current context. Our saved-bank editor deliberately expands that control metadata to allow editing inactive banks; successful storage/readback is not proof that a processing feature is effective on the hardware. Keep these separate when adding availability indicators.
+LG's Settings UI takes `ui.visible` and `ui.active` from `getSystemSettingDesc`, then applies additional conditions such as the ISF calibration lock. The description is for the current context. Earlier versions expanded that metadata to allow editing inactive banks. The editor now resolves applicability for each target and respects live locks when the target is active; successful storage/readback is not treated as proof of processing support.
 
 The TV reports board `O26_ATSC_US`, firmware 43.21.69 and SDK 11.2.0. Its native Settings app renames `dolbyHdrCinema` to **FILMMAKER MODE** when `tv.hw.turnkeyVersion` is `LG` and `tv.hw.panelResolution` is `UD` or `8K`. Both conditions match this G6 (`LG` / `UD`). The editor therefore labels that existing bank **Dolby Vision Filmmaker**; no bank ID, mapping or saved value changes.
 

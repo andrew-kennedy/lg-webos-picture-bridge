@@ -166,3 +166,5 @@ npm run site
 ```
 
 Tagging a tested version as `vX.Y.Z` runs the release workflow, publishes the IPK/manifest/feed, and updates GitHub Pages. The feed requires webOS 11 or later; the verified CEC hash remains firmware-specific.
+
+See [setting applicability](docs/setting-availability.md) for how the shared TV/HA standards editor filters unused and unverified controls by input, preset and signal, while preserving the saved document.

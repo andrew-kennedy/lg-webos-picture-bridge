@@ -5,6 +5,7 @@ const fs = require('fs');
 const model = require('./profile-model');
 const banks = require('./profile-banks');
 const disk = require('./profile-store');
+const availability = require('./profile-availability');
 
 function create(options) {
   const store = options.store || disk.create(), clock = options.now || Date.now;
@@ -71,7 +72,7 @@ function create(options) {
       migration_id:saved && saved.migration_id || null,context:model.clone(context),created_at:new Date(clock()).toISOString()};
   }
   function status() {
-    return {configured:!!saved,editor_api:3,owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
+    return {configured:!!saved,editor_api:4,owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
       enabled:!!(saved && saved.enabled),room,power,context,temporary_count:Object.values(overrides).reduce((n,v) => n + Object.keys(v).length,0),
       pending_restore:Object.keys(journal.restore).length > 0,applying,changed_count:changedCount,
       error:loadError || lastError,backup_sequence:latestBackup ? sequence : null,backup_acknowledged:acknowledged,
@@ -258,15 +259,37 @@ function create(options) {
     catch (error) { loadError = 'Profile storage failed; recover before continuing: ' + error.message; notify(); throw error; }
     changed(true);
   }
-  async function inspect(bank) {
+  function editorOptions(variant = 'standard', candidate = saved) {
+    if (!['standard','bright','dark'].includes(variant)) throw new Error('Unknown room variant');
+    return {document:candidate && candidate.document,context,
+      reviewed:options.availabilityReviewed,
+      values:bank => {
+        const value = {...bank.settings,...(variant === 'standard' ? {} : (bank.variants || {})[variant] || {})};
+        if (bank.brightness_role && candidate) value.backlight = candidate.preferences[
+          bank.brightness_role === 'game_sdr' ? 'game_sdr' : 'movie_' + (variant === 'standard' ? room : variant)];
+        return value;
+      }};
+  }
+  async function inspect(bank, variant = 'standard') {
     guard();
     if (options.inspect) return options.inspect(bank);
     return new Promise((resolve,reject) => {
       const epoch = powerEpoch;
       const check = () => { guard(); if (epoch !== powerEpoch) throw new Error('TV power session changed'); };
-      const run = done => banks.inspect(options.service,bank,check,() => context).then(v => done(null,v),done);
+      const run = done => banks.inspect(options.service,bank,check,() => context,editorOptions(variant)).then(v => done(null,v),done);
       if (options.enqueue) options.enqueue(run,(e,v) => e ? reject(e) : resolve(v)); else run((e,v) => e ? reject(e) : resolve(v));
     });
+  }
+  async function validateSharedBrightness(candidate, patch, inspected, check) {
+    for (const bank of candidate.document.banks.filter(b=>b.brightness_role)) {
+      const roles = bank.brightness_role === 'game_sdr' ? ['game_sdr'] : ['movie_bright','movie_dark'];
+      for (const role of roles.filter(r=>Object.hasOwn(patch,r))) {
+        if (!inspected.has(bank.id)) inspected.set(bank.id,await inspect(bankById(bank.id)));
+        check();
+        availability.assertEditable('backlight',candidate.preferences[role],bank,inspected.get(bank.id),
+          editorOptions(role === 'game_sdr' ? 'standard' : role.slice(6),candidate));
+      }
+    }
   }
   async function initialize(command) {
     if (saved) {
@@ -317,8 +340,8 @@ function create(options) {
       if (loadError) throw new Error(loadError);
       if (!saved) throw new Error('Import a profile collection first');
       if (input.action === 'inspect') {
-        const bank = bankById(input.bank_id), result = await inspect(bank);
-        delete result.descriptions; return result;
+        const bank = bankById(input.bank_id), result = await inspect(bank,input.variant || 'standard');
+        delete result.descriptions; delete result.factory_descriptions; delete result.active_values; return result;
       }
       if (input.action === 'set_environment') {
         if (!['bright','dark'].includes(input.room)) throw new Error('Expected bright or dark room');
@@ -385,6 +408,15 @@ function create(options) {
           check();
         }
         model.validate(candidate.document); model.preferences(candidate.preferences);
+        // Validate the completed candidate, so dependency edits in the same
+        // transaction are independent of their order. Nothing is persisted or
+        // applied until every target passes its own applicability check.
+        for (const edit of edits) {
+          const bank = candidate.document.banks.find(b=>b.id===edit.bank_id), live = inspected.get(bank.id);
+          for (const [key,value] of Object.entries(edit.settings))
+            availability.assertEditable(key,value,bank,live,editorOptions(edit.variant || 'standard',candidate));
+        }
+        await validateSharedBrightness(candidate,prefValues,inspected,check);
         check();
         if (model.canonical(candidate.document)===model.canonical(saved.document) && model.canonical(candidate.preferences)===model.canonical(saved.preferences)) return status();
         const affected = {};
@@ -402,22 +434,27 @@ function create(options) {
         queueSync(); return status();
       }
       if (input.action === 'edit') {
-        checkRevision(input);
+        guard(); checkRevision(input); const epoch = powerEpoch;
+        const check = () => { externalGuard(); guard(); checkRevision(input); if (epoch !== powerEpoch) throw new Error('TV power session changed'); };
         const original = bankById(input.bank_id), candidate = model.clone(saved);
         const bank = candidate.document.banks.find(b => b.id === original.id), variant = input.variant || 'standard', patch = input.settings;
         if (!['standard','bright','dark'].includes(variant) || !patch || !Object.keys(patch).length || Object.keys(patch).some(k => !Object.hasOwn(bank.settings,k))) throw new Error('Invalid bank edit');
-        const live = await inspect(bank), encoded = {};
+        const live = await inspect(bank), encoded = {}, prefValues = {};
         for (const [k,v] of Object.entries(patch)) encoded[k] = banks.encode(k,v,live.settings[k],(live.descriptions || []).find(d => d.key === k),bank);
-        externalGuard(); checkRevision(input);
+        check();
         for (const [k,v] of Object.entries(encoded)) {
           if (k === 'backlight' && bank.brightness_role) {
-            if (bank.brightness_role === 'game_sdr') candidate.preferences.game_sdr = Number(v);
-            else if (variant === 'standard') throw new Error('Choose Bright or Dark to edit shared movie SDR brightness');
-            else candidate.preferences['movie_' + variant] = Number(v);
+            if (bank.brightness_role !== 'game_sdr' && variant === 'standard') throw new Error('Choose Bright or Dark to edit shared movie SDR brightness');
+            const role = bank.brightness_role === 'game_sdr' ? 'game_sdr' : 'movie_' + variant;
+            prefValues[role] = Number(v); candidate.preferences[role] = Number(v);
           } else if (variant === 'standard') bank.settings[k] = v;
           else { bank.variants = bank.variants || {}; bank.variants[variant] = bank.variants[variant] || {}; bank.variants[variant][k] = v; }
         }
         model.validate(candidate.document); model.preferences(candidate.preferences);
+        for (const [key,value] of Object.entries(encoded))
+          availability.assertEditable(key,value,bank,live,editorOptions(variant,candidate));
+        await validateSharedBrightness(candidate,prefValues,new Map([[bank.id,live]]),check);
+        check();
         saved = candidate;
         const affected = Object.keys(encoded).filter(k => variant === 'standard' || variant === room ||
           (k === 'backlight' && bank.brightness_role === 'game_sdr'));
@@ -438,10 +475,10 @@ function create(options) {
         externalGuard(); guard(); checkRevision(input);
         if (epoch !== powerEpoch) throw new Error('TV power session changed');
         if (input.selection && input.room !== room) throw new Error('Room changed; review the selected settings again');
-        const selection = selectedKeys(input,'active'), candidate = model.clone(saved), prefValues = {};
+        const selection = selectedKeys(input,'active'), candidate = model.clone(saved), prefValues = {}, promoted = model.clone(overrides);
         for (const [id,keys] of Object.entries(selection)) {
           const bank = candidate.document.banks.find(b => b.id === id);
-          for (const [k,v] of Object.entries(overrides[bank.id] || {})) {
+          for (const [k,v] of Object.entries(promoted[bank.id] || {})) {
             if (!keys.includes(k)) continue;
             if (input.selection && (!input.expected || !input.expected[id] || !model.same(input.expected[id][k],v))) throw new Error('Temporary adjustments changed; review them again');
             if (k === 'backlight' && bank.brightness_role) {
@@ -456,7 +493,28 @@ function create(options) {
         if (input.selection) for (const [id,keys] of Object.entries(selection)) for (const key of keys) {
           if (!input.expected || !input.expected[id] || !Object.hasOwn(input.expected[id],key) || !model.same(input.expected[id][key],(overrides[id] || {})[key])) throw new Error('Temporary adjustments changed; review them again');
         }
-        model.validate(candidate.document); model.preferences(candidate.preferences); saved = candidate;
+        model.validate(candidate.document); model.preferences(candidate.preferences);
+        const inspected = new Map();
+        const check = () => {
+          externalGuard(); guard(); checkRevision(input);
+          if (epoch !== powerEpoch) throw new Error('TV power session changed');
+          if (input.selection && input.room !== room) throw new Error('Room changed; review the selected settings again');
+        };
+        for (const [id,keys] of Object.entries(selection)) {
+          const bank = candidate.document.banks.find(b=>b.id===id), adjusted = keys.filter(k=>Object.hasOwn(promoted[id] || {},k));
+          if (!adjusted.length) continue;
+          const live = await inspect(bankById(id));
+          inspected.set(id,live); check();
+          for (const key of adjusted) availability.assertEditable(key,promoted[id][key],bank,live,editorOptions(room,candidate));
+        }
+        await validateSharedBrightness(candidate,prefValues,inspected,check);
+        check();
+        for (const [id,keys] of Object.entries(selection)) for (const key of keys) {
+          const before = promoted[id] || {}, now = overrides[id] || {};
+          if (Object.hasOwn(before,key) !== Object.hasOwn(now,key) || Object.hasOwn(before,key) && !model.same(before[key],now[key]))
+            throw new Error('Temporary adjustments changed; review them again');
+        }
+        saved = candidate;
         for (const [id,keys] of Object.entries(selection)) {
           for (const key of keys) if (overrides[id]) delete overrides[id][key];
           if (overrides[id] && !Object.keys(overrides[id]).length) delete overrides[id];

@@ -2,7 +2,7 @@
 // Browser interactions share a deterministic TV transport; engine tests cover
 // atomicity, native validation, persistence and recovery separately.
 function setup(initial) {
-  window.fixture=structuredClone(initial);window.calls=[];window.editorApi=3;
+  window.fixture=structuredClone(initial);window.calls=[];window.editorApi=4;
   window.confirm=()=>true;
   window.requestProfile=async command=>{
     window.calls.push(structuredClone(command));
@@ -19,7 +19,13 @@ function setup(initial) {
       }
       if(controls.enable144HzBooster)controls.enable144HzBooster.label='165 Hz boost';
       if(window.slowInspect===bank.id||window.delayInspect)await new Promise(resolve=>setTimeout(resolve,100));
-      return {id:bank.id,settings:structuredClone(bank.settings),controls};
+      if(controls.pictureMode)controls.pictureMode.options=bank.target.dimension.dynamicRange.startsWith('sdr')?['filmMaker','game']:bank.target.dimension.dynamicRange.startsWith('hdr')?['hdrFilmMaker','hdrGame']:['dolbyHdrCinema','dolbyHdrCinemaBright','dolbyHdrGame'];
+      if(controls.blackLevel)controls.blackLevel={component:'select',options:['auto','high','low']};
+      const availability=Object.fromEntries(Object.keys(bank.settings).map(key=>[key,{state:'editable',editable:true}]));
+      for(const [key,reason] of Object.entries((window.unavailable||{})[bank.id]||{})) {
+        availability[key]={state:'unavailable',editable:false,reason};delete controls[key];
+      }
+      return {id:bank.id,settings:structuredClone(bank.settings),controls,availability};
     }
     if(['edit_many','save','restore'].includes(command.action)&&command.revision!==window.fixture.revision)throw new Error('Profiles changed; refresh before saving');
     if(command.action==='edit_many') {

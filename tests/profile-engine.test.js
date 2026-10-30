@@ -8,20 +8,24 @@ const doc = {schema:1,name:'Test G6',devices:{switch_2:'Switch 2',apple:'Apple T
   {id:'game',name:'Switch game',devices:['switch_2'],target:{category:'other',dimension:{gameInput:'hdmi3',dynamicRange:'hdrALLM',gameGenre:'Standard'}},settings:{gameSharpness:0,gameColorDepth:50}},
   {id:'movie',name:'Shared movie SDR',devices:['apple','shield'],target:{category:'picture',dimension:{input:'hdmi3',pictureMode:'filmMaker'}},settings:{backlight:3,color:50},brightness_role:'movie_sdr'},
   {id:'mapping',name:'SDR movie mapping',target:{category:'picture',dimension:{input:'hdmi3',dynamicRange:'sdr'}},settings:{pictureMode:'filmMaker'},devices:['apple','shield']},
-  {id:'port',name:'HDMI 3 game capability',target:{category:'other',dimension:{gameInput:'hdmi3'}},settings:{enableALLM:'on'},devices:['switch_2']}
+  {id:'port',name:'HDMI 3 game capability',target:{category:'other',dimension:{gameInput:'hdmi3'}},settings:{enableALLM:'on'},devices:['switch_2']},
+  {id:'game_mapping',name:'HDR ALLM Game',target:{category:'picture',dimension:{input:'hdmi3',dynamicRange:'hdrALLM'}},settings:{pictureMode:'hdrGame'},devices:['switch_2']}
 ]};
 function fixture(collection = doc) {
   const files = {}, writes = [], operations = [], inspections = [], values = Object.fromEntries(collection.banks.map(b => [b.id,clone(b.settings)]));
-  let milliseconds = Date.now(), hooks = null, inspectHook = null, bootId = 'boot1';
+  let milliseconds = Date.now(), hooks = null, inspectHook = null, descriptionHook = null, bootId = 'boot1';
   const timers = new Set();
   const store = {read:n => files[n] ? clone(files[n]) : null,write:(n,v) => { files[n] = clone(v); writes.push(n); }};
   function create() {
-    return engine.create({store,bootId,now:() => ++milliseconds,setTimeout:fn => {timers.add(fn);return fn;},clearTimeout:fn => timers.delete(fn),
+    return engine.create({store,bootId,availabilityReviewed:true,now:() => ++milliseconds,setTimeout:fn => {timers.add(fn);return fn;},clearTimeout:fn => timers.delete(fn),
       inspect:async bank => {
         inspections.push(bank.id);if (inspectHook) await inspectHook(bank);
-        return {settings:clone(values[bank.id]),descriptions:Object.keys(bank.settings).map(key => typeof bank.settings[key]==='number'?
-          {key,dimension:Object.keys(bank.target.dimension),dataType:'int',vtype:'Range',values:{range:{min:0,max:100,interval:1}}}:
-          {key,dimension:Object.keys(bank.target.dimension),dataType:'string',vtype:'Array',values:{array:['off','on','filmMaker','game']}})};
+        const descriptions=Object.keys(bank.settings).map(key => ({key,dbtype:bank.target.app_id?'M':'G',dimension:Object.keys(bank.target.dimension),ui:{active:true,visible:true},
+          ...(typeof bank.settings[key]==='number'?
+          {dataType:'int',vtype:'Range',values:{range:{min:0,max:100,interval:1}}}:
+          {dataType:'string',vtype:'ArrayExt',values:{arrayExt:['off','on','filmMaker','game','hdrGame','hdrFilmMaker','dolbyHdrCinema','dolbyHdrCinemaBright','dolbyHdrGame'].map(value=>({value,visible:true,active:true}))}})}));
+        if (descriptionHook) descriptionHook(bank,descriptions);
+        return {settings:clone(values[bank.id]),descriptions,factory_descriptions:Object.fromEntries(descriptions.map(d=>[d.key,d]))};
       },
       runBanks:async (command,guard) => {
         guard(); operations.push(clone(command));
@@ -42,7 +46,7 @@ function fixture(collection = doc) {
     values[id][key] = value;
     e.observe([{target:collection.banks.find(b => b.id === id).target,key,value,observed_at:new Date(++milliseconds).toISOString()}]);
   }
-  return {files,writes,operations,inspections,values,create,observe,timers,setBoot:v => {bootId=v;},hook:fn => {hooks=fn;},inspectHook:fn => {inspectHook=fn;}};
+  return {files,writes,operations,inspections,values,create,observe,timers,setBoot:v => {bootId=v;},hook:fn => {hooks=fn;},inspectHook:fn => {inspectHook=fn;},descriptionHook:fn => {descriptionHook=fn;}};
 }
 module.exports = async function () {
   const f = fixture(); let e = f.create();
