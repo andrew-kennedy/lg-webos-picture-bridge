@@ -21,7 +21,7 @@
     peakBrightness:'Controls the panel’s maximum brightness level, including bright highlights. LG locks this control in SDR Game; HDR Game has a separate value.',
     hdrDynamicToneMapping:'Fits HDR highlights into the TV’s brightness range. On adapts to the scene; HGiG is intended for games calibrated to the display. Off disables the dynamic adjustment.',
     expressionEnhancer:'Processes HDR contrast to make foregrounds, backgrounds and objects stand out. Detail emphasizes detail; highlight is LG’s Brightness option. Off skips this enhancement.',
-    dolbyPrecisionDetail:'Extra Dolby Vision clarity and contrast processing on supported models. LG hides this control in Dolby Vision Filmmaker on this G6; support in other presets is unverified. Saving a value does not establish support.',
+    dolbyPrecisionDetail:'Extra Dolby Vision clarity and contrast processing on supported models. LG disables this control in this G6’s model configuration for every preset; all six selectable Dolby Vision presets were verified.',
     nearBlackDetail:'Adjusts how detail just above black is rendered. This is a picture-preset control, separate from Game Optimizer’s Fine tune dark areas.',
     dynamicContrast:'Automatically changes contrast according to the picture. This can make scenes look punchier, while changing how shadows and highlights are shown.',
     dynamicColor:'Adds color enhancement to make colors more vivid. This can change their appearance from the source.',
