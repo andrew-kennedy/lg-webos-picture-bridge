@@ -1,0 +1,71 @@
+{
+  "date": "2026-10-30",
+  "model": "OLED77G6WUA",
+  "firmware": "43.21.69",
+  "sdk": "11.2.0",
+  "environment": {
+    "boardTypeStr": "_O26_",
+    "toolType": "G6",
+    "initialPlatformVersion": "11"
+  },
+  "capabilities": {
+    "tv.model.dolbyVisionPrecisionDetail": false
+  },
+  "signal": {
+    "input": "hdmi3",
+    "width": 3840,
+    "height": 2160,
+    "frame_rate": 24,
+    "hdr_type": "DolbyLL"
+  },
+  "presets": [
+    {
+      "preset": "dolbyHdrPersonalized",
+      "visible": false,
+      "active": false,
+      "calibration_locked": false,
+      "clarity_group": true
+    },
+    {
+      "preset": "dolbyHdrVivid",
+      "visible": false,
+      "active": false,
+      "calibration_locked": false,
+      "clarity_group": true
+    },
+    {
+      "preset": "dolbyHdrStandard",
+      "visible": false,
+      "active": false,
+      "calibration_locked": false,
+      "clarity_group": true
+    },
+    {
+      "preset": "dolbyHdrCinemaBright",
+      "visible": false,
+      "active": false,
+      "calibration_locked": false,
+      "clarity_group": true
+    },
+    {
+      "preset": "dolbyHdrCinema",
+      "visible": false,
+      "active": false,
+      "calibration_locked": false,
+      "clarity_group": true
+    },
+    {
+      "preset": "dolbyHdrGame",
+      "visible": false,
+      "active": false,
+      "calibration_locked": false,
+      "clarity_group": true
+    }
+  ],
+  "restoration": {
+    "preset": "dolbyHdrCinemaBright",
+    "restored": true,
+    "management_restored": true,
+    "standards_and_adjustments_unchanged": true
+  }
+}

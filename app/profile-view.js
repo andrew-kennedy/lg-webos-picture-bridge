@@ -31,8 +31,7 @@
   }
   function control(row,live) {
     const controls=row.bindings.map(({bank,key})=>{
-      if(key==='blackLevel')return {component:'select',options:['auto','high','low']};
-      if(key==='pictureMode')return {component:'select',options:format(bank)==='sdr'?['filmMaker','game']:format(bank)==='hdr'?['hdrFilmMaker','hdrGame']:['dolbyHdrCinema','dolbyHdrCinemaBright','dolbyHdrGame']};
+      if(!live||!live[bank.id]||!live[bank.id].availability||!live[bank.id].availability[key]||live[bank.id].availability[key].editable!==true)return null;
       return live&&live[bank.id]&&live[bank.id].controls[key];
     });
     if(controls.some(c=>!c))return null;
@@ -126,6 +125,29 @@
       d.dynamicRange?(formats[record.format]||record.format)+(d.dynamicRange.endsWith('ALLM')?' + ALLM':' without ALLM')+' · '+(d.gameGenre?'Game Optimizer / '+d.gameGenre:'Preset selection'):'Shared port settings';
     return inputName(input(bank))+' · '+detail;
   }
-  function combinedControl(cell,live) { return control({bindings:cell.records.map(r=>({bank:r.bank,key:r.key}))},live); }
-  return {values,control,same,inputName,modes,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl};
+  function combinedControl(cell,live) {
+    if(cell.records.some(r=>r.availability&&!r.availability.editable))return null;
+    return control({bindings:cell.records.map(r=>({bank:r.bank,key:r.key}))},live);
+  }
+  function applicability(record,live) {
+    const bank=live&&live[record.bank.id];
+    if(!bank)return {state:'pending',editable:false,reason:'Checking applicability…'};
+    return bank.availability&&bank.availability[record.key]||{state:'unverified',editable:false,reason:'Update the bridge to verify this setting for the selected profile.'};
+  }
+  function partition(all,live) {
+    const visible=[],excluded=[];
+    for(const record of all) {
+      let status=applicability(record,live);
+      if(record.preference) {
+        const shared=all.filter(r=>r.preference===record.preference).map(r=>applicability(r,live));
+        const blocked=shared.find(a=>!a.editable&&a.state!=='pending');
+        if(blocked)status={...blocked,reason:'Shared brightness affects another profile: '+blocked.reason};
+        else if(shared.some(a=>a.state==='pending'))status={state:'pending',editable:false,reason:'Checking all profiles affected by shared brightness…'};
+      }
+      if(status.editable||status.state==='pending')visible.push({...record,availability:status});
+      else excluded.push({...record,availability:status});
+    }
+    return {visible,excluded};
+  }
+  return {values,control,same,inputName,modes,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition};
 });

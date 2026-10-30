@@ -4,6 +4,8 @@
 // to reviewed picture/HDMI settings, and never accepts arbitrary Luna methods.
 var settings = require('./settings-controls');
 var executor = require('./luna-executor');
+var availability = require('./profile-availability');
+var factoryDescriptions = require('./profile-descriptions');
 var PRESETS = ['filmMaker', 'hdrFilmMaker', 'game', 'hdrGame', 'dolbyHdrGame',
   'dolbyHdrCinema', 'dolbyHdrCinemaBright'];
 var RANGES = ['sdr', 'sdrALLM', 'hdr', 'hdrALLM', 'dolbyHdr', 'dolbyHdrALLM'];
@@ -171,20 +173,43 @@ function observation(category, key, description, record, context) {
 }
 module.exports = {normalize:normalize, target:target, run:run, same:same,
   observationKeys:observationKeys, observation:observation, request:request, encode:encode,
-  async inspect(service, bank, guard, context) {
+  async inspect(service, bank, guard, context, editor) {
     var result = (await run(service, normalize({action:'read',banks:[{
       id:bank.id,target:bank.target,keys:Object.keys(bank.settings)}]}),guard,context)).banks[0];
     guard();
-    var desc = await request(service,'getSystemSettingDesc',{category:bank.target.category,keys:Object.keys(bank.settings)});
+    var captured = JSON.stringify(context && context());
+    var descriptionParams = {category:bank.target.category,keys:Object.keys(bank.settings)};
+    if (bank.target.app_id) descriptionParams.app_id = bank.target.app_id;
+    var desc = await request(service,'getSystemSettingDesc',descriptionParams);
     result.descriptions = desc.results || [];
+    var activeParams = {category:bank.target.category,keys:Object.keys(bank.settings)};
+    var lockKeys = ['brightnessActive','colorActive','clarityActive','isfMode'];
+    if (bank.target.app_id) activeParams.current_app = true;
+    if (bank.target.category === 'picture' && !bank.target.app_id) activeParams.keys = [...new Set(activeParams.keys.concat(lockKeys))];
+    result.active_values = await request(service,'getSystemSettings',activeParams);
+    // LG's app-scoped read rejects global group/calibration keys. Read those
+    // separately while keeping the motion value's app binding and dimensions.
+    if (bank.target.app_id) {
+      var locks = await request(service,'getSystemSettings',{category:'picture',keys:lockKeys});
+      result.active_values.settings = Object.assign({},result.active_values.settings,locks.settings);
+    }
+    guard();
+    if (captured !== JSON.stringify(context && context())) throw fail('TV signal changed while checking availability', 'stale_context');
+    var factory = await factoryDescriptions.load(PICTURE.concat(GAME,PORT,['pictureMode','truMotionMode']));
+    result.capabilities = await availability.loadCapabilities(service);
+    result.factory_descriptions = {};
+    result.availability = {};
     result.controls = {};
     for (var key of Object.keys(bank.settings)) {
       var d = result.descriptions.find(v => v.key === key);
-      if (!d) continue;
-      var expanded = Object.assign({},d,{ui:{visible:true,active:true}});
-      if (d.values && Array.isArray(d.values.arrayExt)) expanded.values = {arrayExt:d.values.arrayExt.map(v => Object.assign({},v,{visible:true,active:true}))};
-      var control = settings.describe({key:key},expanded,result.settings[key]);
-      if (control) result.controls[key] = control;
+      result.factory_descriptions[key] = factory.resolve(key,bank.target);
+      var applicable = availability.describe(key,bank,{live:d,factory:result.factory_descriptions[key],
+        current:result.active_values,value:result.settings[key]},Object.assign({context:context && context(),values:b=>b.settings,capabilities:result.capabilities},editor));
+      if (applicable.control) result.controls[key] = applicable.control;
+      delete applicable.control;
+      result.availability[key] = applicable;
     }
+    guard();
+    if (captured !== JSON.stringify(context && context())) throw fail('TV signal changed while checking availability', 'stale_context');
     return result;
   }};

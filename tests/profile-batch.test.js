@@ -6,18 +6,24 @@ module.exports=async()=>{
   const collection=model.clone(doc);
   collection.banks[1].settings.realCinema='on';
   collection.banks.push({...model.clone(collection.banks[1]),id:'movie2',target:{category:'picture',dimension:{input:'hdmi4',pictureMode:'filmMaker'}}});
+  collection.banks.push({id:'unused_game_picture',name:'Unused ordinary Game sliders',devices:['switch_2'],target:{category:'picture',dimension:{input:'hdmi3',pictureMode:'hdrGame'}},settings:{contrast:100,brightness:50}});
   const f=fixture(collection),e=f.create();e.setPower('on');await e.idle();
   await e.command({action:'initialize',document:collection,enabled:true,migration_id:'test',room:'dark'});
   const writes=()=>f.writes.filter(n=>n==='profiles').length;
   const batch=(edits,extra={})=>e.command({action:'edit_many',edits,revision:e.status().revision,...extra});
   const edit=(bank_id,settings,variant='standard')=>({bank_id,settings,variant});
   const selection=(action,keys,expected)=>({action,selection:keys,expected,room:'dark',revision:e.status().revision});
-  assert.equal(e.status().editor_api,3);
+  assert.equal(e.status().editor_api,4);
   let count=writes(),revision=e.status().revision;
   await assert.rejects(batch([edit('game',{gameSharpness:2}),edit('movie',{color:101})]),/range/);
   assert.equal(writes(),count,'All values validate before the first durable commit');
   assert.equal(e.status().revision,revision);
   assert.equal(f.values.game.gameSharpness,0,'An invalid later edit cannot partially apply an earlier one');
+  await assert.rejects(batch([edit('game',{gameSharpness:2}),edit('unused_game_picture',{contrast:80})]),/Game Optimizer/);
+  assert.equal(writes(),count,'Inapplicable later targets abort the whole batch before persistence');
+  assert.equal(f.values.game.gameSharpness,0);
+  await assert.rejects(e.command({action:'edit',bank_id:'unused_game_picture',settings:{brightness:55},revision:e.status().revision}),/Game Optimizer/);
+  assert.equal(writes(),count,'The single-bank editor cannot bypass applicability');
   await assert.rejects(batch([edit('game',{gameSharpness:2}),edit('game',{gameSharpness:3})]),/Duplicate/);
   await assert.rejects(batch([edit('movie',{backlight:5},'dark')],{preferences:{movie_dark:8}}),/Conflicting/);
   await assert.rejects(batch([],{preferences:JSON.parse('{"__proto__":{}}')}),/Unexpected/);
@@ -46,6 +52,11 @@ module.exports=async()=>{
   await e.command(selection('save',{movie:['realCinema']},{movie:{realCinema:'off'}}));await e.idle();
   assert.equal(e.snapshot().document.banks[1].settings.realCinema,'off');
   assert.equal(e.snapshot().overrides.movie.color,57,'Keeping Motion preserves unselected temporary adjustments');
+  f.inspectHook(()=>f.observe(e,'movie','color',58));
+  await assert.rejects(e.command(selection('save',{movie:['color']},{movie:{color:57}})),/adjustments changed/);
+  assert.equal(e.snapshot().overrides.movie.color,58,'A remote edit during applicability validation must not be lost');
+  assert.equal(e.snapshot().document.banks[1].settings.color,51);
+  f.inspectHook(null);f.observe(e,'movie','color',57);
   await assert.rejects(e.command(selection('save',{movie:['color']},{movie:{color:56}})),/changed/);
   await assert.rejects(e.command({...selection('restore',{movie:['color']}),room:'bright'}),/Room changed/);
   await assert.rejects(e.command(selection('restore',{movie:[]})),/explicit/);
@@ -68,4 +79,19 @@ module.exports=async()=>{
   f.hook(null);await e.command({action:'reconcile'});
   assert.equal(f.values.game.gameSharpness,3);assert.equal(f.values.movie.color,53);assert.equal(e.status().pending_restore,false);
   e.stop();
+
+  const blocked=fixture(collection),manager=blocked.create();manager.setPower('on');await manager.idle();
+  await manager.command({action:'initialize',document:collection,enabled:true,migration_id:'test',room:'dark'});
+  blocked.descriptionHook((bank,descriptions)=>{
+    if(bank.id==='movie2')descriptions.find(d=>d.key==='backlight').ui.active=false;
+  });
+  const before=blocked.writes.filter(n=>n==='profiles').length,version=manager.status().revision;
+  await assert.rejects(manager.command({action:'edit_many',edits:[],preferences:{movie_dark:9},revision:version}),/does not enable/);
+  await assert.rejects(manager.command({action:'edit',bank_id:'movie',variant:'dark',settings:{backlight:9},revision:version}),/does not enable/);
+  blocked.observe(manager,'movie','backlight',9);
+  await assert.rejects(manager.command({action:'save',selection:{movie:['backlight']},expected:{movie:{backlight:9}},room:'dark',revision:version}),/does not enable/);
+  assert.equal(blocked.writes.filter(n=>n==='profiles').length,before,'Every shared-brightness edit path validates all affected banks before persistence');
+  assert.equal(manager.snapshot().preferences.movie_dark,3);
+  assert.equal(manager.snapshot().overrides.movie.backlight,9,'A failed promotion must preserve the temporary adjustment');
+  manager.stop();
 };
