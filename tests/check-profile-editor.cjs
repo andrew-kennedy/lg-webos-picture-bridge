@@ -42,7 +42,7 @@ const state=require('./fixtures/profile-editor.cjs');
       assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),viewport.height,'Only the editor panes scroll');
       await a.noOverflow(viewport.width);
       for(const n of await q('button').all()) {
-        const b=await n.boundingBox();if(b)assert(b.x>=0&&b.x+b.width<=viewport.width+1,'Controls must not overflow horizontally');
+        const b=await n.boundingBox();if(b)assert(b.x>=0&&b.x+b.width<=viewport.width+1,'Controls must not overflow horizontally: '+(await n.getAttribute('data-focus'))+' at '+viewport.width+'px ('+Math.round(b.x)+'–'+Math.round(b.x+b.width)+')');
       }
       assert.deepEqual(errors,[]);
       if(viewport.width===1920||viewport.width===390)await page.screenshot({path:'/tmp/lg-scope-editor-'+viewport.width+'.png'});

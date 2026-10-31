@@ -1217,7 +1217,7 @@
     .tab,.top button{min-height:2.3em;padding:.3em .55em;font-size:.9em}
     .grid{gap:3px}.cell{font-size:.85em}.rowh{font-size:.8em;padding:.2em .35em}.colh .colname{font-size:.8em}
     .detail{padding:.7em .6em}.valuebox{padding:.55em .65em}
-    .footer{flex-wrap:nowrap}.footer .actions{flex-wrap:nowrap}.footer button{font-size:.85em;padding:.3em .55em;white-space:nowrap}.counts{font-size:.8em}
+    .footer{row-gap:.3em}.footer .actions{flex-wrap:wrap;justify-content:flex-end;margin-left:auto}.footer button{font-size:.85em;padding:.3em .55em;white-space:nowrap}.counts{font-size:.8em;flex:1 1 9em;min-width:0}
   }
   @media(max-width:650px){.frame{padding:.6em .6em;gap:.45em}}
   `;
