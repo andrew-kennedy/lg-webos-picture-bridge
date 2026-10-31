@@ -26,6 +26,13 @@ module.exports = async function () {
   channel.receive(JSON.stringify(batch),{retain:false});
   assert.deepEqual(calls[1],batch.policy,'The complete reviewed batch reaches the TV manager exactly once');
   assert.equal(calls.length,2);
+  for(const action of ['upgrade_profiles','create_profile','rename_profile','delete_profile','reset_profile','set_automatic','apply_profile']) {
+    const policy={action,revision:5,profile_id:'p_evening'},message={...envelope,request_id:action,policy},before=calls.length;
+    channel.receive(JSON.stringify(message),{retain:true});assert.equal(calls.length,before);
+    channel.receive(JSON.stringify(message),{retain:false});await new Promise(resolve=>setImmediate(resolve));
+    assert.deepEqual(calls.at(-1),policy,'Named profile command reaches the manager');
+    channel.receive(JSON.stringify(message),{retain:false});assert.equal(calls.length,before+1,'Catalog retries are deduplicated');
+  }
   channel.receive(JSON.stringify({...envelope,request_id:'legacy',policy:{action:'apply',banks:[{id:'mapping',target:{category:'picture',dimension:{input:'hdmi3',dynamicRange:'sdr'}},settings:{pictureMode:'game'},expected:{pictureMode:'filmMaker'}}]}}),{retain:false});
   const rejected=messages.findLast(m=>m.topic.endsWith('/status')).value.results.legacy;
   assert.equal(rejected.ok,false);

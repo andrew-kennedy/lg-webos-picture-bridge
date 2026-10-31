@@ -2,7 +2,7 @@
 // Browser interactions share a deterministic TV transport; engine tests cover
 // atomicity, native validation, persistence and recovery separately.
 function setup(initial) {
-  window.fixture=structuredClone(initial);window.calls=[];window.editorApi=5;
+  window.fixture=structuredClone(initial);window.calls=[];window.editorApi=initial.document.schema===2?6:5;
   window.confirm=()=>true;
   window.requestProfile=async command=>{
     window.calls.push(structuredClone(command));
@@ -35,7 +35,7 @@ function setup(initial) {
     }
     if(['edit_many','save','restore','set_brightness_links'].includes(command.action)&&command.revision!==window.fixture.revision)throw new Error('Profiles changed; refresh before saving');
     if(command.action==='set_brightness_links') {
-      for(const link of command.links)window.LGProfileView.setBrightnessLink(window.fixture.document.banks.find(b=>b.id===link.bank_id),link.linked,window.fixture.preferences,window.fixture.room);
+      for(const link of command.links)window.LGProfileView.setBrightnessLink(window.fixture.document.banks.find(b=>b.id===link.bank_id),link.linked,window.fixture.preferences,window.fixture.room,window.fixture.document);
       window.fixture.revision++;
     }
     if(command.action==='edit_many') {
@@ -43,12 +43,30 @@ function setup(initial) {
       const next=structuredClone(window.fixture);
       for(const edit of command.edits) {
         const bank=next.document.banks.find(b=>b.id===edit.bank_id);
+        if(next.document.schema===2&&bank.brightness_role&&Object.hasOwn(edit.settings,'backlight')) {
+          const target=edit.variant==='standard'?next.document:next.document.profiles.find(p=>p.id===edit.variant);target.brightness=target.brightness||{};target.brightness[bank.brightness_role]=edit.settings.backlight;
+          delete edit.settings.backlight;
+        }
         if(edit.variant==='standard')Object.assign(bank.settings,edit.settings);
         else {bank.variants=bank.variants||{};bank.variants[edit.variant]={...(bank.variants[edit.variant]||{}),...edit.settings};}
       }
       Object.assign(next.preferences,command.preferences);next.revision++;window.fixture=next;
       if(window.failNextBatch==='after'){window.failNextBatch=null;throw new Error('Reply lost');}
     }
+    if(command.action==='create_profile') {
+      const id='p_'+window.fixture.revision,source=window.fixture.document.profiles.find(p=>p.id===command.copy_from);
+      window.fixture.document.profiles.push({id,name:command.name,brightness:structuredClone(source&&source.brightness||{})});
+      for(const bank of window.fixture.document.banks)if((bank.variants||{})[command.copy_from])bank.variants[id]=structuredClone(bank.variants[command.copy_from]);
+      window.fixture.revision++;return {revision:window.fixture.revision,profile_id:id};
+    }
+    if(command.action==='rename_profile'){window.fixture.document.profiles.find(p=>p.id===command.profile_id).name=command.name;window.fixture.revision++;}
+    if(command.action==='set_automatic'){window.fixture.document.automatic=command.profiles;window.fixture.revision++;}
+    if(command.action==='apply_profile'){window.fixture.selection=command.profile_id;window.fixture.active_profile=command.profile_id==='automatic'?window.fixture.document.automatic[window.fixture.room]:command.profile_id;window.fixture.overrides={};}
+    if(command.action==='reset_profile') {
+      window.fixture.document.profiles.find(p=>p.id===command.profile_id).brightness={};
+      for(const bank of window.fixture.document.banks)if(bank.variants)delete bank.variants[command.profile_id];window.fixture.revision++;
+    }
+    if(command.action==='delete_profile'){window.fixture.document.profiles=window.fixture.document.profiles.filter(p=>p.id!==command.profile_id);window.fixture.revision++;}
     if(command.action==='set_enabled'){window.fixture.enabled=command.enabled;window.fixture.revision++;}
     if(['restore','save'].includes(command.action)) {
       if(command.room!==window.fixture.room)throw new Error('Room changed; review again');

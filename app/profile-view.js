@@ -17,10 +17,26 @@
     return null;
   }
   function values(bank,state,variant) {
+    if(state.document.schema===2) {
+      const result={...bank.settings,...(bank.variants||{})[variant]||{}};
+      if(bank.brightness_role)result.backlight=brightness(state.document,variant)[bank.brightness_role];
+      return result;
+    }
     const room=variant==='standard'?state.room:variant;
     const result={...bank.settings,...(variant==='standard'?{}:(bank.variants||{})[room]||{})};
     if(bank.brightness_role)result.backlight=state.preferences[bank.brightness_role==='game_sdr'?'game_sdr':'movie_'+room];
     return result;
+  }
+  function profileOptions(document) {
+    return [['standard','Base standard'],...(document.schema===2?document.profiles.map(p=>[p.id,p.name]):[['bright','Bright room'],['dark','Dark room']])];
+  }
+  function brightness(document,variant) {
+    const profile=(document.profiles||[]).find(p=>p.id===variant);
+    return {...document.brightness,...profile&&profile.brightness||{}};
+  }
+  function preferenceValue(state,key) {
+    if(state.document.schema!==2)return state.preferences[key];
+    const [variant,role]=key.split('/');return brightness(state.document,variant)[role];
   }
   function inputName(bank) {
     return String(typeof bank==='string'?bank:input(bank)||'').replace(/^hdmi([1-4])(_pc)?$/,(_,n,pc)=>'HDMI '+n+(pc?' (PC)':''));
@@ -29,11 +45,22 @@
     if(bank.target.category!=='picture'||bank.target.app_id||!Object.hasOwn(bank.settings,'backlight'))return null;
     return {game:'game_sdr',filmMaker:'movie_sdr'}[bank.target.dimension.pictureMode]||null;
   }
-  function setBrightnessLink(bank,linked,preferences,room) {
+  function setBrightnessLink(bank,linked,preferences,room,document) {
     const role=brightnessRole(bank);
     if(!role||typeof linked!=='boolean')throw new Error('Choose an SDR picture profile and a brightness link state');
     if(!!bank.brightness_role===linked)return;
     if(linked)bank.brightness_role=role;
+    else if(document&&document.schema===2) {
+      bank.settings.backlight=brightness(document,'standard')[role];
+      bank.variants=bank.variants||{};
+      for(const profile of document.profiles) {
+        const value=brightness(document,profile.id)[role];
+        if(!same(value,bank.settings.backlight)) {
+          bank.variants[profile.id]=bank.variants[profile.id]||{};bank.variants[profile.id].backlight=value;
+        } else if(bank.variants[profile.id])delete bank.variants[profile.id].backlight;
+      }
+      delete bank.brightness_role;
+    }
     else {
       // Freeze the effective standards, never a temporary viewing adjustment.
       bank.settings.backlight=preferences[role==='game_sdr'?'game_sdr':'movie_'+room];
@@ -84,12 +111,13 @@
       for(const key of Object.keys(bank.settings)) {
         const category=motionKeys.has(key)?'motion':bank.target.category==='picture'?(d.dynamicRange?'selection':'picture'):
           gameKeys[key]?'picture':d.gameGenre||['gameGenre','inputOptimization'].includes(key)?'game':'port';
-        const preference=key==='backlight'&&bank.brightness_role?(bank.brightness_role==='game_sdr'?'game_sdr':variant==='standard'?null:'movie_'+variant):null;
+        const preference=key==='backlight'&&bank.brightness_role?(doc.schema===2?variant+'/'+bank.brightness_role:bank.brightness_role==='game_sdr'?'game_sdr':variant==='standard'?null:'movie_'+variant):null;
         result.push({id:bank.id+':'+key,bank,key,alias:gameKeys[key]||key,category,port,format:family,preset,
           family:d.gameGenre?'game':preset?(isGame(preset)?'game':'movie'):d.dynamicRange?(isGame(values(bank,state,variant).pictureMode)?'game':'movie'):null,
           genre:d.gameGenre||null,signals:signals.length?signals:['off','on'],devices:deviceIds,
           preference,brightnessRole:key==='backlight'?bank.brightness_role:null,
-          locked:key==='backlight'&&bank.brightness_role==='movie_sdr'&&variant==='standard',
+          locked:doc.schema!==2&&key==='backlight'&&bank.brightness_role==='movie_sdr'&&variant==='standard',
+          inherited:doc.schema===2&&variant!=='standard'&&(preference?!Object.hasOwn((doc.profiles.find(p=>p.id===variant)||{}).brightness||{},bank.brightness_role):!Object.hasOwn((bank.variants||{})[variant]||{},key)),
           value:values(bank,state,variant)[key]});
       }
     }
@@ -105,7 +133,7 @@
     return !Array.isArray(scope.allm)||record.signals.some(v=>scope.allm.includes(v));
   }
   function factor(record,key) {
-    if(record.preference)return record.preference==='game_sdr'?'All SDR game profiles':'All SDR movie profiles';
+    if(record.preference)return record.preference.includes('/')?(record.brightnessRole==='game_sdr'?'Linked SDR gaming values':'Linked SDR movie values'):(record.preference==='game_sdr'?'All SDR game profiles':'All SDR movie profiles');
     if(key==='port')return inputName(record.port);
     if(key==='format')return formats[record.format]||'All formats';
     if(key==='family')return record.family==='game'?'Gaming':record.family==='movie'?'Movies':'All presets';
@@ -171,7 +199,7 @@
     return {visible,excluded};
   }
   function scopeSelection(state,scope={},selectedCategories=Object.keys(categories)) {
-    const all=records(state,state.room),available=options(all);
+    const all=records(state,state.active_profile||state.room),available=options(all);
     if(!scope||typeof scope!=='object'||Array.isArray(scope)||Object.keys(scope).some(k=>!Object.hasOwn(available,k)))throw new Error('Unknown scope filter');
     for(const [key,list] of Object.entries(scope))if(!Array.isArray(list)||!list.length||list.some(v=>!available[key].includes(v)))throw new Error('Unknown or empty '+key+' filter');
     if(!Array.isArray(selectedCategories)||!selectedCategories.length||selectedCategories.some(k=>!Object.hasOwn(categories,k)))throw new Error('Unknown or empty settings category');
@@ -182,5 +210,5 @@
     if(!Object.keys(selection).length)throw new Error('No managed settings match this scope');
     return selection;
   }
-  return {values,control,same,inputName,brightnessRole,setBrightnessLink,scopeSelection,modes,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition};
+  return {values,brightness,profileOptions,preferenceValue,control,same,inputName,brightnessRole,setBrightnessLink,scopeSelection,modes,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition};
 });

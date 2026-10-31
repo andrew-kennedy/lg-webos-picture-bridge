@@ -4,6 +4,7 @@
 // deliberately share one standard; selecting a source never runs a picture recipe.
 const banks = require('./profile-banks');
 const crypto = require('crypto');
+const catalog = require('./profile-catalog');
 const clone = value => JSON.parse(JSON.stringify(value));
 const plain = value => value && typeof value === 'object' && !Array.isArray(value);
 function fail(message) { throw new Error(message); }
@@ -34,8 +35,9 @@ function observedValue(key, value, target) {
   scalar(key,value,target);
 }
 function validate(document) {
-  fields(document, ['schema','name','devices','banks']);
-  if (document.schema !== 1 || typeof document.name !== 'string' || !document.name.length || document.name.length > 100) fail('Expected a named schema 1 collection');
+  fields(document, ['schema','name','devices','banks',...(document.schema===2?['profiles','brightness','automatic']:[])]);
+  if (![1,2].includes(document.schema) || typeof document.name !== 'string' || !document.name.length || document.name.length > 100) fail('Expected a named schema 1 or 2 collection');
+  if(document.schema===2)catalog.validate(document);
   const devices = document.devices || {}, ids = new Set(), targets = new Set();
   if (!plain(devices) || Object.keys(devices).length > 20 || Object.keys(devices).some(k =>
     !/^[a-z][a-z0-9_]{0,39}$/.test(k) || ['constructor','prototype','__proto__'].includes(k) ||
@@ -52,7 +54,7 @@ function validate(document) {
     if (!plain(bank.settings) || !Object.keys(bank.settings).length || Object.keys(bank.settings).length > 40 ||
         Object.keys(bank.settings).some(k => !target.allowed.includes(k))) fail('Unreviewed or missing settings');
     const variants = bank.variants || {};
-    fields(variants, ['bright','dark']);
+    fields(variants, catalog.ids(document));
     for (const values of [bank.settings, ...Object.values(variants)]) {
       fields(values, Object.keys(bank.settings));
       Object.keys(values).forEach(k => scalar(k, values[k], bank.target));
@@ -109,6 +111,7 @@ function decodeBackup(envelope) {
   const state = JSON.parse(envelope.state_json);
   if (state.schema !== 1 || !Number.isSafeInteger(state.revision) || state.revision < 1) fail('Invalid backup state');
   validate(state.document); preferences(state.preferences); scopedValues(state.document,state.overrides || {});
+  if(state.document.schema===2&&state.selection!==undefined&&state.selection!=='automatic'&&!catalog.valid(state.document,state.selection))fail('Invalid selected profile');
   return state;
 }
 module.exports = {clone, canonical, validate, preferences, desired, environmentKeys, active, scopedValues,

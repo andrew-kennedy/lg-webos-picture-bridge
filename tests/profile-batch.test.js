@@ -13,7 +13,7 @@ module.exports=async()=>{
   const batch=(edits,extra={})=>e.command({action:'edit_many',edits,revision:e.status().revision,...extra});
   const edit=(bank_id,settings,variant='standard')=>({bank_id,settings,variant});
   const selection=(action,keys,expected)=>({action,selection:keys,expected,room:'dark',revision:e.status().revision});
-  assert.equal(e.status().editor_api,5);
+  assert.equal(e.status().editor_api,6);
   let count=writes(),revision=e.status().revision;
   await assert.rejects(batch([edit('game',{gameSharpness:2}),edit('movie',{color:101})]),/range/);
   assert.equal(writes(),count,'All values validate before the first durable commit');

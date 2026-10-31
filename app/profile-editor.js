@@ -97,6 +97,7 @@
       if(this.editingKey===active.dataset.focus) {
         if(key==='Enter'||key==='Escape'){this.editing(null);handled();return;}
         if(!arrow)return;
+        if(active.tagName==='INPUT'&&active.type==='text'){event.stopPropagation();return;}
         handled();
         if(active.tagName==='SELECT') {
           const options=[...active.options].filter(o=>!o.disabled&&!o.hidden),i=options.indexOf(active.selectedOptions[0]);
@@ -109,7 +110,7 @@
         }
         return;
       }
-      if(key==='Enter' && ['SELECT','INPUT'].includes(active.tagName)){this.editing(active);handled();return;}
+      if(key==='Enter' && ['SELECT','INPUT'].includes(active.tagName)){this.editing(active);if(active.type==='text')event.stopPropagation();else handled();return;}
       if(key==='Enter'&&active.tagName==='BUTTON'){handled();active.click();return;}
       if(key==='Enter'&&active.tagName==='SUMMARY'){handled();active.click();return;}
       if(!arrow)return;
@@ -131,8 +132,14 @@
       try {
         const result=await this.request({action:'get'});if(epoch!==this.epoch)return false;
         if(force||!this.state||this.state.instance_id!==result.state.instance_id||this.state.revision!==result.state.revision||
-          JSON.stringify(this.state.context)!==JSON.stringify(result.state.context)||this.state.room!==result.state.room)this.live={};
+          JSON.stringify(this.state.context)!==JSON.stringify(result.state.context)||this.state.room!==result.state.room||this.state.active_profile!==result.state.active_profile)this.live={};
         this.state=result.state;this.status=result.status||{};
+        if(this.state.document&&this.state.document.schema===2) {
+          if(!this.namedReady){this.variant=this.state.active_profile||'standard';this.namedReady=true;}
+          const choices=model.profileOptions(this.state.document);
+          if(!choices.some(p=>p[0]===this.variant))this.variant='standard';
+          if(this.applyChoice&&this.applyChoice!=='automatic'&&!choices.some(p=>p[0]===this.applyChoice))this.applyChoice=null;
+        }
         const banks=(this.state.document||{}).banks||[];
         for(const id of Object.keys(this.live))if(!banks.some(b=>b.id===id&&JSON.stringify(b.target)===JSON.stringify(this.live[id].target)))delete this.live[id];
         this.render(focus);await this.inspect();return true;
@@ -162,7 +169,7 @@
     entryId(record,variant=this.variant) {return record.preference?'preference:'+record.preference:variant+':'+record.id;}
     draftValue(record) {const entry=this.draft[this.entryId(record)];return entry?entry.value:record.value;}
     currentEntry(entry) {
-      if(entry.preference)return this.state.preferences[entry.preference];
+      if(entry.preference)return model.preferenceValue(this.state,entry.preference);
       const bank=(this.state.document||{}).banks.find(b=>b.id===entry.bank_id);
       if(!bank||JSON.stringify(bank.target)!==JSON.stringify(entry.target)||!Object.hasOwn(bank.settings,entry.key))throw new Error('A draft target changed or was removed. Discard this draft and select it again.');
       return model.values(bank,this.state,entry.variant)[entry.key];
@@ -170,7 +177,7 @@
     stage(cell,value) {
       if(!Object.keys(this.draft).length)this.draftRevision=this.state.revision;
       for(const r of cell.records) {
-        const id=this.entryId(r),before=r.preference?this.state.preferences[r.preference]:r.value;
+        const id=this.entryId(r),before=r.preference?model.preferenceValue(this.state,r.preference):r.value;
         const encoded=value!==undefined&&r.key==='blackLevel'?Object.fromEntries(Object.keys(before).map(k=>[k,value])):value;
         if(value===undefined||model.same(before,encoded))delete this.draft[id];
         else this.draft[id]={...(this.draft[id]||{id,bank_id:r.bank.id,key:r.key,variant:this.variant,target:r.bank.target,preference:r.preference,before}),value:encoded,label:pretty(r.alias),targets:cell.records.filter(t=>r.preference?t.preference===r.preference:t.id===r.id).map(t=>({id:t.id,scope:model.storedScope(t)}))};
@@ -180,10 +187,44 @@
     brightnessBanks() {
       return this.records().filter(r=>r.key==='backlight'&&model.brightnessRole(r.bank)&&model.matches(r,this.scope)).map(r=>r.bank);
     }
+    profileName(id) {return (model.profileOptions(this.state.document).find(p=>p[0]===id)||[id,id])[1];}
+    async profileCommand(command) {
+      if(Object.keys(this.draft).length){this.error('Save or discard staged edits before changing profiles.');return;}
+      return this.mutate({...command,revision:this.state.revision});
+    }
+    reviewProfile(action) {
+      if(Object.keys(this.draft).length){this.error('Save or discard staged edits first.');return;}
+      const deleting=action==='delete_profile';
+      this.review={action,profile_id:this.variant,revision:this.state.revision,entries:[{label:this.profileName(this.variant),variant:this.variant,before:deleting?'Saved profile':'Profile overrides',value:deleting?'Delete profile':'Inherit every base standard',targets:[{scope:deleting?'An active selection returns to Automatic.':'All ports, formats and settings in this profile. Shared base standards are preserved.'}]}]};
+      this.render({key:'review-back',neighbors:[],scroll:0});
+    }
+    renderProfiles() {
+      if(this.state.document.schema!==2) {
+        if(this.status.editor_api>=6) {
+          const box=el('div',undefined,'grouping');box.append(el('p','Named profiles inherit base standards and can be selected by Home Assistant. Upgrading keeps your Bright/Dark values and temporary adjustments.','scope-note'),this.button('Enable named profiles',()=>this.profileCommand({action:'upgrade_profiles'})));this.rows.append(box);
+        }
+        return;
+      }
+      const box=el('div',undefined,'filters'),choices=model.profileOptions(this.state.document),grid=el('div',undefined,'filter-grid');
+      grid.append(this.select('Profile to edit',choices,this.variant,id=>this.changeView(()=>{this.variant=id;this.live={};})));
+      const apply=el('div',undefined,'choice'),selected=this.applyChoice||this.state.selection||'automatic';
+      apply.append(this.select('Profile to apply',[['automatic','Automatic'],...choices],selected,id=>{this.applyChoice=id;}),this.button('Apply profile',()=>this.profileCommand({action:'apply_profile',profile_id:this.applyChoice||this.state.selection||'automatic'}),undefined,'profile-apply'));grid.append(apply);box.append(grid);
+      box.append(el('p','Active: '+this.profileName(this.state.active_profile)+(this.state.selection==='automatic'?' · Automatic':' · Manual selection')+'. Editing a different profile saves it for later. Apply profile also clears temporary adjustments.','scope-note'));
+      const manage=el('div',undefined,'filters'),nameLabel=el('label',undefined,'choice'),name=el('input');name.type='text';name.maxLength=64;name.placeholder='e.g. Evening';name.value=this.profileNameDraft||'';name.dataset.focus='profile-name';name.setAttribute('aria-label','Profile name');name.oninput=()=>{this.profileNameDraft=name.value;};nameLabel.append(el('span','Profile name'),name);manage.append(nameLabel);
+      const actions=el('div',undefined,'actions'),make=copy=>this.profileCommand({action:'create_profile',name:name.value.trim(),copy_from:copy});
+      actions.append(this.button('New from base',()=>make('standard')),this.button('Duplicate selected',()=>make(this.variant)));
+      if(this.variant!=='standard')actions.append(this.button('Rename selected',()=>this.profileCommand({action:'rename_profile',profile_id:this.variant,name:name.value.trim()})),this.button('Reset selected to base',()=>this.reviewProfile('reset_profile')),this.button('Delete selected',()=>this.reviewProfile('delete_profile')));
+      manage.append(actions,el('p','Profiles inherit base values unless you override them. Duplicating copies only the selected profile’s overrides. Reset removes all its overrides.','scope-note'));
+      if(this.variant!=='standard')manage.append(el('p','Automation profile ID: '+this.variant+'. Renaming keeps this ID.','scope-note'));
+      const bindings=el('div',undefined,'filter-grid'),automatic=this.automaticDraft||{...this.state.document.automatic};
+      for(const [key,label] of [['bright','Automatic bright room'],['dark','Automatic dark room']])bindings.append(this.select(label,choices,automatic[key],id=>{this.automaticDraft={...automatic,[key]:id};automatic[key]=id;}));
+      manage.append(bindings,this.button('Save automatic bindings',()=>this.profileCommand({action:'set_automatic',profiles:this.automaticDraft||this.state.document.automatic})),el('p','Home Assistant supplies bright/dark room context from the sun. These bindings are used only while Automatic is selected; sunset preserves temporary adjustments.','scope-note'));
+      box.append(this.details('Manage profiles and automatic selection','profile-management',manage));box.querySelectorAll('button').forEach(b=>b.dataset.profileAction='');this.rows.append(box);
+    }
     renderBrightnessLinks() {
       const banks=this.brightnessBanks();if(!banks.length)return;
       const content=el('div',undefined,'grouping');
-      content.append(el('p','Linked gaming profiles share one SDR brightness. Linked movie profiles share Bright and Dark room values. Independent profiles can be edited per input, preset and room. Unlinking keeps the current standards.','scope-note'));
+      content.append(el('p','Linked gaming banks share gaming brightness; linked movie banks share movie brightness. Each named profile can override either value. Unlink to edit per input and preset; unlinking preserves every profile’s brightness.','scope-note'));
       const actions=el('div',undefined,'actions');
       for(const [label,linked] of [['Link selected profiles',true],['Unlink selected profiles',false]]) {
         const b=this.button(label,()=>this.openBrightnessReview(banks,linked),undefined,'brightness-links:'+linked);b.dataset.linkAction='';actions.append(b);
@@ -199,8 +240,8 @@
     openBrightnessReview(banks,linked) {
       if(Object.keys(this.draft).length){this.error('Save or discard staged value edits before changing brightness links.');return;}
       const changed=banks.filter(b=>!!b.brightness_role!==linked);if(!changed.length){this.error('The selected profiles already have this link state.');return;}
-      const describe=bank=>(bank.brightness_role?'Linked':'Independent')+' · Bright '+model.values(bank,this.state,'bright').backlight+' / Dark '+model.values(bank,this.state,'dark').backlight;
-      const entries=changed.map(bank=>{const after=JSON.parse(JSON.stringify(bank));model.setBrightnessLink(after,linked,this.state.preferences,this.state.room);return {label:'SDR brightness link',variant:'Bright and Dark',before:describe(bank),value:describe(after),targets:[{scope:model.inputName(bank)+' · '+model.modes[bank.target.dimension.pictureMode]}]};});
+      const describe=bank=>(bank.brightness_role?'Linked':'Independent')+' · '+(this.state.document.schema===2?model.profileOptions(this.state.document).map(([id,label])=>label+' '+model.values(bank,this.state,id).backlight).join(' / '):'Bright '+model.values(bank,this.state,'bright').backlight+' / Dark '+model.values(bank,this.state,'dark').backlight);
+      const entries=changed.map(bank=>{const after=JSON.parse(JSON.stringify(bank));model.setBrightnessLink(after,linked,this.state.preferences,this.state.room,this.state.document);return {label:'SDR brightness link',variant:'All profiles',before:describe(bank),value:describe(after),targets:[{scope:model.inputName(bank)+' · '+model.modes[bank.target.dimension.pictureMode]}]};});
       this.review={action:'set_brightness_links',revision:this.state.revision,links:changed.map(bank=>({bank_id:bank.id,linked})),entries};this.render({key:'review-back',neighbors:[],scroll:0});
     }
     changeView(change) {change();this.review=null;this.render();this.inspect();}
@@ -221,9 +262,9 @@
     render(focus=this.captureFocus()) {
       const root=this.shadowRoot;root.innerHTML=`<style>
       :host{display:block;height:100%;min-height:0;color:#e9eef6;background:#101a2b;font:16px/1.4 system-ui,Arial,sans-serif;color-scheme:dark}*{box-sizing:border-box}
-      button,select,input{font:inherit;color:inherit}button,select,input[type=number]{background:#22334b;border:1px solid #53637a;border-radius:8px;padding:8px 11px;min-height:40px;max-width:100%}button,summary{cursor:pointer}button:disabled{opacity:.45;cursor:default}button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #6ee7e5;outline-offset:2px}[data-editing]{outline:3px solid #ffd695!important;outline-offset:2px}
+      button,select,input{font:inherit;color:inherit}button,select,input[type=number],input[type=text]{background:#22334b;border:1px solid #53637a;border-radius:8px;padding:8px 11px;min-height:40px;max-width:100%}button,summary{cursor:pointer}button:disabled{opacity:.45;cursor:default}button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #6ee7e5;outline-offset:2px}[data-editing]{outline:3px solid #ffd695!important;outline-offset:2px}
       button.primary,button[aria-pressed=true]{background:#91e4d4;color:#091c23;border-color:#91e4d4}.frame{height:100%;display:flex;flex-direction:column;gap:12px;padding:20px;overflow:hidden}.top,.actions,.footer,.row-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.top,.footer{justify-content:space-between}.top h2{font-size:25px;margin:0;font-weight:600}.muted,.notice,.message,.comparison,.targets{font-size:13px;color:#b5c2d4}.muted{margin:4px 0}.message{min-height:18px;margin:0}.error{color:#ffb0b8}.temporary,.mixed{color:#ffd695}.body{flex:1;min-height:100px;overflow:auto;border:1px solid #34445b;border-radius:12px;scroll-padding:12px}.filters,.grouping,.review{padding:14px 18px}.filters{display:grid;gap:12px}.filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.chips,.categories{display:flex;flex-wrap:wrap;gap:6px}fieldset{border:0;padding:0;margin:0;min-width:0}legend,.choice>span{font-size:12px;color:#b5c2d4;margin:0 0 6px;padding:0}.chip{font-size:14px;min-height:36px;padding:6px 9px}.choice{display:flex;flex-direction:column;min-width:0}select{width:100%}.categories{padding:12px 18px;background:#1c2b40;border-block:1px solid #34445b}.grouping{border-bottom:1px solid #34445b}.row{padding:16px 18px;display:grid;grid-template-columns:minmax(140px,.7fr) minmax(0,2fr);gap:14px;border-bottom:1px solid #34445b}.row h3{font:inherit;font-weight:600;margin:0}.cells{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:16px;min-width:0}.cell{min-width:0}.cell-label{display:block;font-size:13px;color:#b5c2d4;margin-bottom:5px}.range{display:flex;gap:10px;align-items:center}.range input[type=range]{min-width:60px;width:100%;flex:1;accent-color:#91e4d4}.range input[type=number]{width:78px}.comparison{margin:5px 0}.targets{padding:0;list-style:none;margin:6px 0}.targets li{border-top:1px solid #34445b;padding:6px 0;overflow-wrap:anywhere}summary{font-size:13px;color:#b5c2d4;padding:5px 0}.badge{border:1px solid #487165;border-radius:16px;padding:4px 9px;color:#9be2cd;font-size:12px}.review h3{margin:0 0 12px}.diff{display:grid;grid-template-columns:1fr auto;gap:12px;border-bottom:1px solid #34445b;padding:10px 0}.diff .value{font-variant-numeric:tabular-nums}.empty{padding:20px}.remote-help{margin:0;font-size:13px;color:#b5c2d4}.counts{font-size:13px;color:#b5c2d4}.scope-note{font-size:13px;color:#b5c2d4;margin:8px 0 0}
-      @media(min-width:1500px){:host{font-size:21px}.top h2{font-size:30px}.chip{font-size:19px}.muted,.notice,.message,.comparison,.targets,.scope-note,.counts,.remote-help,summary,.cell-label{font-size:17px}legend,.choice>span,.badge{font-size:16px}button,select,input[type=number]{min-height:48px}.cells{grid-template-columns:repeat(auto-fit,minmax(min(285px,100%),1fr))}.frame{padding:24px;gap:14px}}
+      @media(min-width:1500px){:host{font-size:21px}.top h2{font-size:30px}.chip{font-size:19px}.muted,.notice,.message,.comparison,.targets,.scope-note,.counts,.remote-help,summary,.cell-label{font-size:17px}legend,.choice>span,.badge{font-size:16px}button,select,input[type=number],input[type=text]{min-height:48px}.cells{grid-template-columns:repeat(auto-fit,minmax(min(285px,100%),1fr))}.frame{padding:24px;gap:14px}}
       @media(max-width:650px){.frame{padding:12px;gap:9px}.top h2{font-size:22px}.top .actions{gap:5px}.top button{padding:6px 8px}.filters,.grouping,.categories,.review{padding:12px}.filter-grid{grid-template-columns:1fr}.row{grid-template-columns:1fr;padding:12px}.cells{grid-template-columns:1fr}.footer .actions{width:100%}.footer button{font-size:13px;padding:6px 8px}.counts{font-size:12px}.message{font-size:12px}.body{min-height:100px}}
       </style>`;
       const frame=el('div',undefined,'frame'),top=el('div',undefined,'top'),heading=el('div');heading.append(el('h2','Picture standards'),el('p','Saved on your TV. Everyday adjustments reset after a power cycle.','muted'));top.append(heading);
@@ -233,6 +274,7 @@
       if(!this.state.document){frame.append(el('p','Import a profile collection using LG Picture Profiles in Home Assistant.','empty'),el('p',this.status.error||'No collection yet.','message'));root.append(frame);this.lockControls();this.restoreFocus(focus);return;}
       this.rows=el('div',undefined,'body');this.rows.setAttribute('aria-label','Settings editor');frame.append(this.rows);
       if(this.review)this.renderReview();else {
+        this.renderProfiles();
         const all=this.records(),opts=model.options(all),filters=el('div',undefined,'filters');
         filters.append(this.chips('Select ports','port',opts.port,v=>model.inputName(v)));
         const family=this.chips('Preset family','family',opts.family,v=>v==='game'?'Gaming':'Movies');
@@ -242,8 +284,8 @@
         presets.append(el('p','A specific LG picture mode, such as HDR Game or Dolby Vision Filmmaker. Choose a family for a broad selection, or an exact preset to narrow it.','scope-note'));
         const more=el('div',undefined,'filters');more.append(presets,this.chips('ALLM signal','allm',opts.allm,v=>v==='on'?'On':'Off'));
         if(opts.genre.length>1)more.append(this.chips('Game genres','genre',opts.genre,v=>v));else if(opts.genre.length)more.append(el('p','Managed game genre: '+opts.genre.join(', '),'muted'));
-        more.append(this.select('Room variant',[['standard','Base standard'],['bright','Bright room'],['dark','Dark room']],this.variant,v=>this.changeView(()=>{this.variant=v;this.live={};})));
-        filters.append(this.details('More factors · '+(this.variant==='standard'?'Base standard':this.variant+' room'),'more-factors',more));this.rows.append(filters);
+        if(this.state.document.schema!==2)more.append(this.select('Room variant',[['standard','Base standard'],['bright','Bright room'],['dark','Dark room']],this.variant,v=>this.changeView(()=>{this.variant=v;this.live={};})));
+        filters.append(this.details('More factors · '+this.profileName(this.variant),'more-factors',more));this.rows.append(filters);
         const categories=el('nav',undefined,'categories');categories.setAttribute('aria-label','Settings categories');
         for(const [key,label] of Object.entries(model.categories))categories.append(this.toggle(label,this.category===key,()=>this.changeView(()=>{this.category=key;}),'category:'+key));this.rows.append(categories);
         const grouping=el('div',undefined,'grouping'),field=el('fieldset'),chips=el('div',undefined,'chips');field.append(el('legend','Show separate controls by'));
@@ -259,10 +301,10 @@
       const footer=el('div',undefined,'footer'),footerActions=el('div',undefined,'actions');this.counts=el('span',undefined,'counts');
       this.reviewButton=this.button('Review changes',()=>this.openEditReview(),'primary','review');this.discardButton=this.button('Discard edits',()=>{this.draft={};this.review=null;this.render();},undefined,'discard');
       this.restoreButton=this.button('Restore selected',()=>this.openActionReview('restore'),undefined,'restore');this.keepButton=this.button('Keep adjustments',()=>this.openActionReview('save'),undefined,'promote');
-      const manage=this.button(this.state.enabled?'Automatic profiles: On':'Automatic profiles: Off',()=>this.mutate({action:'set_enabled',enabled:!this.state.enabled}),undefined,'management');manage.disabled=!this.writable();manage.setAttribute('aria-pressed',String(this.state.enabled));
+      const manage=this.button(this.state.enabled?'Management: On':'Management: Off',()=>this.mutate({action:'set_enabled',enabled:!this.state.enabled}),undefined,'management');manage.disabled=!this.writable();manage.setAttribute('aria-pressed',String(this.state.enabled));
       footerActions.append(this.reviewButton,this.discardButton,this.restoreButton,this.keepButton,manage);footer.append(this.counts,footerActions);frame.append(footer);
       const ack=this.status.backup_sequence&&this.status.backup_sequence===this.status.backup_acknowledged;
-      frame.append(el('p',this.status.offline?'TV offline · showing saved backup':this.status.editor_api<4||!this.status.editor_api?'Update LG Picture Bridge to 0.15.0 or newer to verify which controls apply to each profile.':this.state.enabled?'Automatic profiles apply day/night settings and restore temporary adjustments after a power cycle.':'Automatic profiles are paused; current TV settings stay in place.','muted'));
+      frame.append(el('p',this.status.offline?'TV offline · showing saved backup':this.status.editor_api<4||!this.status.editor_api?'Update LG Picture Bridge to 0.15.0 or newer to verify which controls apply to each profile.':this.state.enabled?'Management applies the selected profile and restores temporary adjustments after a power cycle.':'Management is paused; profile selections are saved but will apply only when management resumes.','muted'));
       frame.append(el('p',this.status.error||('Current room: '+this.state.room+' · '+(ack?'Backup confirmed in HA':'TV owns standards')),'message'));
       if(this.adapter.tvRemote)frame.append(el('p',undefined,'remote-help'));root.append(frame);
       if(!this.review)this.renderRows();this.updateFooter();this.lockControls();this.restoreFocus(focus);this.editing(root.activeElement&&this.editingKey===root.activeElement.dataset.focus?root.activeElement:null);
@@ -277,7 +319,7 @@
           const group=el('div',undefined,'cell'),ready=cell.records.every(r=>this.live[r.bank.id]&&Object.hasOwn(this.live[r.bank.id].settings,r.key)),control=ready?model.combinedControl(cell,this.live):null;
           const label=(control&&control.label)||pretty(row.key),fieldLabel=label+' · '+cell.label,vals=cell.records.map(r=>this.draftValue(r)),unique=[...new Set(vals.map(display))],mixed=unique.length>1||vals.some(v=>v&&typeof v==='object'&&new Set(Object.values(v)).size>1);
           group.append(el('span',cell.label,'cell-label'));
-          if(cell.brightnessRole)group.append(el('p',cell.brightnessRole==='game_sdr'?'Shared SDR game brightness':this.variant==='standard'?'Choose Bright or Dark under More factors to edit shared movie brightness':'Shared SDR movie brightness','muted'));
+          if(cell.brightnessRole)group.append(el('p',cell.brightnessRole==='game_sdr'?'Shared SDR game brightness':this.state.document.schema!==2&&this.variant==='standard'?'Choose Bright or Dark under More factors to edit shared movie brightness':'Shared SDR movie brightness','muted'));
           const disabled=!this.writable()||cell.records.some(r=>r.locked);let input;
           const update=value=>{this.stage(cell,value);const comparison=group.querySelector('.comparison');if(comparison)comparison.textContent=value===undefined?'Edit cleared; saved values retained.':'Draft · '+display(value);};
           if(control&&control.component==='number') {
@@ -290,6 +332,7 @@
             for(const value of control.options){const option=el('option',row.key==='truMotionMode'&&value==='user'?'User Selection':value);option.value=value;input.append(option);}input.value=mixed?'':unique[0];input.disabled=disabled;input.onchange=()=>update(input.value);
           } else input=el('span',mixed?'Mixed: '+unique.join(' / '):unique[0],mixed?'mixed':'');
           group.append(input);
+          if(this.state.document.schema===2&&this.variant!=='standard')group.append(el('p',cell.records.every(r=>r.inherited)?'Inherited from base':cell.records.every(r=>!r.inherited)?'Override in this profile':'Mix of inherited values and profile overrides','muted'));
           if(descriptions[row.key])group.querySelectorAll('input,select').forEach(node=>node.setAttribute('aria-describedby','help-'+row.key));
           if(!ready&&!this.status.offline)group.append(el('p','Checking TV applicability and ranges…','muted'));else if(!control&&!this.status.offline)group.append(el('p','No common verified control. Split by Format or Preset to inspect separately.','muted'));
           const temporary=cell.records.filter(r=>Object.hasOwn((this.state.overrides||{})[r.bank.id]||{},r.key)).map(r=>this.state.overrides[r.bank.id][r.key]);
@@ -320,6 +363,7 @@
       this.counts.textContent=this.selectedRecords().length+' selected values · '+this.excludedRecords().length+' excluded · '+entries.length+' staged changes'+(outside?' ('+outside+' outside this selection)':'');
       this.reviewButton.textContent=stale?'Review against latest':entries.length?'Review '+entries.length+' changes':'Review changes';this.reviewButton.disabled=!this.writable()||!entries.length||!!this.review;
       this.discardButton.disabled=!entries.length||!!this.review;this.restoreButton.disabled=!this.writable()||!shown.size||this.selectedRecords().some(r=>!(r.availability||model.applicability(r,this.live)).editable)||!!entries.length||!!this.review;this.keepButton.disabled=this.restoreButton.disabled;
+      this.shadowRoot.querySelectorAll('[data-profile-action]').forEach(b=>b.disabled=!this.writable()||!!entries.length||!!this.review);
       this.shadowRoot.querySelectorAll('[data-link-action]').forEach(b=>b.disabled=!this.writable()||this.status.editor_api<5||!!entries.length||!!this.review);
     }
     openEditReview() {
@@ -335,39 +379,40 @@
       this.busy=true;this.lockControls();const refreshed=await this.refresh();this.busy=false;
       if(!refreshed||!this.writable()){this.render();if(!refreshed)this.error('Could not refresh the TV. Try again before reviewing adjustments.');return;}
       const selection={},expected={},entries=[];
-      const records=model.records(this.state,this.state.room),selected=chosen.map(c=>records.find(r=>r.id===c.id&&JSON.stringify(r.bank.target)===c.target));
+      const records=model.records(this.state,this.state.active_profile||this.state.room),selected=chosen.map(c=>records.find(r=>r.id===c.id&&JSON.stringify(r.bank.target)===c.target));
       if(selected.some(r=>!r)){this.render();this.error('Selected settings changed. Select them again.');return;}
       const shared=new Map();
       for(const r of selected) {
         const temp=(this.state.overrides||{})[r.bank.id]||{},has=Object.hasOwn(temp,r.key);if(action==='save'&&!has)continue;
         (selection[r.bank.id]||(selection[r.bank.id]=[])).push(r.key);
         if(has)(expected[r.bank.id]||(expected[r.bank.id]={}))[r.key]=temp[r.key];
-        const bank=r.bank,current=model.values(bank,this.state,this.state.room)[r.key];
+        const bank=r.bank,current=model.values(bank,this.state,this.state.active_profile||this.state.room)[r.key];
         if(action==='save'&&r.preference) {
           if(shared.has(r.preference)&&!model.same(shared.get(r.preference).value,temp[r.key])){this.render();this.error('Selected temporary brightness values conflict. Adjust them to the same value before keeping them.');return;}
-          shared.set(r.preference,{preference:r.preference,label:pretty(r.alias),variant:this.state.room,before:current,value:temp[r.key],targets:records.filter(t=>t.preference===r.preference).map(t=>({scope:model.storedScope(t)}))});
-        } else entries.push({label:pretty(r.alias),variant:this.state.room,before:action==='save'?current:has?temp[r.key]:(this.live[bank.id]||{settings:{}}).settings[r.key],value:action==='save'?temp[r.key]:current,targets:[{scope:model.storedScope(r)}]});
+          shared.set(r.preference,{preference:r.preference,label:pretty(r.alias),variant:this.state.active_profile||this.state.room,before:current,value:temp[r.key],targets:records.filter(t=>t.preference===r.preference).map(t=>({scope:model.storedScope(t)}))});
+        } else entries.push({label:pretty(r.alias),variant:this.state.active_profile||this.state.room,before:action==='save'?current:has?temp[r.key]:(this.live[bank.id]||{settings:{}}).settings[r.key],value:action==='save'?temp[r.key]:current,targets:[{scope:model.storedScope(r)}]});
       }
       entries.push(...shared.values());
       if(!entries.length){this.render();this.error('No tracked temporary adjustments in this selection.');return;}
-      this.review={action,selection,expected,room:this.state.room,revision:this.state.revision,entries};this.render({key:'review-back',neighbors:[],scroll:0});
+      this.review={action,selection,expected,profile_id:this.state.active_profile,room:this.state.room,revision:this.state.revision,entries};this.render({key:'review-back',neighbors:[],scroll:0});
     }
     closeReview() {const key=this.review.action==='set_brightness_links'?'brightness-links':this.review.action==='edit_many'?'review':this.review.action==='restore'?'restore':'promote';this.review=null;this.render({key,neighbors:[],scroll:0});}
     renderReview() {
-      const box=el('section',undefined,'review'),r=this.review;box.append(el('h3',r.action==='set_brightness_links'?'Review brightness links':r.action==='edit_many'?'Review saved standards':r.action==='restore'?'Restore current '+this.state.room+' room standards':'Keep current '+this.state.room+' room adjustments'));
+      const box=el('section',undefined,'review'),r=this.review;box.append(el('h3',r.action==='delete_profile'?'Delete profile':r.action==='reset_profile'?'Reset profile to base':r.action==='set_brightness_links'?'Review brightness links':r.action==='edit_many'?'Review saved standards':r.action==='restore'?'Restore '+this.profileName(this.state.active_profile||this.state.room)+' standards':'Keep adjustments in '+this.profileName(this.state.active_profile||this.state.room)));
       for(const entry of r.entries) {
-        const row=el('div',undefined,'diff'),label=el('div');label.append(el('strong',entry.label),el('p',entry.preference?'Shared preference: '+entry.preference:'Room variant: '+entry.variant,'muted'));
+        const row=el('div',undefined,'diff'),label=el('div');label.append(el('strong',entry.label),el('p',entry.preference?'Shared preference: '+entry.preference:'Profile: '+this.profileName(entry.variant),'muted'));
         const list=el('ul',undefined,'targets');entry.targets.forEach(t=>list.append(el('li',t.scope)));label.append(list);row.append(label,el('span',display(entry.before)+' → '+display(entry.value),'value'));box.append(row);
       }
-      const actions=el('div',undefined,'actions');actions.append(this.button('Back to editing',()=>this.closeReview(),undefined,'review-back'),this.button(r.action==='set_brightness_links'?'Save brightness links':r.action==='edit_many'?'Save standards':r.action==='restore'?'Restore selected settings':'Keep these adjustments',()=>this.confirmReview(),'primary','review-confirm'));box.append(actions);this.rows.append(box);
+      const actions=el('div',undefined,'actions');actions.append(this.button('Back to editing',()=>this.closeReview(),undefined,'review-back'),this.button(r.action==='delete_profile'?'Delete profile':r.action==='reset_profile'?'Reset profile':r.action==='set_brightness_links'?'Save brightness links':r.action==='edit_many'?'Save standards':r.action==='restore'?'Restore selected settings':'Keep these adjustments',()=>this.confirmReview(),'primary','review-confirm'));box.append(actions);this.rows.append(box);
     }
     async confirmReview() {
       const r=this.review;if(!r)return;
+      if(['delete_profile','reset_profile'].includes(r.action)){await this.mutate({action:r.action,profile_id:r.profile_id,revision:r.revision});return;}
       if(r.action==='set_brightness_links'){await this.mutate({action:r.action,links:r.links,revision:r.revision});return;}
-      if(r.action!=='edit_many'){await this.mutate({action:r.action,selection:r.selection,expected:r.expected,room:r.room,revision:r.revision});return;}
+      if(r.action!=='edit_many'){await this.mutate({action:r.action,selection:r.selection,expected:r.expected,room:r.room,profile_id:r.profile_id,revision:r.revision});return;}
       const edits=new Map(),preferences={};
       for(const entry of r.entries) {
-        if(entry.preference){preferences[entry.preference]=Number(entry.value);continue;}
+        if(entry.preference&&this.state.document.schema!==2){preferences[entry.preference]=Number(entry.value);continue;}
         const id=entry.bank_id+':'+entry.variant;if(!edits.has(id))edits.set(id,{bank_id:entry.bank_id,variant:entry.variant,settings:{}});edits.get(id).settings[entry.key]=entry.value;
       }
       await this.mutate({action:'edit_many',edits:[...edits.values()],preferences,revision:r.revision});
@@ -375,7 +420,11 @@
     async mutate(command) {
       if(this.busy)return;const focus=this.captureFocus();this.busy=true;++this.epoch;this.lockControls();let message,error=false;
       try {
-        await this.request(command);if(['edit_many','initialize','import','restore_backup'].includes(command.action))this.draft={};this.review=null;this.live={};
+        const reply=await this.request(command);
+        if(command.action==='create_profile'&&reply.profile_id){this.variant=reply.profile_id;this.profileNameDraft='';}
+        if(command.action==='set_automatic')this.automaticDraft=null;
+        if(command.action==='apply_profile')this.applyChoice=null;
+        if(['edit_many','initialize','import','restore_backup'].includes(command.action))this.draft={};this.review=null;this.live={};
         if(!await this.refresh())throw new Error('Command accepted, but the saved state could not be refreshed');
         message=this.status.pending_restore?'Standards saved. TV application is pending; the bridge will retry.':'Saved on the TV. Backup is sent to Home Assistant.';
       } catch(e) {
