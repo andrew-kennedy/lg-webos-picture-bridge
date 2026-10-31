@@ -180,6 +180,135 @@
         "port_controls_not_split_by_format": true,
         "browsing_did_not_modify_standards": true
       }
+    },
+    {
+      "label": "switch-hdr-performance",
+      "game": "Metroid Prime 4: Beyond \u2013 Nintendo Switch 2 Edition",
+      "game_display_mode": "Performance",
+      "captured_at": "2026-10-31T06:15:13.275Z",
+      "bridge_version": "0.15.6",
+      "context": {
+        "input": "hdmi3",
+        "mode": "hdrGame",
+        "range": "hdrALLM",
+        "ready": true
+      },
+      "game_genre": "Standard",
+      "width": 1920,
+      "height": 1080,
+      "frame_rate_reported": 120,
+      "hdr_type": "HDR10",
+      "pixel_encoding": "RGB",
+      "rgb_range": "FULL",
+      "allm_enabled": 1,
+      "is_game_mode": true,
+      "vrr_metadata": {
+        "fvaFactorM1": 0,
+        "baseVFront": 0,
+        "vrrEnabled": true,
+        "baseRefreshRate": 0
+      },
+      "qft_enabled": false,
+      "dsc_enabled": false,
+      "control_count": 39,
+      "changes_from_sdr": {
+        "peakBrightness": {
+          "value": "high",
+          "visible": true,
+          "active": false,
+          "editor": "unavailable"
+        },
+        "expressionEnhancer": {
+          "value": "off",
+          "visible": true,
+          "active": true,
+          "editor": "editable",
+          "options": [
+            "off",
+            "detail",
+            "highlight"
+          ]
+        },
+        "gammaLevel": {
+          "value": 0,
+          "visible": true,
+          "active": true,
+          "editor": "unavailable"
+        },
+        "contrast": {
+          "value": "100",
+          "visible": true,
+          "active": false,
+          "editor": "unavailable"
+        },
+        "gamma": {
+          "value": "mediumHavingLevel",
+          "visible": true,
+          "active": false,
+          "editor": "unavailable"
+        },
+        "backlight": {
+          "value": "100",
+          "visible": true,
+          "active": true,
+          "editor": "editable",
+          "min": 0,
+          "max": 100,
+          "step": 1
+        },
+        "hdrDynamicToneMapping": {
+          "value": "HGIG",
+          "visible": true,
+          "active": true,
+          "editor": "editable",
+          "options": [
+            "on",
+            "off",
+            "HGIG"
+          ]
+        },
+        "gameAdjustContrast": {
+          "value": 100,
+          "visible": true,
+          "active": true,
+          "editor": "editable",
+          "min": 0,
+          "max": 100,
+          "step": 1
+        },
+        "pictureMode": {
+          "value": "hdrGame",
+          "visible": true,
+          "active": true,
+          "editor": "editable",
+          "options": [
+            "hdrGame",
+            "hdrFilmMaker"
+          ]
+        }
+      },
+      "native_scopes_and_availability_match": true,
+      "state_unchanged": {
+        "document": true,
+        "preferences": true,
+        "revision": true,
+        "enabled": true,
+        "overrides": true
+      },
+      "temporary_count": 0,
+      "grouping": {
+        "format": "hdr",
+        "game_picture_controls_replace_unused_ordinary_controls": true,
+        "game_values_scoped_to_port_range_and_genre": true,
+        "shared_sdr_brightness_affects_all_three_game_profiles": false,
+        "hdr_brightness_is_independent": true,
+        "gamma_fine_adjustment_only_in_sdr": true,
+        "movie_processing_excluded_from_active_game_view": true,
+        "port_controls_not_split_by_format": true,
+        "browsing_did_not_modify_standards": true
+      },
+      "native_control_differences_from_same_format_60hz": {},
+      "backup_acknowledged": true
     }
   ],
   "baseline_controls": {
@@ -592,7 +721,7 @@
     "fix": "Game processing controls with runtime dependencies require a matching live input/preset/app context; native enablement remains authoritative for active profiles. Existing stored values are preserved. SDR Game Peak Brightness retains its existing fixed exclusion."
   },
   "notes": [
-    "Both signals are 4K/60 RGB Full with incoming ALLM and LG Game Optimizer. Native settings scopes are sdrALLM/hdrALLM with Standard genre.",
+    "The initial SDR/HDR signals are 4K/60 RGB Full with incoming ALLM and LG Game Optimizer. Native settings scopes are sdrALLM/hdrALLM with Standard genre.",
     "SDR recalled brightness 80, Game Contrast 95 and adjustable-2.2 Gamma with fine offset 0. HDR recalled brightness 100, Game Contrast 100 and HGiG. Both used Game Color Depth 50, Game Sharpness 0, Game Black Level 50, stabilizers 10/10 and Fine Tune Dark Areas 0.",
     "Ordinary contrast/black-level/color/sharpness are natively disabled; the editor uses the separate Game Optimizer values under the matching port/range/genre.",
     "SDR Gamma offers high2 and mediumHavingLevel; fine adjustment is -3 through +3. HDR Gamma and its fine adjustment are excluded even though the native child flag remains active.",
@@ -601,7 +730,13 @@
     "Peak Brightness, Dynamic Contrast, both noise-reduction controls, Smooth Gradation and TruMotion are locked in these live Game contexts. Inactive factory descriptions incorrectly offered them; the runtime policies consult low-latency signal, Game Optimizer and TruMotion eligibility.",
     "The native controller functions reviewed include pq_ux_setNoiseReductionMenuInfoToDB, pq_ux_setMpegNoiseReductionMenuInfoToDB, pq_ux_setSmoothGradationMenuInfoToDB, pq_ux_setDynamicContrastInfoToDB, pq_ux_setTruMotionMenuInfoToDB and pq_ux_setPeakBrightnessMenuInfoToDB. They reference runtime low-latency/auto-low-delay, Game Optimizer, window and TruMotion state; the fix does not invent a permanent unsupported claim from one signal.",
     "Shared SDR game brightness still affects PC, Nintendo and PS5 together even under a narrow Nintendo filter. HDR brightness remains an independent per-input/preset standard.",
-    "The TV reports vrrEnabled true with baseRefreshRate 0. That metadata is recorded without claiming independent verification of variable frame delivery. QFT is configured on but qftEnabled is false in both signals; DSC is off.",
-    "No picture setting was changed during the captures. The user changed games; saved standards, preferences, revision, management and empty adjustments remained unchanged. Audit files are stored on the workstation, not TV internal storage."
+    "The TV reports vrrEnabled true with baseRefreshRate 0. That metadata is recorded without claiming independent verification of variable frame delivery. QFT is configured on but qftEnabled is false in the initial SDR/HDR signals; DSC is off.",
+    "No picture setting was changed during the captures. The user changed games; saved standards, preferences, revision, management and empty adjustments remained unchanged. Audit files are stored on the workstation, not TV internal storage.",
+    "Subsequent 120 Hz samples use Metroid Prime 4 Performance Mode on bridge 0.15.6. Their native dimensions, values, visibility/activity, choices and ranges are compared with the matching original 60 Hz format. Each sample states its resolution and HDR format; this does not verify PS5 HDMI 4 or 4K/120 output. Existing reviewed inactive-profile rules remain in force.",
+    "switch-hdr-performance: 39 managed controls verified at 1920x1080/120 Hz HDR10. Native control differences from the matching original 60 Hz format: 0. The native VRR flag remains enabled with baseRefreshRate 0; variable frame delivery is not independently measured."
+  ],
+  "captured_bridge_versions": [
+    "0.15.4",
+    "0.15.6"
   ]
 }
