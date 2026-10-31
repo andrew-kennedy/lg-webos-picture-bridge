@@ -6,6 +6,7 @@ const model = require('./profile-model');
 const banks = require('./profile-banks');
 const disk = require('./profile-store');
 const availability = require('./profile-availability');
+const view = require('../../profile-view');
 
 function create(options) {
   const store = options.store || disk.create(), clock = options.now || Date.now;
@@ -72,7 +73,7 @@ function create(options) {
       migration_id:saved && saved.migration_id || null,context:model.clone(context),created_at:new Date(clock()).toISOString()};
   }
   function status() {
-    return {configured:!!saved,editor_api:4,owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
+    return {configured:!!saved,editor_api:5,owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
       enabled:!!(saved && saved.enabled),room,power,context,temporary_count:Object.values(overrides).reduce((n,v) => n + Object.keys(v).length,0),
       pending_restore:Object.keys(journal.restore).length > 0,applying,changed_count:changedCount,
       error:loadError || lastError,backup_sequence:latestBackup ? sequence : null,backup_acknowledged:acknowledged,
@@ -358,6 +359,69 @@ function create(options) {
         const next = model.preferences(Object.assign({},preferences(),input.values));
         if (model.canonical(next) !== model.canonical(preferences())) { saved.preferences = next; persistStandards(); }
         return reconcile();
+      }
+      if (input.action === 'set_brightness_links') {
+        guard(); checkRevision(input);
+        if (!Array.isArray(input.links) || !input.links.length || input.links.length > 100) throw new Error('Choose brightness links');
+        const candidate = model.clone(saved), seen = new Set(), epoch = powerEpoch;
+        const check = () => { externalGuard(); guard(); checkRevision(input); if (powerEpoch !== epoch) throw new Error('TV power session changed'); };
+        for (const link of input.links) {
+          if (!link || Object.keys(link).some(k=>!['bank_id','linked'].includes(k)) || seen.has(link.bank_id)) throw new Error('Invalid or duplicate brightness link');
+          const original = bankById(link.bank_id), bank = candidate.document.banks.find(b=>b.id===original.id);
+          seen.add(bank.id); view.setBrightnessLink(bank,link.linked,candidate.preferences,room);
+          const live = await inspect(original); check();
+          for (const variant of ['standard','bright','dark']) {
+            const opts = editorOptions(variant,candidate);
+            availability.assertEditable('backlight',opts.values(bank).backlight,bank,live,opts);
+          }
+        }
+        model.validate(candidate.document); check();
+        if (model.canonical(candidate.document) === model.canonical(saved.document)) return status();
+        const affected = {};
+        for (const id of seen) {
+          const bank = candidate.document.banks.find(b=>b.id===id);
+          if (!model.same(model.desired(bank,room,candidate.preferences).backlight,model.desired(bankById(id),room,saved.preferences).backlight)) {
+            affected[id]=['backlight']; if (overrides[id]) delete overrides[id].backlight;
+          }
+        }
+        saved=candidate; mergeScopes(journal.restore,affected); journal.dirty=dirtyScopes(); persistStandards();
+        queueSync(); return status();
+      }
+      if (input.action === 'include_motion_controls') {
+        guard(); checkRevision(input);
+        const candidate=model.clone(saved), epoch=powerEpoch;
+        const check=()=>{externalGuard();guard();checkRevision(input);if(powerEpoch!==epoch)throw new Error('TV power session changed');};
+        for (const bank of candidate.document.banks) {
+          const d=bank.target.dimension;
+          if(bank.target.category!=='picture'||bank.target.app_id||!['filmMaker','hdrFilmMaker','dolbyHdrCinema','dolbyHdrCinemaBright'].includes(d.pictureMode))continue;
+          const keys=['truMotionJudder','truMotionBlur'].filter(k=>!Object.hasOwn(bank.settings,k));
+          if(!keys.length)continue;
+          const values=(await native({action:'read',banks:[{id:bank.id,target:bank.target,keys}]},check)).banks[0].settings;
+          for(const key of keys)bank.settings[key]=values[key];
+          const live=await inspect(bank);check();
+          for(const key of keys)bank.settings[key]=banks.encode(key,values[key],live.settings[key],live.descriptions.find(d=>d.key===key),bank);
+        }
+        model.validate(candidate.document);check();
+        if(model.canonical(candidate.document)!==model.canonical(saved.document)){saved=candidate;persistStandards();}
+        return status();
+      }
+      if (input.action === 'restore_scope') {
+        guard(); checkRevision(input);
+        if(input.scope!==undefined&&!['all','active'].includes(input.scope))throw new Error('Unknown scope');
+        const requested=view.scopeSelection(snapshot(),input.filters,input.categories), selection={},excluded=[], epoch=powerEpoch, currentRoom=room, currentContext=model.canonical(context);
+        const check=()=>{externalGuard();guard();checkRevision(input);if(powerEpoch!==epoch||room!==currentRoom||model.canonical(context)!==currentContext)throw new Error('TV session, signal or room changed');};
+        for(const [id,keys] of Object.entries(requested)) {
+          const bank=bankById(id);if(input.scope==='active'&&!model.active(bank,context))continue;
+          const live=await inspect(bank,currentRoom);check();
+          for(const key of keys) {
+            try {availability.assertEditable(key,model.desired(bank,currentRoom,preferences())[key],bank,live,editorOptions(currentRoom));}
+            catch(error){if(error.code!=='profile_setting_unavailable')throw error;excluded.push({bank_id:id,key,reason:error.message});continue;}
+            (selection[id]||(selection[id]=[])).push(key);
+          }
+        }
+        check();if(!Object.keys(selection).length)throw new Error('No applicable settings match this scope');
+        mergeScopes(journal.restore,selection);writeJournal();changed(true);
+        return {...await reconcile(),selection,excluded};
       }
       if (input.action === 'import') {
         checkRevision(input);

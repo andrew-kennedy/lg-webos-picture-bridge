@@ -33,6 +33,9 @@ function resolve(key,target) {
   if(sdr&&key==='gamma')return select(['high2','mediumHavingLevel']);
   // The caller validates the saved/candidate Gamma dependency first.
   if(sdr&&key==='gammaLevel')return number(-3,3);
+  // Native SDR/HDR/Dolby movie audits captured both 0–10 controls. Their
+  // User Selection dependency is checked against the saved/candidate mode.
+  if(isMovie&&['truMotionJudder','truMotionBlur'].includes(key))return number(0,10);
   if(isGame&&processing.has(key))return blocked('LG does not use this processing control in this verified Game Optimizer profile.');
   if(d.input==='hdmi1_pc'&&['dynamicColor','superResolution','expressionEnhancer'].includes(key))
     return blocked('LG does not use this processing control in the verified PC Game Optimizer profile.');

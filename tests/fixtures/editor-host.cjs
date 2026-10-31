@@ -2,7 +2,7 @@
 // Browser interactions share a deterministic TV transport; engine tests cover
 // atomicity, native validation, persistence and recovery separately.
 function setup(initial) {
-  window.fixture=structuredClone(initial);window.calls=[];window.editorApi=4;
+  window.fixture=structuredClone(initial);window.calls=[];window.editorApi=5;
   window.confirm=()=>true;
   window.requestProfile=async command=>{
     window.calls.push(structuredClone(command));
@@ -18,6 +18,7 @@ function setup(initial) {
           {component:'select',options:['on','off'].includes(value)?['off','on']:[value]};
       }
       if(controls.enable144HzBooster)controls.enable144HzBooster.label='165 Hz boost';
+      if(window.motionDependencies&&controls.truMotionMode)controls.truMotionMode.options=['off','user'];
       if(window.slowInspect===bank.id||window.delayInspect)await new Promise(resolve=>setTimeout(resolve,100));
       if(controls.pictureMode)controls.pictureMode.options=bank.target.dimension.dynamicRange.startsWith('sdr')?['filmMaker','game']:bank.target.dimension.dynamicRange.startsWith('hdr')?['hdrFilmMaker','hdrGame']:['dolbyHdrCinema','dolbyHdrCinemaBright','dolbyHdrGame'];
       if(controls.blackLevel)controls.blackLevel={component:'select',options:['auto','high','low']};
@@ -25,9 +26,18 @@ function setup(initial) {
       for(const [key,reason] of Object.entries((window.unavailable||{})[bank.id]||{})) {
         availability[key]={state:'unavailable',editable:false,reason};delete controls[key];
       }
+      if(window.motionDependencies)for(const key of ['truMotionJudder','truMotionBlur'].filter(k=>Object.hasOwn(bank.settings,k))) {
+        const motion=window.fixture.document.banks.find(b=>b.target.app_id&&b.target.dimension.input===bank.target.dimension.input&&b.target.dimension.pictureMode===bank.target.dimension.pictureMode);
+        if(!motion||motion.settings.truMotionMode!=='user'){availability[key]={state:'unavailable',editable:false,reason:'Requires TruMotion User Selection in this preset.'};delete controls[key];}
+        else controls[key]={component:'number',min:0,max:10,step:1};
+      }
       return {id:bank.id,settings:structuredClone(bank.settings),controls,availability};
     }
-    if(['edit_many','save','restore'].includes(command.action)&&command.revision!==window.fixture.revision)throw new Error('Profiles changed; refresh before saving');
+    if(['edit_many','save','restore','set_brightness_links'].includes(command.action)&&command.revision!==window.fixture.revision)throw new Error('Profiles changed; refresh before saving');
+    if(command.action==='set_brightness_links') {
+      for(const link of command.links)window.LGProfileView.setBrightnessLink(window.fixture.document.banks.find(b=>b.id===link.bank_id),link.linked,window.fixture.preferences,window.fixture.room);
+      window.fixture.revision++;
+    }
     if(command.action==='edit_many') {
       if(window.failNextBatch==='before'){window.failNextBatch=null;window.fixture.revision++;throw new Error('Another editor changed the profiles');}
       const next=structuredClone(window.fixture);

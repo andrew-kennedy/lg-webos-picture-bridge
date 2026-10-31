@@ -25,6 +25,27 @@
   function inputName(bank) {
     return String(typeof bank==='string'?bank:input(bank)||'').replace(/^hdmi([1-4])(_pc)?$/,(_,n,pc)=>'HDMI '+n+(pc?' (PC)':''));
   }
+  function brightnessRole(bank) {
+    if(bank.target.category!=='picture'||bank.target.app_id||!Object.hasOwn(bank.settings,'backlight'))return null;
+    return {game:'game_sdr',filmMaker:'movie_sdr'}[bank.target.dimension.pictureMode]||null;
+  }
+  function setBrightnessLink(bank,linked,preferences,room) {
+    const role=brightnessRole(bank);
+    if(!role||typeof linked!=='boolean')throw new Error('Choose an SDR picture profile and a brightness link state');
+    if(!!bank.brightness_role===linked)return;
+    if(linked)bank.brightness_role=role;
+    else {
+      // Freeze the effective standards, never a temporary viewing adjustment.
+      bank.settings.backlight=preferences[role==='game_sdr'?'game_sdr':'movie_'+room];
+      if(role==='movie_sdr')bank.variants=bank.variants||{};
+      for(const variant of ['bright','dark']) {
+        if(role==='movie_sdr')bank.variants[variant]=bank.variants[variant]||{};
+        if(bank.variants&&bank.variants[variant]&&(role==='movie_sdr'||Object.hasOwn(bank.variants[variant],'backlight')))
+          bank.variants[variant].backlight=preferences[role==='game_sdr'?'game_sdr':'movie_'+variant];
+      }
+      delete bank.brightness_role;
+    }
+  }
   function same(a,b) {
     if(a&&b&&typeof a==='object'&&typeof b==='object')return Object.keys(a).sort().join()===Object.keys(b).sort().join()&&Object.keys(a).every(k=>same(a[k],b[k]));
     return a!==undefined&&b!==undefined&&String(a)===String(b);
@@ -149,5 +170,17 @@
     }
     return {visible,excluded};
   }
-  return {values,control,same,inputName,modes,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition};
+  function scopeSelection(state,scope={},selectedCategories=Object.keys(categories)) {
+    const all=records(state,state.room),available=options(all);
+    if(!scope||typeof scope!=='object'||Array.isArray(scope)||Object.keys(scope).some(k=>!Object.hasOwn(available,k)))throw new Error('Unknown scope filter');
+    for(const [key,list] of Object.entries(scope))if(!Array.isArray(list)||!list.length||list.some(v=>!available[key].includes(v)))throw new Error('Unknown or empty '+key+' filter');
+    if(!Array.isArray(selectedCategories)||!selectedCategories.length||selectedCategories.some(k=>!Object.hasOwn(categories,k)))throw new Error('Unknown or empty settings category');
+    const selection={};
+    for(const category of selectedCategories)for(const row of scopeRows(all,scope,category,[]))for(const cell of row.cells)for(const r of cell.records) {
+      const keys=selection[r.bank.id]||(selection[r.bank.id]=[]);if(!keys.includes(r.key))keys.push(r.key);
+    }
+    if(!Object.keys(selection).length)throw new Error('No managed settings match this scope');
+    return selection;
+  }
+  return {values,control,same,inputName,brightnessRole,setBrightnessLink,scopeSelection,modes,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition};
 });

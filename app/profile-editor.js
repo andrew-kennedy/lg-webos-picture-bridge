@@ -8,7 +8,7 @@
   // help and value labels. See docs/setting-help.md for sources and caveats.
   // Keep this local: rendering help requires no TV reads or persistent writes.
   const descriptions = {
-    backlight:'Sets how much light the OLED panel emits. SDR movie brightness uses the Bright and Dark room values; HDR and Dolby Vision have their own saved values.',
+    backlight:'Sets how much light the OLED panel emits. SDR profiles can share brightness or keep independent values using SDR brightness links. HDR and Dolby Vision have their own saved values.',
     contrast:'Adjusts the difference between light and dark areas. Raising it can make bright shades harder to distinguish.',
     brightness:'Adjusts how dark the picture’s black and shadow areas appear. Too high can make black look gray; too low can hide shadow detail.',
     color:'Adjusts color intensity. Higher values make colors more saturated; this does not change the HDMI signal’s bit depth.',
@@ -31,7 +31,7 @@
     smoothGradation:'Smooths visible steps between similar shades, such as bands in a sky. Stronger smoothing can reduce subtle texture.',
     blackLevel:'Matches the source’s RGB signal range: high is Full, low is Limited, and auto detects it. A mismatch can wash out blacks or hide dark and bright detail.',
     realCinema:'Handles the original frame cadence of film content for more even motion. LG disables this control in Game presets; signal conditions can restrict it further. TruMotion controls motion smoothing separately.',
-    truMotionMode:'Smooths movement using motion processing. Stronger smoothing can make films look like live video; User Selection enables the individual adjustments.',
+    truMotionMode:'Smooths movement using motion processing. Stronger smoothing can make films look like live video. Save User Selection to edit de-judder and de-blur for this preset, including while its source is inactive.',
     truMotionJudder:'Adjusts smoothing for the stepping motion visible in low-frame-rate content. Used with TruMotion’s User Selection mode.',
     truMotionBlur:'Adjusts TruMotion’s reduction of motion blur. Used with TruMotion’s User Selection mode.',
     motionProOLED:'Uses dark intervals between displayed frames to improve motion clarity. This can dim the picture and make flicker visible.',
@@ -59,7 +59,10 @@
       // across renders, including the empty/offline editor.
       this.shadowRoot.addEventListener('keydown',event=>this.remoteKey(event));
     }
-    controls() { return [...this.shadowRoot.querySelectorAll('[data-focus]:not(:disabled)')].filter(n=>n.getClientRects().length); }
+    controls() { return [...this.shadowRoot.querySelectorAll('[data-focus]:not(:disabled)')].filter(n=>{
+      const closed=n.closest('details:not([open])');
+      return n.getClientRects().length&&(!closed||closed.firstElementChild===n);
+    }); }
     captureFocus() {
       const active=this.shadowRoot.activeElement,controls=this.controls(),index=controls.indexOf(active);
       return index>=0 ? {key:active.dataset.focus,neighbors:controls.slice(index+1).concat(controls.slice(0,index).reverse()).map(n=>n.dataset.focus),scroll:this.rows ? this.rows.scrollTop : 0} : null;
@@ -174,6 +177,32 @@
       }
       this.review=null;this.updateFooter();
     }
+    brightnessBanks() {
+      return this.records().filter(r=>r.key==='backlight'&&model.brightnessRole(r.bank)&&model.matches(r,this.scope)).map(r=>r.bank);
+    }
+    renderBrightnessLinks() {
+      const banks=this.brightnessBanks();if(!banks.length)return;
+      const content=el('div',undefined,'grouping');
+      content.append(el('p','Linked gaming profiles share one SDR brightness. Linked movie profiles share Bright and Dark room values. Independent profiles can be edited per input, preset and room. Unlinking keeps the current standards.','scope-note'));
+      const actions=el('div',undefined,'actions');
+      for(const [label,linked] of [['Link selected profiles',true],['Unlink selected profiles',false]]) {
+        const b=this.button(label,()=>this.openBrightnessReview(banks,linked),undefined,'brightness-links:'+linked);b.dataset.linkAction='';actions.append(b);
+      }
+      content.append(actions);
+      for(const bank of banks) {
+        const row=el('div',undefined,'diff'),label=el('div');label.append(el('strong',model.inputName(bank)+' · '+model.modes[bank.target.dimension.pictureMode]),el('p',bank.brightness_role?'Linked to shared '+(bank.brightness_role==='game_sdr'?'gaming':'movie')+' brightness':'Independent brightness','muted'));
+        const b=this.button(bank.brightness_role?'Unlink':'Link',()=>this.openBrightnessReview([bank],!bank.brightness_role),undefined,'brightness-link:'+bank.id);b.dataset.linkAction='';row.append(label,b);content.append(row);
+      }
+      content.append(el('p','Save or discard staged value edits before changing links. Home Assistant’s shared sliders affect linked profiles only.','scope-note'));
+      this.rows.append(this.details('SDR brightness links','brightness-links',content));
+    }
+    openBrightnessReview(banks,linked) {
+      if(Object.keys(this.draft).length){this.error('Save or discard staged value edits before changing brightness links.');return;}
+      const changed=banks.filter(b=>!!b.brightness_role!==linked);if(!changed.length){this.error('The selected profiles already have this link state.');return;}
+      const describe=bank=>(bank.brightness_role?'Linked':'Independent')+' · Bright '+model.values(bank,this.state,'bright').backlight+' / Dark '+model.values(bank,this.state,'dark').backlight;
+      const entries=changed.map(bank=>{const after=JSON.parse(JSON.stringify(bank));model.setBrightnessLink(after,linked,this.state.preferences,this.state.room);return {label:'SDR brightness link',variant:'Bright and Dark',before:describe(bank),value:describe(after),targets:[{scope:model.inputName(bank)+' · '+model.modes[bank.target.dimension.pictureMode]}]};});
+      this.review={action:'set_brightness_links',revision:this.state.revision,links:changed.map(bank=>({bank_id:bank.id,linked})),entries};this.render({key:'review-back',neighbors:[],scroll:0});
+    }
     changeView(change) {change();this.review=null;this.render();this.inspect();}
     chips(label,key,choices,labels) {
       const field=el('fieldset');field.append(el('legend',label));const list=el('div',undefined,'chips');
@@ -220,6 +249,11 @@
         const grouping=el('div',undefined,'grouping'),field=el('fieldset'),chips=el('div',undefined,'chips');field.append(el('legend','Show separate controls by'));
         for(const [key,label] of [['port','Port'],['format','Format'],['family','Preset family'],['preset','Exact preset'],['genre','Genre'],['allm','ALLM']])if(key!=='genre'||opts.genre.length>1)chips.append(this.toggle(label,this.split.includes(key),()=>this.changeView(()=>{this.split=this.split.includes(key)?this.split.filter(k=>k!==key):[...this.split,key];}),'split:'+key));
         field.append(chips);grouping.append(field,el('p',this.category==='port'?'Connection settings are shared by every device and format on each port.':this.category==='selection'?'Choose which preset LG uses for each input and signal. Exact preset and genre filters do not split these mappings.':'Preset family separates Gaming and Movies. Exact preset separates individual LG picture modes. Mixed values stay separate until you explicitly edit a combined control.','scope-note'));this.rows.append(grouping);
+        if(this.category==='picture'&&this.status.editor_api>=5)this.renderBrightnessLinks();
+        if(this.category==='motion'&&this.status.editor_api>=5&&this.state.document.banks.some(b=>b.target.category==='picture'&&!b.target.app_id&&['filmMaker','hdrFilmMaker','dolbyHdrCinema','dolbyHdrCinemaBright'].includes(b.target.dimension.pictureMode)&&['truMotionJudder','truMotionBlur'].some(k=>!Object.hasOwn(b.settings,k)))) {
+          const box=el('div',undefined,'grouping');box.append(el('p','Include the TV’s existing de-judder and de-blur values in your movie standards. TruMotion keeps its saved mode.','scope-note'));
+          const b=this.button('Include TruMotion adjustments',()=>this.mutate({action:'include_motion_controls',revision:this.state.revision}));b.dataset.linkAction='';box.append(b);this.rows.append(box);
+        }
         this.settings=el('div');this.rows.append(this.settings);
       }
       const footer=el('div',undefined,'footer'),footerActions=el('div',undefined,'actions');this.counts=el('span',undefined,'counts');
@@ -253,7 +287,7 @@
           } else if(control&&control.options) {
             input=el('select');input.setAttribute('aria-label',fieldLabel);input.dataset.focus='setting:'+cell.id;
             if(mixed){const option=el('option','Mixed');option.value='';option.disabled=true;input.append(option);}
-            for(const value of control.options){const option=el('option',value);option.value=value;input.append(option);}input.value=mixed?'':unique[0];input.disabled=disabled;input.onchange=()=>update(input.value);
+            for(const value of control.options){const option=el('option',row.key==='truMotionMode'&&value==='user'?'User Selection':value);option.value=value;input.append(option);}input.value=mixed?'':unique[0];input.disabled=disabled;input.onchange=()=>update(input.value);
           } else input=el('span',mixed?'Mixed: '+unique.join(' / '):unique[0],mixed?'mixed':'');
           group.append(input);
           if(descriptions[row.key])group.querySelectorAll('input,select').forEach(node=>node.setAttribute('aria-describedby','help-'+row.key));
@@ -286,6 +320,7 @@
       this.counts.textContent=this.selectedRecords().length+' selected values · '+this.excludedRecords().length+' excluded · '+entries.length+' staged changes'+(outside?' ('+outside+' outside this selection)':'');
       this.reviewButton.textContent=stale?'Review against latest':entries.length?'Review '+entries.length+' changes':'Review changes';this.reviewButton.disabled=!this.writable()||!entries.length||!!this.review;
       this.discardButton.disabled=!entries.length||!!this.review;this.restoreButton.disabled=!this.writable()||!shown.size||this.selectedRecords().some(r=>!(r.availability||model.applicability(r,this.live)).editable)||!!entries.length||!!this.review;this.keepButton.disabled=this.restoreButton.disabled;
+      this.shadowRoot.querySelectorAll('[data-link-action]').forEach(b=>b.disabled=!this.writable()||this.status.editor_api<5||!!entries.length||!!this.review);
     }
     openEditReview() {
       try {
@@ -317,17 +352,18 @@
       if(!entries.length){this.render();this.error('No tracked temporary adjustments in this selection.');return;}
       this.review={action,selection,expected,room:this.state.room,revision:this.state.revision,entries};this.render({key:'review-back',neighbors:[],scroll:0});
     }
-    closeReview() {const key=this.review.action==='edit_many'?'review':this.review.action==='restore'?'restore':'promote';this.review=null;this.render({key,neighbors:[],scroll:0});}
+    closeReview() {const key=this.review.action==='set_brightness_links'?'brightness-links':this.review.action==='edit_many'?'review':this.review.action==='restore'?'restore':'promote';this.review=null;this.render({key,neighbors:[],scroll:0});}
     renderReview() {
-      const box=el('section',undefined,'review'),r=this.review;box.append(el('h3',r.action==='edit_many'?'Review saved standards':r.action==='restore'?'Restore current '+this.state.room+' room standards':'Keep current '+this.state.room+' room adjustments'));
+      const box=el('section',undefined,'review'),r=this.review;box.append(el('h3',r.action==='set_brightness_links'?'Review brightness links':r.action==='edit_many'?'Review saved standards':r.action==='restore'?'Restore current '+this.state.room+' room standards':'Keep current '+this.state.room+' room adjustments'));
       for(const entry of r.entries) {
         const row=el('div',undefined,'diff'),label=el('div');label.append(el('strong',entry.label),el('p',entry.preference?'Shared preference: '+entry.preference:'Room variant: '+entry.variant,'muted'));
         const list=el('ul',undefined,'targets');entry.targets.forEach(t=>list.append(el('li',t.scope)));label.append(list);row.append(label,el('span',display(entry.before)+' → '+display(entry.value),'value'));box.append(row);
       }
-      const actions=el('div',undefined,'actions');actions.append(this.button('Back to editing',()=>this.closeReview(),undefined,'review-back'),this.button(r.action==='edit_many'?'Save standards':r.action==='restore'?'Restore selected settings':'Keep these adjustments',()=>this.confirmReview(),'primary','review-confirm'));box.append(actions);this.rows.append(box);
+      const actions=el('div',undefined,'actions');actions.append(this.button('Back to editing',()=>this.closeReview(),undefined,'review-back'),this.button(r.action==='set_brightness_links'?'Save brightness links':r.action==='edit_many'?'Save standards':r.action==='restore'?'Restore selected settings':'Keep these adjustments',()=>this.confirmReview(),'primary','review-confirm'));box.append(actions);this.rows.append(box);
     }
     async confirmReview() {
       const r=this.review;if(!r)return;
+      if(r.action==='set_brightness_links'){await this.mutate({action:r.action,links:r.links,revision:r.revision});return;}
       if(r.action!=='edit_many'){await this.mutate({action:r.action,selection:r.selection,expected:r.expected,room:r.room,revision:r.revision});return;}
       const edits=new Map(),preferences={};
       for(const entry of r.entries) {
