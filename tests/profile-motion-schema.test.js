@@ -10,6 +10,7 @@ module.exports=async function(){
   const bank={id:'movie',target};
   assert.equal(banks.encodingDescription('truMotionBlur',bank,live,factory,true),factory);
   assert.equal(banks.encodingDescription('truMotionBlur',bank,live,factory,false),live,'Unknown firmware retains strict scope validation');
+  assert.equal(banks.encodingDescription('truMotionBlur',{target:{...target,dimension:{input:'hdmi3',pictureMode:'expert1'}}},live,factory,true),factory,'The native Expert storage schema is independent of the active Game placeholder');
   assert.equal(banks.encodingDescription('truMotionBlur',{target:{...target,dimension:{input:'hdmi4',pictureMode:'game'}}},live,factory,true),live,'No fallback for unreviewed profiles');
   assert.throws(()=>banks.encode('truMotionBlur',9,'10',live,bank),/app scope/);
   const load=factories.load,platform=availability.reviewedPlatform,writes=[];let value='10';

@@ -8,6 +8,7 @@ const disk = require('./profile-store');
 const availability = require('./profile-availability');
 const view = require('../../profile-view');
 const catalog = require('./profile-catalog');
+const nativeCatalog = require('./profile-native-catalog');
 
 function create(options) {
   const store = options.store || disk.create(), clock = options.now || Date.now;
@@ -85,7 +86,7 @@ function create(options) {
       migration_id:saved && saved.migration_id || null,context:model.clone(context),created_at:new Date(clock()).toISOString()};
   }
   function status() {
-    return {configured:!!saved,editor_api:7,profile_schema:document()&&document().schema,selection:selection(),active_profile:activeProfile(),owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
+    return {configured:!!saved,editor_api:8,profile_schema:document()&&document().schema,selection:selection(),active_profile:activeProfile(),owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
       enabled:!!(saved && saved.enabled),room,power,context,temporary_count:Object.values(overrides).reduce((n,v) => n + Object.keys(v).length,0),
       pending_restore:Object.keys(journal.restore).length > 0,applying,changed_count:changedCount,
       error:loadError || lastError,backup_sequence:latestBackup ? sequence : null,backup_acknowledged:acknowledged,
@@ -302,13 +303,13 @@ function create(options) {
         return value;
       }};
   }
-  async function inspect(bank, variant = 'standard') {
+  async function inspect(bank, variant = 'standard', readCache) {
     guard();
     if (options.inspect) return options.inspect(bank);
     return new Promise((resolve,reject) => {
       const epoch = powerEpoch;
       const check = () => { guard(); if (epoch !== powerEpoch) throw new Error('TV power session changed'); };
-      const run = done => banks.inspect(options.service,bank,check,() => context,editorOptions(variant)).then(v => done(null,v),done);
+      const run = done => banks.inspect(options.service,bank,check,() => context,{...editorOptions(variant),readCache}).then(v => done(null,v),done);
       if (options.enqueue) options.enqueue(run,(e,v) => e ? reject(e) : resolve(v)); else run((e,v) => e ? reject(e) : resolve(v));
     });
   }
@@ -435,9 +436,27 @@ function create(options) {
         if(input.clear_adjustments!==false)mergeScopes(journal.restore,allKeys());
         writeJournal();changed(true);return reconcile();
       }
-      if (input.action === 'inspect') {
-        const bank = bankById(input.bank_id), result = await inspect(bank,input.variant || 'standard');
-        delete result.descriptions; delete result.factory_descriptions; delete result.active_values; return result;
+      if (input.action === 'inspect'||input.action==='inspect_many') {
+        const ids=input.action==='inspect'?[input.bank_id]:input.bank_ids;
+        if(!Array.isArray(ids)||!ids.length||ids.length>32||new Set(ids).size!==ids.length)throw new Error('Inspect 1–32 unique native banks');
+        const chosen=ids.map(bankById),results=[],readCache=new Map(),captured=model.canonical(context),epoch=powerEpoch;
+        for(const bank of chosen) {
+          const result=await inspect(bank,input.variant||'standard',readCache);
+          externalGuard();guard();if(epoch!==powerEpoch||captured!==model.canonical(context))throw new Error('TV signal changed while checking availability');
+          for(const key of ['descriptions','factory_descriptions','active_values','preset_description','genre_description'])delete result[key];
+          results.push(result);
+        }
+        return input.action==='inspect'?results[0]:{banks:results};
+      }
+      if(input.action==='include_native_catalog') {
+        guard();checkRevision(input);
+        if(options.availabilityReviewed!==true&&!availability.reviewedPlatform().reviewed)throw new Error('Native catalog enrollment requires the reviewed TV software');
+        const epoch=powerEpoch;
+        const check=()=>{externalGuard();guard();checkRevision(input);if(epoch!==powerEpoch)throw new Error('TV power session changed');};
+        const expanded=await nativeCatalog.expand(document(),command=>native(command,check),check,{inputs:input.inputs,index:options.nativeDescriptions});
+        model.validate(expanded.document);check();
+        if(expanded.added_settings) {saved.document=expanded.document;persistStandards();}
+        return {...status(),added_banks:expanded.added_banks,added_settings:expanded.added_settings};
       }
       if (input.action === 'set_environment') {
         if (!['bright','dark'].includes(input.room)) throw new Error('Expected bright or dark room');
@@ -464,7 +483,7 @@ function create(options) {
       }
       if (input.action === 'set_brightness_links') {
         guard(); checkRevision(input);
-        if (!Array.isArray(input.links) || !input.links.length || input.links.length > 100) throw new Error('Choose brightness links');
+        if (!Array.isArray(input.links) || !input.links.length || input.links.length > 768) throw new Error('Choose brightness links');
         const candidate = model.clone(saved), seen = new Set(), epoch = powerEpoch;
         const check = () => { externalGuard(); guard(); checkRevision(input); if (powerEpoch !== epoch) throw new Error('TV power session changed'); };
         for (const link of input.links) {
@@ -539,7 +558,7 @@ function create(options) {
         const candidate = model.clone(saved), seen = new Set(), prefValues = {}, inspected = new Map(), epoch = powerEpoch;
         const check = () => { externalGuard(); guard(); checkRevision(input); if (epoch !== powerEpoch) throw new Error('TV power session changed'); };
         if (!prefPatch || typeof prefPatch !== 'object' || Array.isArray(prefPatch)) throw new Error('Invalid brightness preferences');
-        if (!Array.isArray(edits) || edits.length > 300 || (!edits.length && !Object.keys(prefPatch).length)) throw new Error('Choose settings to edit');
+        if (!Array.isArray(edits) || edits.length > 768 || (!edits.length && !Object.keys(prefPatch).length)) throw new Error('Choose settings to edit');
         model.preferences({...preferences(candidate),...prefPatch});
         if(candidate.document.schema===2)catalog.legacyPatch(candidate.document,prefPatch);
         else candidate.preferences = model.preferences({...candidate.preferences,...prefPatch});

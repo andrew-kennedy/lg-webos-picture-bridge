@@ -11,13 +11,13 @@ const doc = {schema:1,name:'Test G6',devices:{switch_2:'Switch 2',apple:'Apple T
   {id:'port',name:'HDMI 3 game capability',target:{category:'other',dimension:{gameInput:'hdmi3'}},settings:{enableALLM:'on'},devices:['switch_2']},
   {id:'game_mapping',name:'HDR ALLM Game',target:{category:'picture',dimension:{input:'hdmi3',dynamicRange:'hdrALLM'}},settings:{pictureMode:'hdrGame'},devices:['switch_2']}
 ]};
-function fixture(collection = doc) {
+function fixture(collection = doc, extra = {}) {
   const files = {}, writes = [], operations = [], inspections = [], values = Object.fromEntries(collection.banks.map(b => [b.id,clone(b.settings)]));
   let milliseconds = Date.now(), hooks = null, inspectHook = null, descriptionHook = null, bootId = 'boot1';
   const timers = new Set();
   const store = {read:n => files[n] ? clone(files[n]) : null,write:(n,v) => { files[n] = clone(v); writes.push(n); }};
   function create() {
-    return engine.create({store,bootId,availabilityReviewed:true,now:() => ++milliseconds,setTimeout:fn => {timers.add(fn);return fn;},clearTimeout:fn => timers.delete(fn),
+    return engine.create({...extra,store,bootId,availabilityReviewed:true,now:() => ++milliseconds,setTimeout:fn => {timers.add(fn);return fn;},clearTimeout:fn => timers.delete(fn),
       inspect:async bank => {
         inspections.push(bank.id);if (inspectHook) await inspectHook(bank);
         const descriptions=Object.keys(bank.settings).map(key => ({key,dbtype:bank.target.app_id?'M':'G',dimension:Object.keys(bank.target.dimension),ui:{active:true,visible:true},
@@ -111,8 +111,8 @@ module.exports = async function () {
   f.hook(null); await e.command({action:'reconcile'});
   assert.equal(f.values.game.gameSharpness,3);
   assert.equal(e.status().pending_restore,false);
-  f.observe(e,'mapping','pictureMode','vivid');
-  assert.equal(e.snapshot().overrides.mapping.pictureMode,'vivid','Remote modes outside curated presets still restore');
+  f.observe(e,'mapping','pictureMode','unknownPreset');
+  assert.equal(e.snapshot().overrides.mapping.pictureMode,'unknownPreset','Remote modes outside curated presets still restore');
   const beforeInvalidSave = model.clone(e.snapshot().document);
   await assert.rejects(e.command({action:'save',scope:'all',revision:e.status().revision}),/signal range/);
   assert.deepEqual(e.snapshot().document,beforeInvalidSave,'An invalid save cannot partially mutate standards');

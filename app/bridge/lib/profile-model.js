@@ -5,6 +5,7 @@
 const banks = require('./profile-banks');
 const crypto = require('crypto');
 const catalog = require('./profile-catalog');
+const view = require('../../profile-view');
 const clone = value => JSON.parse(JSON.stringify(value));
 const plain = value => value && typeof value === 'object' && !Array.isArray(value);
 function fail(message) { throw new Error(message); }
@@ -22,8 +23,7 @@ function scalar(key, value, target) {
     if (Object.keys(value).length !== 8 || Object.values(value).some(v => !['auto','high','low'].includes(v))) fail('Invalid HDMI black level');
   } else if (key === 'pictureMode') {
     const range = target.dimension.dynamicRange.replace(/ALLM$/, '');
-    const modes = {sdr:['filmMaker','game'], hdr:['hdrFilmMaker','hdrGame'], dolbyHdr:['dolbyHdrCinema','dolbyHdrCinemaBright','dolbyHdrGame']};
-    if (!(modes[range] || []).includes(value)) fail('Picture mode must match the signal range');
+    if (!view.presetsFor(range).includes(value)) fail('Picture mode must match the signal range');
   } else if (!['string','number','boolean'].includes(typeof value) || String(value).length > 100 ||
       (typeof value === 'number' && !Number.isFinite(value))) fail('Invalid setting value');
 }
@@ -42,7 +42,7 @@ function validate(document) {
   if (!plain(devices) || Object.keys(devices).length > 20 || Object.keys(devices).some(k =>
     !/^[a-z][a-z0-9_]{0,39}$/.test(k) || ['constructor','prototype','__proto__'].includes(k) ||
     typeof devices[k] !== 'string' || devices[k].length > 80)) fail('Invalid device names');
-  if (!Array.isArray(document.banks) || !document.banks.length || document.banks.length > 100) fail('Expected 1–100 native banks');
+  if (!Array.isArray(document.banks) || !document.banks.length || document.banks.length > 768) fail('Expected 1–768 native banks');
   for (const bank of document.banks) {
     fields(bank, ['id','name','devices','target','settings','variants','brightness_role']);
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(bank.id || '') || ['constructor','prototype','__proto__'].includes(bank.id) || ids.has(bank.id)) fail('Bank IDs must be unique');
@@ -62,7 +62,7 @@ function validate(document) {
     if (![undefined,null,'movie_sdr','game_sdr'].includes(bank.brightness_role) ||
         (bank.brightness_role && !Object.hasOwn(bank.settings,'backlight'))) fail('Invalid brightness role');
   }
-  if (Buffer.byteLength(JSON.stringify(document)) > 200000) fail('Profile collection too large');
+  if (Buffer.byteLength(JSON.stringify(document)) > 500000) fail('Profile collection too large');
   return clone(document);
 }
 function preferences(value) {
@@ -85,7 +85,7 @@ function active(bank, context) {
   return !!context.ready && (!d.input || d.input === context.input) &&
     (!d.gameInput || d.gameInput === String(context.input || '').replace(/_pc$/, '')) &&
     (!d.pictureMode || d.pictureMode === context.mode) && (!d.dynamicRange || d.dynamicRange === context.range) &&
-    (!d.gameGenre || d.gameGenre === (context.gameGenre || 'Standard'));
+    (!d.gameGenre || /game$/i.test(context.mode||'')&&d.gameGenre === (context.gameGenre || 'Standard'));
 }
 function scopedValues(document, input) {
   if (!plain(input)) fail('Invalid adjustment map');

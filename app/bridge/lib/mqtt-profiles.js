@@ -11,7 +11,7 @@ function create(options) {
     normalize:function (command) {
       if (command && ['read','apply'].includes(command.action)) return banks.normalize(command);
       if (!engine || !command || !['get','backup','initialize','restore_backup','inspect','set_environment','set_enabled',
-        'set_brightness','set_brightness_links','include_motion_controls','restore_scope','import','edit','edit_many','restore','save','reconcile',
+        'set_brightness','set_brightness_links','include_motion_controls','include_native_catalog','inspect_many','restore_scope','import','edit','edit_many','restore','save','reconcile',
         'upgrade_profiles','create_profile','rename_profile','delete_profile','reset_profile','set_automatic','apply_profile'].includes(command.action)) throw new Error('Unknown profile command');
       return command;
     }, summarizeResult:function (value) { return value; },

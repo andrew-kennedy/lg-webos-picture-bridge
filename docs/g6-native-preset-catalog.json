@@ -1,0 +1,77 @@
+{
+  "observed_on": "2026-10-31",
+  "model": "OLED77G6WUA",
+  "firmware": "43.21.69",
+  "board": "O26",
+  "source": "Native G6 model-resolved getSystemSettingDesc factory declarations and exact saved-bank getSystemSettings readback",
+  "presets": {
+    "sdr": [
+      "personalized",
+      "vivid",
+      "normal",
+      "eco",
+      "cinema",
+      "game",
+      "filmMaker",
+      "expert1",
+      "expert2"
+    ],
+    "sdrALLM": [
+      "personalized",
+      "vivid",
+      "normal",
+      "eco",
+      "cinema",
+      "game",
+      "filmMaker",
+      "expert1",
+      "expert2"
+    ],
+    "hdr": [
+      "hdrPersonalized",
+      "hdrVivid",
+      "hdrStandard",
+      "hdrEco",
+      "hdrCinemaBright",
+      "hdrGame",
+      "hdrFilmMaker"
+    ],
+    "hdrALLM": [
+      "hdrPersonalized",
+      "hdrVivid",
+      "hdrStandard",
+      "hdrEco",
+      "hdrCinemaBright",
+      "hdrGame",
+      "hdrFilmMaker"
+    ],
+    "dolbyHdr": [
+      "dolbyHdrPersonalized",
+      "dolbyHdrVivid",
+      "dolbyHdrStandard",
+      "dolbyHdrCinemaBright",
+      "dolbyHdrCinema",
+      "dolbyHdrGame"
+    ],
+    "dolbyHdrALLM": [
+      "dolbyHdrPersonalized",
+      "dolbyHdrVivid",
+      "dolbyHdrStandard",
+      "dolbyHdrCinemaBright",
+      "dolbyHdrCinema",
+      "dolbyHdrGame"
+    ]
+  },
+  "genres": [
+    "Standard",
+    "FPS",
+    "RPG",
+    "RTS",
+    "Sports",
+    "USER"
+  ],
+  "exact_native_reads": 511,
+  "read_errors": 0,
+  "native_writes_during_discovery": 0,
+  "processing_note": "Preset/storage existence does not prove processing availability. Audited rules and per-target native restrictions remain separate."
+}

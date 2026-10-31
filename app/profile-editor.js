@@ -127,7 +127,7 @@
     shownRecords() {return this.records().filter(r=>!this.overridesOnly()||!r.inherited||this.draft[this.entryId(r)]);}
     selectedRows() { return model.scopeRows(model.partition(this.shownRecords(),this.live).visible,this.scope,this.category,this.split); }
     selectedRecords() { return [...new Map(this.selectedRows().flatMap(row=>row.cells.flatMap(cell=>cell.records)).map(r=>[r.id,r])).values()]; }
-    excludedRecords() {return model.partition(this.shownRecords(),this.live).excluded.filter(r=>r.category===this.category&&model.matches(r,this.scope));}
+    excludedRecords() {return model.partition(this.shownRecords(),this.live).excluded.filter(r=>(this.category==='all'||r.category===this.category)&&model.matches(r,this.scope));}
     writable() { return !this.status.offline&&this.status.editor_api>=4; }
     async refresh(force=false) {
       const epoch=++this.epoch,focus=this.captureFocus();
@@ -152,12 +152,15 @@
       const epoch=++this.epoch,all=this.shownRecords(),unfiltered=model.scopeRows(all,this.scope,this.category,this.split);
       const records=unfiltered.flatMap(row=>row.cells.flatMap(cell=>cell.records)),shared=new Set(records.filter(r=>r.preference).map(r=>r.preference));
       const banks=[...new Map(records.concat(all.filter(r=>shared.has(r.preference))).map(r=>[r.bank.id,r.bank])).values()];
-      for(const bank of banks) {
-        if(this.live[bank.id]&&!force)continue;
+      const pending=banks.filter(bank=>force||!this.live[bank.id]),size=this.status.editor_api>=8?32:1;
+      for(let offset=0;offset<pending.length;offset+=size) {
+        const chunk=pending.slice(offset,offset+size);
         try {
-          const result=await this.request({action:'inspect',bank_id:bank.id,variant:this.variant});if(epoch!==this.epoch)return;
-          this.live[bank.id]={...result,target:bank.target};if(!this.review)this.renderRows();
-        } catch(error){if(epoch!==this.epoch)return;this.error(model.inputName(bank)+': '+error.message);}
+          const result=await this.request(size===1?{action:'inspect',bank_id:chunk[0].id,variant:this.variant}:{action:'inspect_many',bank_ids:chunk.map(b=>b.id),variant:this.variant});if(epoch!==this.epoch)return;
+          const items=size===1?[result]:result.banks;
+          for(const bank of chunk){const item=items.find(r=>r.id===bank.id);if(!item)throw new Error('The TV did not return every requested bank');this.live[bank.id]={...item,target:bank.target};}
+          if(!this.review)this.renderRows();
+        } catch(error){if(epoch!==this.epoch)return;this.error(model.inputName(chunk[0])+': '+error.message);return;}
       }
     }
     button(label,action,cls,id) { const b=el('button',label,cls);b.type='button';b.onclick=action;b.dataset.focus=id||'button:'+label;return b; }
@@ -189,9 +192,14 @@
         const id=this.entryId(r),before=r.preference?model.preferenceValue(this.state,r.preference):r.value;
         const encoded=value!==undefined&&r.key==='blackLevel'?Object.fromEntries(Object.keys(before).map(k=>[k,value])):value;
         if(value===undefined||model.same(before,encoded))delete this.draft[id];
-        else this.draft[id]={...(this.draft[id]||{id,bank_id:r.bank.id,key:r.key,variant:this.variant,target:r.bank.target,preference:r.preference,before}),inherit:false,value:encoded,label:pretty(r.alias),targets:cell.records.filter(t=>r.preference?t.preference===r.preference:t.id===r.id).map(t=>({id:t.id,scope:model.storedScope(t)}))};
+        else this.draft[id]={...(this.draft[id]||{id,bank_id:r.bank.id,key:r.key,variant:this.variant,target:r.bank.target,preference:r.preference,before}),inherit:false,value:encoded,label:pretty(r.alias),targets:cell.records.filter(t=>r.preference?t.preference===r.preference:t.id===r.id).map(t=>({id:t.id,scope:model.storedScope(t)})),excluded:this.excludedForCell(cell)};
       }
       this.review=null;this.updateFooter();
+    }
+    excludedForCell(cell) {
+      return this.excludedRecords().filter(r=>r.alias===cell.records[0].alias&&
+        (cell.records.some(t=>t.preference)||this.split.every(key=>cell.records.some(t=>model.factor(t,key)===model.factor(r,key)))))
+        .map(r=>({id:r.id,scope:model.storedScope(r),reason:r.availability.reason}));
     }
     stageInheritance(cell) {
       if(!this.writable()||this.status.editor_api<7||this.variant==='standard')return;
@@ -306,21 +314,29 @@
       if(this.review)this.renderReview();else {
         this.renderProfiles();
         const all=this.records(),opts=model.options(all),filters=el('div',undefined,'filters');
+        if(this.status.editor_api>=8) {
+          const native=el('div',undefined,'filters');
+          native.append(el('p','Discover every preset and game genre offered by this TV. Existing values become Base without changing the picture. Your saved standards and overrides are preserved; newly discovered brightness values start independent.','scope-note'));
+          const discover=this.button('Discover native presets and genres',()=>this.mutate({action:'include_native_catalog',revision:this.state.revision}),undefined,'native-catalog');discover.dataset.profileAction='';native.append(discover);
+          filters.append(this.details('Native settings catalog · '+this.state.document.banks.length+' stored groups','native-catalog-options',native));
+        }
         filters.append(this.chips('Select ports','port',opts.port,v=>model.inputName(v)));
-        const family=this.chips('Preset family','family',opts.family,v=>v==='game'?'Gaming':'Movies');
-        family.append(el('p','Editor groups: Gaming contains Game presets; Movies contains Filmmaker and Cinema Home.','scope-note'));
+        const family=this.chips('Preset family','family',opts.family,v=>model.families[v]||v);
+        family.append(el('p','Families are selection shortcuts. Every native preset keeps its own values, including Expert / ISF and presets you do not currently use.','scope-note'));
         const filterGrid=el('div',undefined,'filter-grid');filterGrid.append(this.chips('Select formats','format',opts.format,v=>model.formats[v]),family);filters.append(filterGrid);
         const presets=this.chips('Exact presets','preset',opts.preset,v=>model.modes[v]||v);
         presets.append(el('p','A specific LG picture mode, such as HDR Game or Dolby Vision Filmmaker. Choose a family for a broad selection, or an exact preset to narrow it.','scope-note'));
         const more=el('div',undefined,'filters');more.append(presets,this.chips('ALLM signal','allm',opts.allm,v=>v==='on'?'On':'Off'));
+        if(opts.input_type.length>1)more.append(this.chips('Input type','input_type',opts.input_type,v=>v==='pc'?'PC':'Video'),el('p','LG stores separate picture values for PC-labeled and ordinary video inputs. Choosing these filters does not change a port’s label. Connection and Game Optimizer genre settings remain shared by the physical port.','scope-note'));
         if(opts.genre.length>1)more.append(this.chips('Game genres','genre',opts.genre,v=>v));else if(opts.genre.length)more.append(el('p','Managed game genre: '+opts.genre.join(', '),'muted'));
         if(this.state.document.schema!==2)more.append(this.select('Room variant',[['standard','Base standard'],['bright','Bright room'],['dark','Dark room']],this.variant,v=>this.changeView(()=>{this.variant=v;this.live={};})));
         filters.append(this.details('More factors · '+this.profileName(this.variant),'more-factors',more));this.rows.append(filters);
         const categories=el('nav',undefined,'categories');categories.setAttribute('aria-label','Settings categories');
-        for(const [key,label] of Object.entries(model.categories))categories.append(this.toggle(label,this.category===key,()=>this.changeView(()=>{this.category=key;}),'category:'+key));this.rows.append(categories);
+        for(const [key,label] of [['all','All settings'],...Object.entries(model.categories)])categories.append(this.toggle(label,this.category===key,()=>this.changeView(()=>{this.category=key;}),'category:'+key));this.rows.append(categories);
         const grouping=el('div',undefined,'grouping'),field=el('fieldset'),chips=el('div',undefined,'chips');field.append(el('legend','Show separate controls by'));
-        for(const [key,label] of [['port','Port'],['format','Format'],['family','Preset family'],['preset','Exact preset'],['genre','Genre'],['allm','ALLM']])if(key!=='genre'||opts.genre.length>1)chips.append(this.toggle(label,this.split.includes(key),()=>this.changeView(()=>{this.split=this.split.includes(key)?this.split.filter(k=>k!==key):[...this.split,key];}),'split:'+key));
-        field.append(chips);grouping.append(field,el('p',this.category==='port'?'Connection settings are shared by every device and format on each port.':this.category==='selection'?'Choose which preset LG uses for each input and signal. Exact preset and genre filters do not split these mappings.':'Preset family separates Gaming and Movies. Exact preset separates individual LG picture modes. Mixed values stay separate until you explicitly edit a combined control.','scope-note'));this.rows.append(grouping);
+        chips.append(this.toggle('No grouping',!this.split.length,()=>this.changeView(()=>{this.split=[];}),'split:none'));
+        for(const [key,label] of [['port','Port'],['input_type','Input type'],['format','Format'],['family','Preset family'],['preset','Exact preset'],['genre','Genre'],['allm','ALLM']])if((key!=='genre'||opts.genre.length>1)&&(key!=='input_type'||opts.input_type.length>1))chips.append(this.toggle(label,this.split.includes(key),()=>this.changeView(()=>{this.split=this.split.includes(key)?this.split.filter(k=>k!==key):[...this.split,key];}),'split:'+key));
+        field.append(chips);grouping.append(field,el('p',this.category==='port'?'Connection settings are shared by every device and format on each port.':this.category==='selection'?'Choose which preset LG uses for each input and signal. Exact preset and genre filters do not split these mappings.':'Filters choose what an edit affects; grouping only changes how controls are displayed. No grouping combines valid selected values. Disabled or unverified targets are excluded, and choices/ranges must be valid for every included target.','scope-note'));this.rows.append(grouping);
         if(this.category==='picture'&&this.status.editor_api>=5)this.renderBrightnessLinks();
         if(this.category==='motion'&&this.status.editor_api>=5&&this.state.document.banks.some(b=>b.target.category==='picture'&&!b.target.app_id&&['filmMaker','hdrFilmMaker','dolbyHdrCinema','dolbyHdrCinemaBright'].includes(b.target.dimension.pictureMode)&&['truMotionJudder','truMotionBlur'].some(k=>!Object.hasOwn(b.settings,k)))) {
           const box=el('div',undefined,'grouping');box.append(el('p','Include the TV’s existing de-judder and de-blur values in your movie standards. TruMotion keeps its saved mode.','scope-note'));
@@ -359,9 +375,11 @@
           } else if(control&&control.options) {
             input=el('select');input.setAttribute('aria-label',fieldLabel);input.dataset.focus='setting:'+cell.id;
             if(mixed){const option=el('option','Mixed');option.value='';option.disabled=true;input.append(option);}
-            for(const value of control.options){const option=el('option',row.key==='truMotionMode'&&value==='user'?'User Selection':value);option.value=value;input.append(option);}input.value=mixed?'':unique[0];input.disabled=disabled;input.onchange=()=>update(input.value);
+            for(const value of control.options){const option=el('option',row.key==='pictureMode'?(model.modes[value]||value):row.key==='truMotionMode'&&value==='user'?'User Selection':value);option.value=value;input.append(option);}input.value=mixed?'':unique[0];input.disabled=disabled;input.onchange=()=>update(input.value);
           } else input=el('span',mixed?'Mixed: '+unique.join(' / '):unique[0],mixed?'mixed':'');
           group.append(input);
+          const excludedForCell=this.excludedForCell(cell);
+          if(excludedForCell.length)group.append(el('p',excludedForCell.length+' disabled or unverified values excluded from this control. Review shows the affected and excluded targets.','scope-note'));
           if(this.state.document.schema===2&&this.variant!=='standard') {
             group.append(el('p',this.inheritanceText(cell),'muted inheritance'));
             group.append(this.inheritButton(cell,fieldLabel));
@@ -457,6 +475,11 @@
         const list=el('ul',undefined,'targets');entry.targets.forEach(t=>list.append(el('li',t.scope)));label.append(list);
         if(entry.inherit)label.append(el('p','Remove the override and follow future Base changes. Other profile overrides remain saved.','muted'));
         row.append(label,el('span',display(entry.before)+' → '+(entry.inherit?'Base: ':'')+display(entry.value),'value'));box.append(row);
+      }
+      const excluded=[...new Map(r.entries.flatMap(e=>e.excluded||[]).map(e=>[e.id,e])).values()];
+      if(excluded.length) {
+        box.append(el('h3','Excluded from these edits'));
+        const list=el('ul',undefined,'targets');for(const item of excluded)list.append(el('li',item.scope+' — '+item.reason));box.append(list);
       }
       const actions=el('div',undefined,'actions');actions.append(this.button('Back to editing',()=>this.closeReview(),undefined,'review-back'),this.button(r.action==='delete_profile'?'Delete profile':r.action==='reset_profile'?'Reset profile':r.action==='set_brightness_links'?'Save brightness links':r.action==='edit_many'?'Save standards':r.action==='restore'?'Restore selected settings':'Keep these adjustments',()=>this.confirmReview(),'primary','review-confirm'));box.append(actions);this.rows.append(box);
     }

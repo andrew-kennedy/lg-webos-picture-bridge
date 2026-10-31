@@ -7,6 +7,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const controls = require('./settings-controls');
 const rules = require('./profile-rules');
+const view = require('../../profile-view');
 const clone = value => JSON.parse(JSON.stringify(value));
 const game = mode => /game$/i.test(mode || '');
 const format = d => d.dynamicRange ? d.dynamicRange.replace(/ALLM$/, '') :
@@ -58,6 +59,7 @@ function reviewedPlatform() {
 function matchesActive(target, context, current) {
   if (!context || !context.ready || !current || !current.dimension) return false;
   const d = target.dimension;
+  if(d.gameGenre&&!game(context.mode))return false;
   if (physical(d.input || d.gameInput) !== physical(context.input)) return false;
   if (d.input && d.input !== context.input) return false;
   if (d.pictureMode && d.pictureMode !== context.mode) return false;
@@ -69,6 +71,9 @@ function matchesActive(target, context, current) {
 function mappedMode(bank, document, values) {
   const d = bank.target.dimension;
   if (d.pictureMode) return d.pictureMode;
+  // A saved Game Optimizer genre is used with the format's Game preset,
+  // regardless of which preset a separate signal mapping currently selects.
+  if(d.gameGenre)return {sdr:'game',hdr:'hdrGame',dolbyHdr:'dolbyHdrGame'}[format(d)];
   if (!d.dynamicRange || !document) return null;
   const mappings = document.banks.filter(b => b.target.category === 'picture' &&
     physical(b.target.dimension.input) === physical(d.gameInput) && b.target.dimension.dynamicRange === d.dynamicRange);
@@ -116,6 +121,16 @@ function restrictions(key, bank, options) {
 function describe(key, bank, info, options) {
   const reviewed = options.reviewed === undefined ? reviewedPlatform().reviewed : options.reviewed;
   if (!reviewed) return unknown('This TV software has not been verified for profile applicability.');
+  if(bank.target.dimension.pictureMode&&Object.hasOwn(info,'preset')) {
+    const supported=info.preset&&info.preset.values&&info.preset.values.arrayExt||[];
+    if(!supported.some(v=>v.value===bank.target.dimension.pictureMode&&v.visible===true&&v.active===true))
+      return unavailable('LG does not offer this preset for this input and signal format.');
+  }
+  if(bank.target.dimension.gameGenre&&Object.hasOwn(info,'genre')) {
+    const supported=info.genre&&info.genre.values&&info.genre.values.arrayExt||[];
+    if(!supported.some(v=>v.value===bank.target.dimension.gameGenre&&v.visible===true&&v.active===true))
+      return unavailable('LG does not offer this Game Optimizer genre on this port.');
+  }
   if (key === 'dolbyPrecisionDetail' && options.capabilities && options.capabilities.dolbyPrecisionDetail === false)
     return unavailable('LG disables Dolby Precision Detail in this TV model configuration, for every preset.');
   const restriction = reviewed && restrictions(key,bank,options);
@@ -165,7 +180,7 @@ function describe(key, bank, info, options) {
     return unavailable(active ? 'LG disables or hides this control for the current signal and settings.' : 'LG does not enable this control in this input and preset.');
   description = clone(description);
   if (key === 'pictureMode' && description.values && description.values.arrayExt) {
-    const allowed = {sdr:['filmMaker','game'],hdr:['hdrFilmMaker','hdrGame'],dolbyHdr:['dolbyHdrCinema','dolbyHdrCinemaBright','dolbyHdrGame']}[format(bank.target.dimension)] || [];
+    const allowed = view.presetsFor(format(bank.target.dimension));
     description.values.arrayExt = description.values.arrayExt.filter(v=>allowed.includes(v.value));
   }
   if (key === 'hdrDynamicToneMapping' && !game(bank.target.dimension.pictureMode) && description.values && description.values.arrayExt)
@@ -180,12 +195,15 @@ function describe(key, bank, info, options) {
   // correctable. Availability comes from the target rules; encode validates
   // the replacement against those rules before any save.
   control.available = true;
-  return {state:'editable',editable:true,source:active?'live':'native_rules',control};
+  return {state:'editable',editable:true,source:active?'live':'native_rules',control,
+    ...(bank.target.dimension.gameGenre?{condition:'Used with the '+view.modes[mappedMode(bank,options.document,options.values)]+' preset and '+bank.target.dimension.gameGenre+' genre.'}:{})};
 }
 
 function assertEditable(key, value, bank, inspection, options) {
   const result = describe(key,bank,{live:(inspection.descriptions || []).find(d=>d.key===key),
-    factory:(inspection.factory_descriptions || {})[key],current:inspection.active_values,value:inspection.settings[key]},
+    factory:(inspection.factory_descriptions || {})[key],current:inspection.active_values,value:inspection.settings[key],
+    ...(Object.hasOwn(inspection,'preset_description')?{preset:inspection.preset_description}:{}),
+    ...(Object.hasOwn(inspection,'genre_description')?{genre:inspection.genre_description}:{})},
     {...options,capabilities:inspection.capabilities || options.capabilities});
   if (!result.editable) {
     const error = new Error(key+': '+result.reason);error.code='profile_setting_unavailable';throw error;

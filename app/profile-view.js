@@ -5,7 +5,16 @@
 })(typeof window === 'object' ? window : this, function () {
   'use strict';
   const formats = {sdr:'SDR',hdr:'HDR',dolbyHdr:'Dolby Vision'};
-  const modes = {game:'SDR Game',hdrGame:'HDR Game',filmMaker:'SDR Filmmaker',hdrFilmMaker:'HDR Filmmaker',dolbyHdrGame:'Dolby Vision Game',dolbyHdrCinema:'Dolby Vision Filmmaker',dolbyHdrCinemaBright:'Dolby Vision Cinema Home'};
+  // Recognized native identities, not a list of recommended presets. The TV's
+  // model-specific descriptions decide which of these actually exist.
+  const modes = {game:'SDR Game',hdrGame:'HDR Game',filmMaker:'SDR Filmmaker',hdrFilmMaker:'HDR Filmmaker',dolbyHdrGame:'Dolby Vision Game',dolbyHdrCinema:'Dolby Vision Filmmaker',dolbyHdrCinemaBright:'Dolby Vision Cinema Home',
+    normal:'SDR Standard',vivid:'SDR Vivid',cinema:'SDR Cinema',expert1:'SDR Expert / ISF Bright',expert2:'SDR Expert / ISF Dark',eco:'SDR Eco',personalized:'SDR Personalized',sports:'SDR Sports',photo:'SDR Photo',
+    hdrStandard:'HDR Standard',hdrVivid:'HDR Vivid',hdrCinema:'HDR Cinema',hdrCinemaBright:'HDR Cinema Home',hdrEco:'HDR Eco',hdrPersonalized:'HDR Personalized',
+    dolbyHdrStandard:'Dolby Vision Standard',dolbyHdrVivid:'Dolby Vision Vivid',dolbyHdrPersonalized:'Dolby Vision Personalized'};
+  const families={game:'Gaming',movie:'Cinema / Filmmaker',expert:'Expert / ISF',general:'Standard / Vivid',personalized:'Personalized',eco:'Eco'};
+  const presetFormat=mode=>mode.startsWith('dolbyHdr')?'dolbyHdr':mode.startsWith('hdr')?'hdr':'sdr';
+  const presetsFor=range=>Object.keys(modes).filter(mode=>presetFormat(mode)===range.replace(/ALLM$/,''));
+  const presetFamily=mode=>/game$/i.test(mode||'')?'game':/cinema|filmmaker/i.test(mode||'')?'movie':/^expert/.test(mode||'')?'expert':/personalized/i.test(mode||'')?'personalized':/eco/i.test(mode||'')?'eco':'general';
   const gameKeys = {gameColorDepth:'color',gameSharpness:'sharpness',gameAdjustContrast:'contrast',gameBlackLevel:'brightness'};
   const physical = input => String(input||'').replace(/_pc$/,'');
   const input = bank => bank.target.dimension.input||bank.target.dimension.gameInput;
@@ -49,7 +58,8 @@
   }
   function brightnessRole(bank) {
     if(bank.target.category!=='picture'||bank.target.app_id||!Object.hasOwn(bank.settings,'backlight'))return null;
-    return {game:'game_sdr',filmMaker:'movie_sdr'}[bank.target.dimension.pictureMode]||null;
+    const mode=bank.target.dimension.pictureMode;
+    return mode&&presetFormat(mode)==='sdr'?(isGame(mode)?'game_sdr':'movie_sdr'):null;
   }
   function setBrightnessLink(bank,linked,preferences,room,document) {
     const role=brightnessRole(bank);
@@ -104,22 +114,21 @@
   const motionKeys=new Set(['realCinema','truMotionMode','truMotionJudder','truMotionBlur','motionProOLED','motionPro']);
   function records(state,variant='standard') {
     const doc=state.document;if(!doc)return [];
-    const mappings=doc.banks.filter(b=>b.target.category==='picture'&&b.target.dimension.dynamicRange);
-    const mappedModes=b=>[b.settings.pictureMode,...Object.values(b.variants||{}).map(v=>v.pictureMode)].filter(Boolean);
     const result=[];
     for(const bank of doc.banks) {
       const d=bank.target.dimension,port=physical(input(bank)),family=format(bank),nativePreset=d.pictureMode;
-      const matching=mappings.filter(m=>physical(input(m))===port&&format(m)===family&&(!d.dynamicRange||m.target.dimension.dynamicRange===d.dynamicRange));
-      const mappedPreset=d.gameGenre&&matching.length===1?values(matching[0],state,variant).pictureMode:null;
-      const preset=nativePreset||(isGame(mappedPreset)?mappedPreset:null);
-      const signals=d.dynamicRange?[/ALLM$/.test(d.dynamicRange)?'on':'off']:[...new Set(matching.filter(m=>input(m)===input(bank)&&mappedModes(m).includes(nativePreset)).map(m=>/ALLM$/.test(m.target.dimension.dynamicRange)?'on':'off'))];
+      // Game genre banks exist independently of the preset currently mapped
+      // to a signal. Picture banks themselves are shared across ALLM states.
+      const preset=nativePreset||(d.gameGenre?{sdr:'game',hdr:'hdrGame',dolbyHdr:'dolbyHdrGame'}[family]:null);
+      const signals=d.dynamicRange?[/ALLM$/.test(d.dynamicRange)?'on':'off']:['off','on'];
       const deviceIds=!family?[...new Set(doc.banks.filter(b=>physical(input(b))===port).flatMap(b=>b.devices||[]))]:bank.devices||[];
       for(const key of Object.keys(bank.settings)) {
         const category=motionKeys.has(key)?'motion':bank.target.category==='picture'?(d.dynamicRange?'selection':'picture'):
           gameKeys[key]?'picture':d.gameGenre||['gameGenre','inputOptimization'].includes(key)?'game':'port';
         const preference=key==='backlight'&&bank.brightness_role?(doc.schema===2?variant+'/'+bank.brightness_role:bank.brightness_role==='game_sdr'?'game_sdr':variant==='standard'?null:'movie_'+variant):null;
         result.push({id:bank.id+':'+key,bank,key,alias:gameKeys[key]||key,category,port,format:family,preset,
-          family:d.gameGenre?'game':preset?(isGame(preset)?'game':'movie'):d.dynamicRange?(isGame(values(bank,state,variant).pictureMode)?'game':'movie'):null,
+          input_type:d.input?(/_pc$/.test(d.input)?'pc':'video'):null,
+          family:d.gameGenre?'game':preset?presetFamily(preset):d.dynamicRange?presetFamily(values(bank,state,variant).pictureMode):null,
           genre:d.gameGenre||null,signals:signals.length?signals:['off','on'],devices:deviceIds,
           preference,brightnessRole:key==='backlight'?bank.brightness_role:null,
           locked:doc.schema!==2&&key==='backlight'&&bank.brightness_role==='movie_sdr'&&variant==='standard',
@@ -131,24 +140,25 @@
   }
   function options(all) {
     const unique=(key,order)=>[...new Set(all.map(r=>r[key]).filter(Boolean))].sort((a,b)=>order?order.indexOf(a)-order.indexOf(b):a.localeCompare(b));
-    return {port:unique('port'),format:unique('format',['sdr','hdr','dolbyHdr']),family:unique('family',['game','movie']),
+    return {port:unique('port'),input_type:unique('input_type',['video','pc']),format:unique('format',['sdr','hdr','dolbyHdr']),family:unique('family',Object.keys(families)),
       preset:unique('preset'),genre:unique('genre'),allm:['off','on']};
   }
   function matches(record,scope={}) {
-    for(const key of ['port','format','family','preset','genre']) if(record[key]&&Array.isArray(scope[key])&&!scope[key].includes(record[key]))return false;
+    for(const key of ['port','input_type','format','family','preset','genre']) if(record[key]&&Array.isArray(scope[key])&&!scope[key].includes(record[key]))return false;
     return !Array.isArray(scope.allm)||record.signals.some(v=>scope.allm.includes(v));
   }
   function factor(record,key) {
     if(record.preference)return record.preference.includes('/')?(record.brightnessRole==='game_sdr'?'Linked SDR gaming values':'Linked SDR movie values'):(record.preference==='game_sdr'?'All SDR game profiles':'All SDR movie profiles');
     if(key==='port')return inputName(record.port);
+    if(key==='input_type')return record.input_type==='pc'?'PC input':record.input_type==='video'?'Video input':'Both input types';
     if(key==='format')return formats[record.format]||'All formats';
-    if(key==='family')return record.family==='game'?'Gaming':record.family==='movie'?'Movies':'All presets';
+    if(key==='family')return families[record.family]||'All presets';
     if(key==='preset')return modes[record.preset]||record.preset||'All presets';
     if(key==='genre')return record.genre||'All genres';
     if(key==='allm')return record.signals.length>1?'Shared across ALLM':record.signals[0]==='on'?'ALLM on':'ALLM off';
   }
   function scopeRows(all,scope,category,split) {
-    const selected=all.filter(r=>r.category===category&&matches(r,scope)),rows=new Map();
+    const selected=all.filter(r=>(category==='all'||r.category===category)&&matches(r,scope)),rows=new Map();
     for(const record of selected) {
       // Shared SDR preferences must never masquerade as independent per-port
       // values. Resolve their full affected set even under a narrow filter.
@@ -216,5 +226,5 @@
     if(!Object.keys(selection).length)throw new Error('No managed settings match this scope');
     return selection;
   }
-  return {values,brightness,profileOptions,preferenceValue,isInherited,control,same,inputName,brightnessRole,setBrightnessLink,scopeSelection,modes,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition};
+  return {values,brightness,profileOptions,preferenceValue,isInherited,control,same,inputName,brightnessRole,setBrightnessLink,scopeSelection,modes,families,presetsFor,presetFamily,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition};
 });

@@ -33,6 +33,7 @@ function setup(initial) {
       }
       return {id:bank.id,settings:structuredClone(bank.settings),controls,availability};
     }
+    if(command.action==='inspect_many')return {banks:await Promise.all(command.bank_ids.map(bank_id=>window.requestProfile({action:'inspect',bank_id,variant:command.variant})))};
     if(['edit_many','save','restore','set_brightness_links'].includes(command.action)&&command.revision!==window.fixture.revision)throw new Error('Profiles changed; refresh before saving');
     if(command.action==='set_brightness_links') {
       for(const link of command.links)window.LGProfileView.setBrightnessLink(window.fixture.document.banks.find(b=>b.id===link.bank_id),link.linked,window.fixture.preferences,window.fixture.room,window.fixture.document);

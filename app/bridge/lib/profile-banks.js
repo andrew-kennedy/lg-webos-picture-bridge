@@ -6,9 +6,8 @@ var settings = require('./settings-controls');
 var executor = require('./luna-executor');
 var availability = require('./profile-availability');
 var factoryDescriptions = require('./profile-descriptions');
-var rules = require('./profile-rules');
-var PRESETS = ['filmMaker', 'hdrFilmMaker', 'game', 'hdrGame', 'dolbyHdrGame',
-  'dolbyHdrCinema', 'dolbyHdrCinemaBright'];
+var view = require('../../profile-view');
+var PRESETS = Object.keys(view.modes);
 var RANGES = ['sdr', 'sdrALLM', 'hdr', 'hdrALLM', 'dolbyHdr', 'dolbyHdrALLM'];
 var PICTURE = ('backlight contrast brightness color tint sharpness colorTemperature colorGamut gamma gammaLevel ' +
   'peakBrightness hdrDynamicToneMapping expressionEnhancer dynamicContrast dynamicColor superResolution ' +
@@ -81,8 +80,7 @@ function write(service, payload) {
 function encode(key, value, previous, desc, bank) {
   if (key === 'pictureMode') {
     var range = bank.target.dimension.dynamicRange;
-    var allowed = range.startsWith('sdr') ? ['game','filmMaker'] : range.startsWith('hdr') ? ['hdrGame','hdrFilmMaker'] :
-      ['dolbyHdrGame','dolbyHdrCinema','dolbyHdrCinemaBright'];
+    var allowed = view.presetsFor(range);
     if (!allowed.includes(value)) throw fail('Picture mode does not match range');
     return value;
   }
@@ -104,14 +102,17 @@ function encode(key, value, previous, desc, bank) {
   return settings.encode(control, value);
 }
 function encodingDescription(key, bank, live, factory, reviewed) {
-  // On the reviewed G6, Game Optimizer replaces these movie descriptors with
+  // On the reviewed G6, Game Optimizer replaces these non-game descriptors with
   // hidden M-database placeholders (even dataType becomes empty). Their actual
   // saved movie banks remain global input/preset values. Use the target's
-  // factory schema, corroborated by the movie audits, only for these controls.
+  // factory schema only for these controls; processing validity remains a
+  // separate check against the selected target and its saved dependencies.
   if (!['truMotionJudder','truMotionBlur'].includes(key) || bank.target.app_id) return live;
   if (reviewed === undefined) reviewed=availability.reviewedPlatform().reviewed;
-  const rule=reviewed && rules.resolve(key,bank.target);
-  if (rule && rule.editable && factory && (!live || live.dbtype!=='G' || !live.dataType)) return factory;
+  // This substitutes storage schema only. profile-availability still checks
+  // whether the target actually uses motion processing and User Selection.
+  if (reviewed && !/game$/i.test(bank.target.dimension.pictureMode||'') && factory && factory.dbtype==='G' && factory.dataType &&
+      (!live || live.dbtype!=='G' || !live.dataType)) return factory;
   return live;
 }
 async function run(service, command, guard, context) {
@@ -187,6 +188,7 @@ function observation(category, key, description, record, context) {
   return {target:scope, key:key, value:record.value, observed_at:new Date(record.observed_at).toISOString()};
 }
 module.exports = {normalize:normalize, target:target, run:run, same:same, encodingDescription,
+  descriptionKeys, PICTURE, GAME, PORT, RANGES,
   observationKeys:observationKeys, observation:observation, request:request, encode:encode,
   async inspect(service, bank, guard, context, editor) {
     var result = (await run(service, normalize({action:'read',banks:[{
@@ -195,22 +197,32 @@ module.exports = {normalize:normalize, target:target, run:run, same:same, encodi
     var captured = JSON.stringify(context && context());
     var descriptionParams = {category:bank.target.category,keys:Object.keys(bank.settings)};
     if (bank.target.app_id) descriptionParams.app_id = bank.target.app_id;
-    var desc = await request(service,'getSystemSettingDesc',descriptionParams);
+    const cached=(method,params)=>{
+      const cache=editor&&editor.readCache,key=JSON.stringify([method,params]);
+      if(!cache)return request(service,method,params);
+      if(!cache.has(key))cache.set(key,request(service,method,params));
+      return cache.get(key).then(value=>JSON.parse(JSON.stringify(value)));
+    };
+    var desc = await cached('getSystemSettingDesc',descriptionParams);
     result.descriptions = desc.results || [];
     var activeParams = {category:bank.target.category,keys:Object.keys(bank.settings)};
     var lockKeys = ['brightnessActive','colorActive','clarityActive','isfMode'];
     if (bank.target.app_id) activeParams.current_app = true;
     if (bank.target.category === 'picture' && !bank.target.app_id) activeParams.keys = [...new Set(activeParams.keys.concat(lockKeys))];
-    result.active_values = await request(service,'getSystemSettings',activeParams);
+    result.active_values = await cached('getSystemSettings',activeParams);
     // LG's app-scoped read rejects global group/calibration keys. Read those
     // separately while keeping the motion value's app binding and dimensions.
     if (bank.target.app_id) {
-      var locks = await request(service,'getSystemSettings',{category:'picture',keys:lockKeys});
+      var locks = await cached('getSystemSettings',{category:'picture',keys:lockKeys});
       result.active_values.settings = Object.assign({},result.active_values.settings,locks.settings);
     }
     guard();
     if (captured !== JSON.stringify(context && context())) throw fail('TV signal changed while checking availability', 'stale_context');
     var factory = await factoryDescriptions.load(descriptionKeys);
+    if(bank.target.dimension.pictureMode)result.preset_description=factory.resolve('pictureMode',{category:'picture',dimension:{input:bank.target.dimension.input,dynamicRange:availability.format(bank.target.dimension)}});
+    if(bank.target.dimension.gameGenre)result.genre_description=factory.resolve('gameGenre',{category:'other',dimension:{gameInput:bank.target.dimension.gameInput}});
+    if(!result.preset_description)delete result.preset_description;
+    if(!result.genre_description)delete result.genre_description;
     result.capabilities = await availability.loadCapabilities(service);
     result.factory_descriptions = {};
     result.availability = {};
@@ -219,7 +231,9 @@ module.exports = {normalize:normalize, target:target, run:run, same:same, encodi
       var d = result.descriptions.find(v => v.key === key);
       result.factory_descriptions[key] = factory.resolve(key,bank.target);
       var applicable = availability.describe(key,bank,{live:d,factory:result.factory_descriptions[key],
-        current:result.active_values,value:result.settings[key]},Object.assign({context:context && context(),values:b=>b.settings,capabilities:result.capabilities},editor));
+        current:result.active_values,value:result.settings[key],
+        ...(Object.hasOwn(result,'preset_description')?{preset:result.preset_description}:{}),
+        ...(Object.hasOwn(result,'genre_description')?{genre:result.genre_description}:{})},Object.assign({context:context && context(),values:b=>b.settings,capabilities:result.capabilities},editor));
       if (applicable.control) result.controls[key] = applicable.control;
       delete applicable.control;
       result.availability[key] = applicable;
