@@ -59,13 +59,16 @@ function edit(doc,bank,id,key,value,reset=false) {
   if(!valid(doc,id))throw new Error('Unknown profile');
   if(reset&&id==='standard')throw new Error('Base standards cannot inherit from themselves');
   if(key==='backlight'&&bank.brightness_role) {
+    if(reset&&!Object.hasOwn(profile(doc,id).brightness||{},bank.brightness_role))return;
     const p=profile(doc,id);p.brightness=p.brightness||{};
     if(reset)delete p.brightness[bank.brightness_role];else setBrightness(doc,id,bank.brightness_role,value);
   } else if(id==='standard')bank.settings[key]=value;
   else {
+    if(reset&&!Object.hasOwn((bank.variants||{})[id]||{},key))return;
     bank.variants=bank.variants||{};bank.variants[id]=bank.variants[id]||{};
     if(reset)delete bank.variants[id][key];else bank.variants[id][key]=value;
     if(!Object.keys(bank.variants[id]).length)delete bank.variants[id];
+    if(!Object.keys(bank.variants).length)delete bank.variants;
   }
 }
 module.exports={ids,valid,profile,validate,upgrade,preferences,legacyPatch,edit,setBrightness};

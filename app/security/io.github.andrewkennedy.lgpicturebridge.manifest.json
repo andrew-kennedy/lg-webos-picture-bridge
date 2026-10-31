@@ -1,6 +1,6 @@
 {
   "id": "io.github.andrewkennedy.lgpicturebridge",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "apiPermissionFiles": [
     "/var/luna-service2/api-permissions.d/io.github.andrewkennedy.lgpicturebridge.api.json"
   ],

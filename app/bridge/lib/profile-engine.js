@@ -85,7 +85,7 @@ function create(options) {
       migration_id:saved && saved.migration_id || null,context:model.clone(context),created_at:new Date(clock()).toISOString()};
   }
   function status() {
-    return {configured:!!saved,editor_api:6,profile_schema:document()&&document().schema,selection:selection(),active_profile:activeProfile(),owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
+    return {configured:!!saved,editor_api:7,profile_schema:document()&&document().schema,selection:selection(),active_profile:activeProfile(),owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
       enabled:!!(saved && saved.enabled),room,power,context,temporary_count:Object.values(overrides).reduce((n,v) => n + Object.keys(v).length,0),
       pending_restore:Object.keys(journal.restore).length > 0,applying,changed_count:changedCount,
       error:loadError || lastError,backup_sequence:latestBackup ? sequence : null,backup_acknowledged:acknowledged,
@@ -549,8 +549,11 @@ function create(options) {
         } else Object.assign(prefValues,prefPatch);
         for (const edit of edits) {
           if (!edit || typeof edit !== 'object' || Array.isArray(edit)) throw new Error('Invalid bank edit');
-          const original = bankById(edit.bank_id), bank = candidate.document.banks.find(b=>b.id===original.id), variant = edit.variant || 'standard', patch = edit.settings;
-          if (!catalog.valid(candidate.document,variant) || !patch || typeof patch !== 'object' || Array.isArray(patch) || !Object.keys(patch).length || Object.keys(patch).some(k=>!Object.hasOwn(bank.settings,k))) throw new Error('Invalid bank edit');
+          const original = bankById(edit.bank_id), bank = candidate.document.banks.find(b=>b.id===original.id), variant = edit.variant || 'standard', patch = edit.settings===undefined?{}:edit.settings, inherit=edit.inherit===undefined?[]:edit.inherit;
+          if (!catalog.valid(candidate.document,variant) || !patch || typeof patch !== 'object' || Array.isArray(patch) ||
+              !Array.isArray(inherit) || inherit.length>40 || new Set(inherit).size!==inherit.length ||
+              (!Object.keys(patch).length&&!inherit.length) || [...Object.keys(patch),...inherit].some(k=>typeof k!=='string'||!Object.hasOwn(bank.settings,k))) throw new Error('Invalid bank edit');
+          if(inherit.length&&(candidate.document.schema!==2||variant==='standard'))throw new Error('Only named profiles can inherit from Base');
           if (!inspected.has(bank.id)) inspected.set(bank.id,await inspect(original));
           check();
           const live = inspected.get(bank.id);
@@ -562,7 +565,7 @@ function create(options) {
             if(candidate.document.schema===2) {
               if(key==='backlight'&&bank.brightness_role) {
                 const shared=variant+'/'+bank.brightness_role;
-                if(Object.hasOwn(prefValues,shared)&&!model.same(prefValues[shared],encoded))throw new Error('Conflicting shared brightness values');
+                if(Object.hasOwn(prefValues,shared)&&(prefValues[shared]===null||!model.same(prefValues[shared],encoded)))throw new Error('Conflicting shared brightness values');
                 prefValues[shared]=encoded;
               }
               catalog.edit(candidate.document,bank,variant,key,encoded);
@@ -578,6 +581,17 @@ function create(options) {
               else { bank.variants=bank.variants || {}; bank.variants[variant]=bank.variants[variant] || {}; bank.variants[variant][key]=encoded; }
             }
           }
+          for(const key of inherit) {
+            const identity=bank.id+'/'+variant+'/'+key;
+            if(seen.has(identity))throw new Error('Duplicate setting in batch');
+            seen.add(identity);
+            if(key==='backlight'&&bank.brightness_role) {
+              const shared=variant+'/'+bank.brightness_role;
+              if(Object.hasOwn(prefValues,shared)&&prefValues[shared]!==null)throw new Error('Conflicting shared brightness values');
+              prefValues[shared]=null;
+            }
+            catalog.edit(candidate.document,bank,variant,key,undefined,true);
+          }
           check();
         }
         model.validate(candidate.document); model.preferences(preferences(candidate));
@@ -586,8 +600,12 @@ function create(options) {
         // applied until every target passes its own applicability check.
         for (const edit of edits) {
           const bank = candidate.document.banks.find(b=>b.id===edit.bank_id), live = inspected.get(bank.id);
-          for (const [key,value] of Object.entries(edit.settings))
+          for (const [key,value] of Object.entries(edit.settings||{}))
             availability.assertEditable(key,value,bank,live,editorOptions(edit.variant || 'standard',candidate));
+          // Removing an override can also clean up a dormant/unused setting.
+          // Validate Base's storage scope and range without treating cleanup
+          // as permission to introduce a new processing value in that mode.
+          for(const key of edit.inherit||[])encodeStandard(key,resolved(bank,edit.variant,candidate)[key],live,bank);
         }
         await validateSharedBrightness(candidate,prefValues,inspected,check);
         check();

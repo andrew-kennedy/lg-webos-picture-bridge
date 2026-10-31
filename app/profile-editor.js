@@ -123,9 +123,11 @@
     configure(adapter) { this.adapter=adapter;this.refresh(true); }
     request(command) { return this.adapter.request(command); }
     records() { return this.state?model.records(this.state,this.variant):[]; }
-    selectedRows() { return model.scopeRows(model.partition(this.records(),this.live).visible,this.scope,this.category,this.split); }
+    overridesOnly() {return !!this.onlyOverrides&&this.state.document.schema===2&&this.variant!=='standard';}
+    shownRecords() {return this.records().filter(r=>!this.overridesOnly()||!r.inherited||this.draft[this.entryId(r)]);}
+    selectedRows() { return model.scopeRows(model.partition(this.shownRecords(),this.live).visible,this.scope,this.category,this.split); }
     selectedRecords() { return [...new Map(this.selectedRows().flatMap(row=>row.cells.flatMap(cell=>cell.records)).map(r=>[r.id,r])).values()]; }
-    excludedRecords() {return model.partition(this.records(),this.live).excluded.filter(r=>r.category===this.category&&model.matches(r,this.scope));}
+    excludedRecords() {return model.partition(this.shownRecords(),this.live).excluded.filter(r=>r.category===this.category&&model.matches(r,this.scope));}
     writable() { return !this.status.offline&&this.status.editor_api>=4; }
     async refresh(force=false) {
       const epoch=++this.epoch,focus=this.captureFocus();
@@ -147,7 +149,7 @@
     }
     async inspect(force=false) {
       if(!this.state||this.status.offline)return;
-      const epoch=++this.epoch,all=this.records(),unfiltered=model.scopeRows(all,this.scope,this.category,this.split);
+      const epoch=++this.epoch,all=this.shownRecords(),unfiltered=model.scopeRows(all,this.scope,this.category,this.split);
       const records=unfiltered.flatMap(row=>row.cells.flatMap(cell=>cell.records)),shared=new Set(records.filter(r=>r.preference).map(r=>r.preference));
       const banks=[...new Map(records.concat(all.filter(r=>shared.has(r.preference))).map(r=>[r.bank.id,r.bank])).values()];
       for(const bank of banks) {
@@ -168,11 +170,18 @@
     lockControls() {if(this.busy)this.shadowRoot.querySelectorAll('button,select,input').forEach(n=>n.disabled=true);}
     entryId(record,variant=this.variant) {return record.preference?'preference:'+record.preference:variant+':'+record.id;}
     draftValue(record) {const entry=this.draft[this.entryId(record)];return entry?entry.value:record.value;}
-    currentEntry(entry) {
-      if(entry.preference)return model.preferenceValue(this.state,entry.preference);
-      const bank=(this.state.document||{}).banks.find(b=>b.id===entry.bank_id);
-      if(!bank||JSON.stringify(bank.target)!==JSON.stringify(entry.target)||!Object.hasOwn(bank.settings,entry.key))throw new Error('A draft target changed or was removed. Discard this draft and select it again.');
-      return model.values(bank,this.state,entry.variant)[entry.key];
+    entryRecord(entry) {
+      if(!model.profileOptions(this.state.document).some(p=>p[0]===entry.variant))throw new Error('The draft profile was removed. Discard this draft and select it again.');
+      const record=model.records(this.state,entry.variant).find(r=>r.bank.id===entry.bank_id&&r.key===entry.key);
+      if(!record||JSON.stringify(record.bank.target)!==JSON.stringify(entry.target)||record.preference!==entry.preference)throw new Error('A draft target or brightness link changed. Discard this draft and select it again.');
+      return record;
+    }
+    currentEntry(entry) {return this.entryRecord(entry).value;}
+    entryApplied(entry) {const r=this.entryRecord(entry);return entry.inherit?r.inherited:model.same(r.value,entry.value)&&!(this.state.document.schema===2&&entry.variant!=='standard'&&r.inherited);}
+    inheritanceText(cell) {
+      if(cell.records.some(r=>(this.draft[this.entryId(r)]||{}).inherit))return 'Draft: follow Base';
+      if(cell.records.some(r=>this.draft[this.entryId(r)]))return 'Draft: override';
+      return cell.records.every(r=>r.inherited)?'Inherited from base':cell.records.every(r=>!r.inherited)?'Override in this profile':'Mix of inherited values and profile overrides';
     }
     stage(cell,value) {
       if(!Object.keys(this.draft).length)this.draftRevision=this.state.revision;
@@ -180,9 +189,28 @@
         const id=this.entryId(r),before=r.preference?model.preferenceValue(this.state,r.preference):r.value;
         const encoded=value!==undefined&&r.key==='blackLevel'?Object.fromEntries(Object.keys(before).map(k=>[k,value])):value;
         if(value===undefined||model.same(before,encoded))delete this.draft[id];
-        else this.draft[id]={...(this.draft[id]||{id,bank_id:r.bank.id,key:r.key,variant:this.variant,target:r.bank.target,preference:r.preference,before}),value:encoded,label:pretty(r.alias),targets:cell.records.filter(t=>r.preference?t.preference===r.preference:t.id===r.id).map(t=>({id:t.id,scope:model.storedScope(t)}))};
+        else this.draft[id]={...(this.draft[id]||{id,bank_id:r.bank.id,key:r.key,variant:this.variant,target:r.bank.target,preference:r.preference,before}),inherit:false,value:encoded,label:pretty(r.alias),targets:cell.records.filter(t=>r.preference?t.preference===r.preference:t.id===r.id).map(t=>({id:t.id,scope:model.storedScope(t)}))};
       }
       this.review=null;this.updateFooter();
+    }
+    stageInheritance(cell) {
+      if(!this.writable()||this.status.editor_api<7||this.variant==='standard')return;
+      if(!Object.keys(this.draft).length)this.draftRevision=this.state.revision;
+      const all=this.records();
+      for(const r of cell.records) {
+        const id=this.entryId(r);
+        if(r.inherited){delete this.draft[id];continue;}
+        const affected=r.preference?all.filter(t=>t.preference===r.preference):[r];
+        this.draft[id]={id,bank_id:r.bank.id,key:r.key,variant:this.variant,target:r.bank.target,preference:r.preference,
+          before:r.value,value:model.values(r.bank,this.state,'standard')[r.key],inherit:true,label:pretty(r.alias),
+          targets:affected.map(t=>({id:t.id,scope:model.storedScope(t)}))};
+      }
+      this.review=null;this.renderRows();
+    }
+    inheritButton(cell,label) {
+      const b=this.button('Use Base',()=>this.stageInheritance(cell),undefined,'inherit:'+cell.id);
+      b.setAttribute('aria-label','Use Base for '+label);b.title='Remove this profile’s override and follow future Base changes';
+      b.dataset.inheritCell=cell.id;this.inheritCells.set(cell.id,cell);return b;
     }
     brightnessBanks() {
       return this.records().filter(r=>r.key==='backlight'&&model.brightnessRole(r.bank)&&model.matches(r,this.scope)).map(r=>r.bank);
@@ -209,6 +237,8 @@
       grid.append(this.select('Profile to edit',choices,this.variant,id=>this.changeView(()=>{this.variant=id;this.live={};})));
       const apply=el('div',undefined,'choice'),selected=this.applyChoice||this.state.selection||'automatic';
       apply.append(this.select('Profile to apply',[['automatic','Automatic'],...choices],selected,id=>{this.applyChoice=id;}),this.button('Apply profile',()=>this.profileCommand({action:'apply_profile',profile_id:this.applyChoice||this.state.selection||'automatic'}),undefined,'profile-apply'));grid.append(apply);box.append(grid);
+      const filter=this.toggle('Show only overrides',this.overridesOnly(),()=>this.changeView(()=>{this.onlyOverrides=!this.onlyOverrides;}),'only-overrides');
+      filter.disabled=this.variant==='standard';box.append(filter,el('p','Overrides stay fixed when Base changes, even if their current values match Base. Port, format and category filters still apply.','scope-note'));
       box.append(el('p','Active: '+this.profileName(this.state.active_profile)+(this.state.selection==='automatic'?' · Automatic':' · Manual selection')+'. Editing a different profile saves it for later. Apply profile also clears temporary adjustments.','scope-note'));
       const manage=el('div',undefined,'filters'),nameLabel=el('label',undefined,'choice'),name=el('input');name.type='text';name.maxLength=64;name.placeholder='e.g. Evening';name.value=this.profileNameDraft||'';name.dataset.focus='profile-name';name.setAttribute('aria-label','Profile name');name.oninput=()=>{this.profileNameDraft=name.value;};nameLabel.append(el('span','Profile name'),name);manage.append(nameLabel);
       const actions=el('div',undefined,'actions'),make=copy=>this.profileCommand({action:'create_profile',name:name.value.trim(),copy_from:copy});
@@ -219,7 +249,7 @@
       const bindings=el('div',undefined,'filter-grid'),automatic=this.automaticDraft||{...this.state.document.automatic};
       for(const [key,label] of [['bright','Automatic bright room'],['dark','Automatic dark room']])bindings.append(this.select(label,choices,automatic[key],id=>{this.automaticDraft={...automatic,[key]:id};automatic[key]=id;}));
       manage.append(bindings,this.button('Save automatic bindings',()=>this.profileCommand({action:'set_automatic',profiles:this.automaticDraft||this.state.document.automatic})),el('p','Home Assistant supplies bright/dark room context from the sun. These bindings are used only while Automatic is selected; sunset preserves temporary adjustments.','scope-note'));
-      box.append(this.details('Manage profiles and automatic selection','profile-management',manage));box.querySelectorAll('button').forEach(b=>b.dataset.profileAction='');this.rows.append(box);
+      box.append(this.details('Manage profiles and automatic selection','profile-management',manage));box.querySelectorAll('button:not([data-focus="only-overrides"])').forEach(b=>b.dataset.profileAction='');this.rows.append(box);
     }
     renderBrightnessLinks() {
       const banks=this.brightnessBanks();if(!banks.length)return;
@@ -310,7 +340,7 @@
       if(!this.review)this.renderRows();this.updateFooter();this.lockControls();this.restoreFocus(focus);this.editing(root.activeElement&&this.editingKey===root.activeElement.dataset.focus?root.activeElement:null);
     }
     renderRows() {
-      if(!this.settings||this.review)return;const focus=this.captureFocus();this.settings.replaceChildren();
+      if(!this.settings||this.review)return;const focus=this.captureFocus();this.settings.replaceChildren();this.inheritCells=new Map();
       for(const row of this.selectedRows()) {
         const section=el('section',undefined,'row'),name=el('div'),cells=el('div',undefined,'cells');name.append(el('h3',pretty(row.key)));
         if(descriptions[row.key]){const help=el('p',descriptions[row.key],'muted setting-help');help.id='help-'+row.key;name.append(help);}
@@ -321,7 +351,7 @@
           group.append(el('span',cell.label,'cell-label'));
           if(cell.brightnessRole)group.append(el('p',cell.brightnessRole==='game_sdr'?'Shared SDR game brightness':this.state.document.schema!==2&&this.variant==='standard'?'Choose Bright or Dark under More factors to edit shared movie brightness':'Shared SDR movie brightness','muted'));
           const disabled=!this.writable()||cell.records.some(r=>r.locked);let input;
-          const update=value=>{this.stage(cell,value);const comparison=group.querySelector('.comparison');if(comparison)comparison.textContent=value===undefined?'Edit cleared; saved values retained.':'Draft · '+display(value);};
+          const update=value=>{this.stage(cell,value);const comparison=group.querySelector('.comparison');if(comparison)comparison.textContent=value===undefined?'Edit cleared; saved values retained.':'Draft · '+display(value);const inheritance=group.querySelector('.inheritance');if(inheritance)inheritance.textContent=this.inheritanceText(cell);};
           if(control&&control.component==='number') {
             input=el('div',undefined,'range');const slider=el('input'),number=el('input');slider.type='range';number.type='number';
             for(const node of [slider,number]){node.min=control.min;node.max=control.max;node.step=control.step;node.value=mixed?'':unique[0];node.setAttribute('aria-label',fieldLabel);node.dataset.focus='setting:'+cell.id+':'+node.type;node.disabled=disabled;}
@@ -332,7 +362,12 @@
             for(const value of control.options){const option=el('option',row.key==='truMotionMode'&&value==='user'?'User Selection':value);option.value=value;input.append(option);}input.value=mixed?'':unique[0];input.disabled=disabled;input.onchange=()=>update(input.value);
           } else input=el('span',mixed?'Mixed: '+unique.join(' / '):unique[0],mixed?'mixed':'');
           group.append(input);
-          if(this.state.document.schema===2&&this.variant!=='standard')group.append(el('p',cell.records.every(r=>r.inherited)?'Inherited from base':cell.records.every(r=>!r.inherited)?'Override in this profile':'Mix of inherited values and profile overrides','muted'));
+          if(this.state.document.schema===2&&this.variant!=='standard') {
+            group.append(el('p',this.inheritanceText(cell),'muted inheritance'));
+            group.append(this.inheritButton(cell,fieldLabel));
+            const base=[...new Set(cell.records.map(r=>display(model.values(r.bank,this.state,'standard')[r.key])))];
+            group.append(el('p','Base: '+base.join(' / ')+(base.length>1?' · each stored value inherits its own Base':''),'muted'));
+          }
           if(descriptions[row.key])group.querySelectorAll('input,select').forEach(node=>node.setAttribute('aria-describedby','help-'+row.key));
           if(!ready&&!this.status.offline)group.append(el('p','Checking TV applicability and ranges…','muted'));else if(!control&&!this.status.offline)group.append(el('p','No common verified control. Split by Format or Preset to inspect separately.','muted'));
           const temporary=cell.records.filter(r=>Object.hasOwn((this.state.overrides||{})[r.bank.id]||{},r.key)).map(r=>this.state.overrides[r.bank.id][r.key]);
@@ -348,11 +383,18 @@
         this.settings.append(section);
       }
       const excluded=this.excludedRecords();
-      if(!this.settings.childElementCount)this.settings.append(el('p',excluded.length?'No verified editable settings match this selection.':'No saved settings match this selection.','empty'));
+      if(!this.settings.childElementCount)this.settings.append(el('p',excluded.length?'No verified editable settings match this selection.':this.overridesOnly()?'No overrides in this selection. Show all settings to add one, or choose another category.':'No saved settings match this selection.','empty'));
       if(excluded.length) {
         const content=el('div',undefined,'grouping'),list=el('ul',undefined,'targets');
         content.append(el('p','These stored values are preserved, but excluded from edits because LG disables them or their applicability is unverified.','muted'));
-        for(const r of excluded)list.append(el('li',pretty(r.alias)+' · '+model.storedScope(r)+' — '+r.availability.reason));
+        for(const r of excluded) {
+          const item=el('li',pretty(r.alias)+' · '+model.storedScope(r)+' — '+r.availability.reason);
+          if(this.state.document.schema===2&&this.variant!=='standard'&&(!r.inherited||this.draft[this.entryId(r)])) {
+            item.append(el('p','Saved override: '+display(r.value)+' · Base: '+display(model.values(r.bank,this.state,'standard')[r.key]),'muted'),this.inheritButton({id:'excluded:'+r.id,records:[r]},pretty(r.alias)+' · '+model.storedScope(r)));
+            if((this.draft[this.entryId(r)]||{}).inherit)item.append(el('p','Draft: follow Base','muted'));
+          }
+          list.append(item);
+        }
         content.append(list);this.settings.append(this.details(excluded.length+' unavailable or unverified values','excluded-settings',content));
       }
       this.updateFooter();this.lockControls();this.restoreFocus(focus);
@@ -365,10 +407,21 @@
       this.discardButton.disabled=!entries.length||!!this.review;this.restoreButton.disabled=!this.writable()||!shown.size||this.selectedRecords().some(r=>!(r.availability||model.applicability(r,this.live)).editable)||!!entries.length||!!this.review;this.keepButton.disabled=this.restoreButton.disabled;
       this.shadowRoot.querySelectorAll('[data-profile-action]').forEach(b=>b.disabled=!this.writable()||!!entries.length||!!this.review);
       this.shadowRoot.querySelectorAll('[data-link-action]').forEach(b=>b.disabled=!this.writable()||this.status.editor_api<5||!!entries.length||!!this.review);
+      this.shadowRoot.querySelectorAll('[data-inherit-cell]').forEach(b=>{
+        const records=this.inheritCells.get(b.dataset.inheritCell).records;
+        b.disabled=!this.writable()||this.status.editor_api<7||!!this.review||!records.some(r=>!r.inherited||this.draft[this.entryId(r)]);
+        if(this.status.editor_api<7)b.title='Update LG Picture Bridge to 0.17.1 to return individual settings to Base';
+      });
     }
     openEditReview() {
       try {
-        if(this.draftRevision!==this.state.revision){for(const entry of Object.values(this.draft)){entry.before=this.currentEntry(entry);if(model.same(entry.before,entry.value))delete this.draft[entry.id];}this.draftRevision=this.state.revision;}
+        if(this.draftRevision!==this.state.revision){for(const entry of Object.values(this.draft)){
+          const r=this.entryRecord(entry);entry.before=r.value;
+          if(entry.inherit)entry.value=model.values(r.bank,this.state,'standard')[r.key];
+          const affected=r.preference?model.records(this.state,entry.variant).filter(t=>t.preference===r.preference):[r];
+          entry.targets=affected.map(t=>({id:t.id,scope:model.storedScope(t)}));
+          if(this.entryApplied(entry))delete this.draft[entry.id];
+        }this.draftRevision=this.state.revision;}
         const entries=Object.values(this.draft);if(!entries.length){this.render();return;}
         this.review={action:'edit_many',revision:this.draftRevision,entries:JSON.parse(JSON.stringify(entries))};this.render({key:'review-back',neighbors:[],scroll:0});
       } catch(e){this.error(e.message);}
@@ -401,7 +454,9 @@
       const box=el('section',undefined,'review'),r=this.review;box.append(el('h3',r.action==='delete_profile'?'Delete profile':r.action==='reset_profile'?'Reset profile to base':r.action==='set_brightness_links'?'Review brightness links':r.action==='edit_many'?'Review saved standards':r.action==='restore'?'Restore '+this.profileName(this.state.active_profile||this.state.room)+' standards':'Keep adjustments in '+this.profileName(this.state.active_profile||this.state.room)));
       for(const entry of r.entries) {
         const row=el('div',undefined,'diff'),label=el('div');label.append(el('strong',entry.label),el('p',entry.preference?'Shared preference: '+entry.preference:'Profile: '+this.profileName(entry.variant),'muted'));
-        const list=el('ul',undefined,'targets');entry.targets.forEach(t=>list.append(el('li',t.scope)));label.append(list);row.append(label,el('span',display(entry.before)+' → '+display(entry.value),'value'));box.append(row);
+        const list=el('ul',undefined,'targets');entry.targets.forEach(t=>list.append(el('li',t.scope)));label.append(list);
+        if(entry.inherit)label.append(el('p','Remove the override and follow future Base changes. Other profile overrides remain saved.','muted'));
+        row.append(label,el('span',display(entry.before)+' → '+(entry.inherit?'Base: ':'')+display(entry.value),'value'));box.append(row);
       }
       const actions=el('div',undefined,'actions');actions.append(this.button('Back to editing',()=>this.closeReview(),undefined,'review-back'),this.button(r.action==='delete_profile'?'Delete profile':r.action==='reset_profile'?'Reset profile':r.action==='set_brightness_links'?'Save brightness links':r.action==='edit_many'?'Save standards':r.action==='restore'?'Restore selected settings':'Keep these adjustments',()=>this.confirmReview(),'primary','review-confirm'));box.append(actions);this.rows.append(box);
     }
@@ -412,8 +467,10 @@
       if(r.action!=='edit_many'){await this.mutate({action:r.action,selection:r.selection,expected:r.expected,room:r.room,profile_id:r.profile_id,revision:r.revision});return;}
       const edits=new Map(),preferences={};
       for(const entry of r.entries) {
+        if(entry.inherit&&this.status.editor_api<7){this.error('Update LG Picture Bridge to 0.17.1 to remove individual overrides.');return;}
         if(entry.preference&&this.state.document.schema!==2){preferences[entry.preference]=Number(entry.value);continue;}
-        const id=entry.bank_id+':'+entry.variant;if(!edits.has(id))edits.set(id,{bank_id:entry.bank_id,variant:entry.variant,settings:{}});edits.get(id).settings[entry.key]=entry.value;
+        const id=entry.bank_id+':'+entry.variant;if(!edits.has(id))edits.set(id,{bank_id:entry.bank_id,variant:entry.variant,settings:{}});
+        const edit=edits.get(id);if(entry.inherit){edit.inherit=edit.inherit||[];edit.inherit.push(entry.key);}else edit.settings[entry.key]=entry.value;
       }
       await this.mutate({action:'edit_many',edits:[...edits.values()],preferences,revision:r.revision});
     }
@@ -431,7 +488,7 @@
         error=true;this.review=null;await this.refresh();
         // A lost reply may follow a successful atomic commit. Re-read before
         // retrying, retaining only edits not confirmed in the saved document.
-        for(const entry of Object.values(this.draft))try{if(model.same(this.currentEntry(entry),entry.value))delete this.draft[entry.id];}catch(_){}
+        for(const entry of Object.values(this.draft))try{if(this.entryApplied(entry))delete this.draft[entry.id];}catch(_){}
         message=e.message+(Object.keys(this.draft).length?' Unsaved drafts remain for review.':'');
       } finally {this.busy=false;this.render(focus);const n=this.shadowRoot.querySelector('.message');n.textContent=message;n.classList.toggle('error',error);}
     }

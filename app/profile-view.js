@@ -38,6 +38,12 @@
     if(state.document.schema!==2)return state.preferences[key];
     const [variant,role]=key.split('/');return brightness(state.document,variant)[role];
   }
+  function isInherited(bank,state,variant,key) {
+    const doc=state.document;
+    if(doc.schema!==2||variant==='standard')return false;
+    if(key==='backlight'&&bank.brightness_role)return !Object.hasOwn((doc.profiles.find(p=>p.id===variant)||{}).brightness||{},bank.brightness_role);
+    return !Object.hasOwn((bank.variants||{})[variant]||{},key);
+  }
   function inputName(bank) {
     return String(typeof bank==='string'?bank:input(bank)||'').replace(/^hdmi([1-4])(_pc)?$/,(_,n,pc)=>'HDMI '+n+(pc?' (PC)':''));
   }
@@ -117,7 +123,7 @@
           genre:d.gameGenre||null,signals:signals.length?signals:['off','on'],devices:deviceIds,
           preference,brightnessRole:key==='backlight'?bank.brightness_role:null,
           locked:doc.schema!==2&&key==='backlight'&&bank.brightness_role==='movie_sdr'&&variant==='standard',
-          inherited:doc.schema===2&&variant!=='standard'&&(preference?!Object.hasOwn((doc.profiles.find(p=>p.id===variant)||{}).brightness||{},bank.brightness_role):!Object.hasOwn((bank.variants||{})[variant]||{},key)),
+          inherited:isInherited(bank,state,variant,key),
           value:values(bank,state,variant)[key]});
       }
     }
@@ -210,5 +216,5 @@
     if(!Object.keys(selection).length)throw new Error('No managed settings match this scope');
     return selection;
   }
-  return {values,brightness,profileOptions,preferenceValue,control,same,inputName,brightnessRole,setBrightnessLink,scopeSelection,modes,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition};
+  return {values,brightness,profileOptions,preferenceValue,isInherited,control,same,inputName,brightnessRole,setBrightnessLink,scopeSelection,modes,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition};
 });

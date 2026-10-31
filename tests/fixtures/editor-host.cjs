@@ -2,7 +2,7 @@
 // Browser interactions share a deterministic TV transport; engine tests cover
 // atomicity, native validation, persistence and recovery separately.
 function setup(initial) {
-  window.fixture=structuredClone(initial);window.calls=[];window.editorApi=initial.document.schema===2?6:5;
+  window.fixture=structuredClone(initial);window.calls=[];window.editorApi=initial.document.schema===2?7:5;
   window.confirm=()=>true;
   window.requestProfile=async command=>{
     window.calls.push(structuredClone(command));
@@ -42,7 +42,11 @@ function setup(initial) {
       if(window.failNextBatch==='before'){window.failNextBatch=null;window.fixture.revision++;throw new Error('Another editor changed the profiles');}
       const next=structuredClone(window.fixture);
       for(const edit of command.edits) {
-        const bank=next.document.banks.find(b=>b.id===edit.bank_id);
+        const bank=next.document.banks.find(b=>b.id===edit.bank_id);edit.settings=edit.settings||{};
+        for(const key of edit.inherit||[]) {
+          if(key==='backlight'&&bank.brightness_role)delete next.document.profiles.find(p=>p.id===edit.variant).brightness[bank.brightness_role];
+          else if(bank.variants&&bank.variants[edit.variant]){delete bank.variants[edit.variant][key];if(!Object.keys(bank.variants[edit.variant]).length)delete bank.variants[edit.variant];}
+        }
         if(next.document.schema===2&&bank.brightness_role&&Object.hasOwn(edit.settings,'backlight')) {
           const target=edit.variant==='standard'?next.document:next.document.profiles.find(p=>p.id===edit.variant);target.brightness=target.brightness||{};target.brightness[bank.brightness_role]=edit.settings.backlight;
           delete edit.settings.backlight;
