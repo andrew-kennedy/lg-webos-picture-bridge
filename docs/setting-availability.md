@@ -28,8 +28,8 @@ Storage dimensions have been checked against native descriptions for the 47 mana
 
 - Expression Enhancer in HDR Game on HDMI 3/4. HDMI 1 PC HDR Game was checked at 60/120/165 Hz, and HDMI 3 HDR Filmmaker at 24/60 Hz, as recorded below.
 - Prevent Input Delay on the remaining gaming inputs and physical latency effects. HDMI 1 control availability was checked at 60/120/165 Hz, including VRR comparisons.
-- Gamma choices in each SDR Game input, plus movie Gamma under relevant input-processing conditions.
-- Real Cinema and TruMotion in SDR, Dolby Vision at 50/60 Hz, and HDR at 50 Hz, with low latency, PC processing and VRR/QMS where applicable. HDMI 3 HDR Filmmaker was checked at 24/60 Hz; Dolby Filmmaker and Cinema Home were checked at 24 Hz.
+- Gamma choices in the remaining SDR Game inputs, plus movie Gamma under different input-processing conditions. HDMI 1 PC SDR Game was checked at 60 Hz, and HDMI 3 SDR Filmmaker at 24/60 Hz.
+- Real Cinema and TruMotion in Dolby Vision at 50/60 Hz, and SDR/HDR at 50 Hz, with low latency, PC processing and VRR/QMS where applicable. HDMI 3 SDR and HDR Filmmaker were checked at 24/60 Hz; Dolby Filmmaker and Cinema Home were checked at 24 Hz.
 - Fine Tune Dark Areas' visible effect with VRR, and QFT with source support, including effects on accepted formats. HDMI 1 accepted 4K/165 Hz RGB HDR10 with DSC and VRR; this does not verify other formats or displayed image fidelity.
 - HLG versus HDR10 processing restrictions. The collection currently shares their HDR preset banks; common storage does not prove identical processing choices.
 - Filmmaker ambient-light behavior and its dependencies across SDR/HDR/Dolby Vision if that control is added to the managed collection. It is not currently a saved standard.
@@ -70,6 +70,16 @@ Expression Enhancer was editable with Off/Detail/Brightness choices. Peak Bright
 The grouping check used the real saved collection and inspections: ordinary picture controls appeared once for the shared Apple TV/Shield movie bank; Real Cinema appeared under Motion while retaining its picture-bank target; TruMotion retained the `com.webos.app.hdmi3` binding; HDMI connection settings stayed port-wide across formats. No grouping or applicability correction was required for these samples.
 
 Filmmaker Ambient Light Compensation was natively visible/active and stored Off. This confirms control availability for these signals, not sensor behavior; it remains outside the saved collection. Native de-judder/de-blur flags were active while TruMotion was Off, so raw flags alone would incorrectly imply those values are in use. Their editor policy requires TruMotion User Selection. They are not currently saved controls.
+
+### HDMI 3 SDR movie verification
+
+The [2026-10-30 SDR movie audit](g6-sdr-movie-audit.json) checked 30 managed controls while the Shield played the same movie at 3840×2160/24 Hz and 60 Hz. Both signals were YCbCr 4:2:2/limited with no HDR, ALLM or active QFT, using `filmMaker` and the ordinary `sdr` storage bank. Two native captures per sample remained stable around read-only editor inspections.
+
+All values, native storage dimensions, choices and availability matched in both samples. Gamma offered only `high2` and `mediumHavingLevel`; its fine adjustment was editable from −3 to +3 for the selected adjustable-2.2 option, stored at 0. Inactive SDR Game Gamma stayed unverified, while HDR Gamma remained inapplicable. The active SDR signal did not lend its availability to inactive Dolby or Game profiles.
+
+The dark-room standard was correctly recalled: OLED brightness 3, contrast 95, black level/color 50, sharpness 0, Peak Brightness Off, Real Cinema On and TruMotion Off. Tests of the actual saved document confirmed one shared Apple TV/Shield SDR bank, brightness preferences of dark 3 and bright 100, and a locked standard brightness row that directs editing to the room variants. This checked both variants' grouping and resolution; it did not change the room or measure their brightness.
+
+Real Cinema appeared under Motion while retaining its input/picture-preset storage; TruMotion additionally retained the HDMI 3 app scope. HDMI connection controls stayed port-wide, and the natively inactive Game Genre and Prevent Input Delay controls were excluded. No grouping or availability correction was needed. After Plex frame-rate switching was re-enabled, a final native capture confirmed 4K/24 Hz SDR Filmmaker with the same dark-room values. Standards, preferences, revision and management state were unchanged; there were no temporary adjustments or pending restores.
 
 ### Matching live and saved profiles
 

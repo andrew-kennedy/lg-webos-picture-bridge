@@ -1,0 +1,421 @@
+{
+  "date": "2026-10-30",
+  "model": "OLED77G6WUA",
+  "firmware": "43.21.69",
+  "bridge_version": "0.15.4",
+  "input": "hdmi3",
+  "source": "NVIDIA Shield / SDR movie",
+  "method": "Two stable independent native value/description and signal captures surrounding read-only editor inspections; real saved-document grouping checks.",
+  "samples": [
+    {
+      "label": "shield-sdr-initial",
+      "captured_at": "2026-10-31T02:24:10.716Z",
+      "context": {
+        "input": "hdmi3",
+        "mode": "filmMaker",
+        "range": "sdr",
+        "ready": true
+      },
+      "room": "dark",
+      "width": 3840,
+      "height": 2160,
+      "frame_rate_reported": 24,
+      "hdr_type": "none",
+      "pixel_encoding": "YCbCr422",
+      "ycbcr_range": "LIMITED",
+      "allm_enabled": 0,
+      "vrr": null,
+      "qft_enabled": false,
+      "dsc_enabled": false,
+      "control_count": 30,
+      "changes_from_baseline": {},
+      "state_unchanged": {
+        "document": true,
+        "preferences": true,
+        "revision": true,
+        "enabled": true,
+        "overrides": true
+      },
+      "native_scope_and_availability_checks": true,
+      "inactive_profiles_do_not_inherit_current_signal": true
+    },
+    {
+      "label": "shield-sdr-switching-off",
+      "captured_at": "2026-10-31T02:26:46.418Z",
+      "context": {
+        "input": "hdmi3",
+        "mode": "filmMaker",
+        "range": "sdr",
+        "ready": true
+      },
+      "room": "dark",
+      "width": 3840,
+      "height": 2160,
+      "frame_rate_reported": 60,
+      "hdr_type": "none",
+      "pixel_encoding": "YCbCr422",
+      "ycbcr_range": "LIMITED",
+      "allm_enabled": 0,
+      "vrr": null,
+      "qft_enabled": false,
+      "dsc_enabled": false,
+      "control_count": 30,
+      "changes_from_baseline": {},
+      "state_unchanged": {
+        "document": true,
+        "preferences": true,
+        "revision": true,
+        "enabled": true,
+        "overrides": true
+      },
+      "native_scope_and_availability_checks": true,
+      "inactive_profiles_do_not_inherit_current_signal": true
+    }
+  ],
+  "baseline_controls": {
+    "dynamicColor": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high",
+        "user"
+      ]
+    },
+    "blackLevel": {
+      "value": {
+        "secam": "auto",
+        "ntsc": "auto",
+        "pal60": "auto",
+        "ntsc443": "auto",
+        "pal": "auto",
+        "unknown": "auto",
+        "paln": "auto",
+        "palm": "auto"
+      },
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "auto",
+        "low",
+        "high"
+      ]
+    },
+    "realCinema": {
+      "value": "on",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "on",
+        "off"
+      ]
+    },
+    "peakBrightness": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "nearBlackDetail": {
+      "value": 0,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -10,
+      "max": 10,
+      "step": 1
+    },
+    "colorTemperature": {
+      "value": "-40",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -50,
+      "max": 50,
+      "step": 1
+    },
+    "brightness": {
+      "value": "50",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "sharpness": {
+      "value": "0",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 50,
+      "step": 1
+    },
+    "mpegNoiseReduction": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high",
+        "auto"
+      ]
+    },
+    "gammaLevel": {
+      "value": 0,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -3,
+      "max": 3,
+      "step": 1
+    },
+    "contrast": {
+      "value": "95",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "gamma": {
+      "value": "mediumHavingLevel",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "high2",
+        "mediumHavingLevel"
+      ]
+    },
+    "colorGamut": {
+      "value": "auto",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "auto",
+        "native",
+        "dynamic",
+        "adobeRGB",
+        "dci-p3"
+      ]
+    },
+    "color": {
+      "value": "50",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "superResolution": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "backlight": {
+      "value": 3,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "tint": {
+      "value": "0",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -50,
+      "max": 50,
+      "step": 1
+    },
+    "noiseReduction": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high",
+        "auto"
+      ]
+    },
+    "smoothGradation": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "dynamicContrast": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "truMotionMode": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "cinemaClear",
+        "natural",
+        "smooth",
+        "user"
+      ]
+    },
+    "freesync": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "on",
+        "off"
+      ]
+    },
+    "enable144HzBooster": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "on"
+      ]
+    },
+    "uhdDeepColor": {
+      "value": "4k",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "4k"
+      ]
+    },
+    "enableALLM": {
+      "value": "on",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "on"
+      ]
+    },
+    "gameGenre": {
+      "value": "Standard",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "gameOptimization": {
+      "value": "on",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "on",
+        "off"
+      ]
+    },
+    "inputOptimization": {
+      "value": "on",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "enableQFT": {
+      "value": "on",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "on"
+      ]
+    },
+    "pictureMode": {
+      "value": "filmMaker",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "game",
+        "filmMaker"
+      ]
+    }
+  },
+  "notes": [
+    "The SDR Filmmaker bank is shared by Apple TV and Shield. The collection does not create duplicate standards per device.",
+    "Gamma offers only high2 and mediumHavingLevel; the legacy factory choices low, medium and high1 are hidden. Gamma fine adjustment is -3 through +3, enabled for the currently selected adjustable-2.2 option.",
+    "Night OLED brightness 3 and Peak Brightness Off matched the saved dark-room profile. Brightness is a shared movie preference: the editor resolves dark 3 versus bright 100 and keeps the standard row locked; no room change was applied in this audit.",
+    "Real Cinema uses the input/preset picture scope but appears in Motion. TruMotion additionally binds to com.webos.app.hdmi3 and is shown in the same Motion section.",
+    "Real Cinema is On and TruMotion is Off. Native de-judder/de-blur descriptions remain active while TruMotion is Off; they are outside the managed collection, and their editor policy requires User Selection.",
+    "HDMI connection settings stay port-wide. Game Genre and Prevent Input Delay are natively inactive in this movie context and are excluded.",
+    "Filmmaker Ambient Light Compensation, AI HDR Remastering and Motion Eye Care are natively available but stored Off and are outside the managed collection. OLED Motion and Dolby Precision Detail are hidden/inactive.",
+    "Inactive Game Gamma remains unverified, HDR Gamma inapplicable and inactive Dolby HDMI Black Level unverified; this SDR movie cannot provide live evidence for those profiles.",
+    "This audit verifies values, scopes, grouping, choices and control applicability. It does not measure physical image processing or assert sensor behavior."
+  ],
+  "restoration": {
+    "captured_at": "2026-10-31T02:28:08.028Z",
+    "frame_rate_reported": 24,
+    "input": "hdmi3",
+    "preset": "filmMaker",
+    "format": "sdr",
+    "room": "dark",
+    "backlight": 3,
+    "gamma": "mediumHavingLevel",
+    "gamma_fine_adjustment": 0,
+    "real_cinema": "on",
+    "trumotion": "off",
+    "saved_standards_and_preferences_unchanged": true,
+    "temporary_count": 0,
+    "pending_restore": false,
+    "backup_acknowledged": true
+  }
+}
