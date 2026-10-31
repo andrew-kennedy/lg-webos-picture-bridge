@@ -28,9 +28,8 @@ Inactive Game profiles also require live confirmation for Peak Brightness, Dynam
 
 Storage dimensions have been checked against native descriptions for the 47 managed banks. That establishes which settings share storage, rather than proving processing support under every signal condition. Inactive rows marked `native_rules` use reviewed factory and controller rules; `live` rows additionally use current native visibility/activity. The main remaining live matrix is:
 
-- Expression Enhancer in HDR Game on HDMI 4. HDMI 1 PC HDR Game was checked at 60/120/165 Hz, HDMI 3 Switch HDR Game at 60 Hz, and HDMI 3 HDR Filmmaker at 24/60 Hz, as recorded below.
-- Prevent Input Delay on HDMI 4 and physical latency effects. HDMI 1 control availability was checked at 60/120/165 Hz, including VRR comparisons; Switch SDR/HDR Game was checked at 60 Hz.
-- Gamma choices in HDMI 4 SDR Game, plus movie Gamma under different input-processing conditions. HDMI 1 PC and HDMI 3 Switch SDR Game were checked at 60 Hz, and HDMI 3 SDR Filmmaker at 24/60 Hz.
+- PS5 controls at 120 Hz and with VRR, particularly Expression Enhancer, Gamma and Prevent Input Delay. All three configured gaming inputs now have SDR checks at 60 Hz; Switch and PS5 have HDR checks at 60 Hz. HDMI 1 PC HDR Game was checked at 60/120/165 Hz, including VRR comparisons. These samples do not establish every console signal variant.
+- Physical latency effects of Prevent Input Delay. Native Standard/Boost availability was checked on every configured gaming port; this does not measure a benefit at any particular frame rate.
 - Real Cinema and TruMotion in Dolby Vision at 50/60 Hz, and SDR/HDR at 50 Hz, with low latency, PC processing and VRR/QMS where applicable. HDMI 3 SDR and HDR Filmmaker were checked at 24/60 Hz; Dolby Filmmaker and Cinema Home were checked at 24 Hz.
 - Fine Tune Dark Areas' visible effect with VRR, and QFT with source support, including effects on accepted formats. HDMI 1 accepted 4K/165 Hz RGB HDR10 with DSC and VRR; this does not verify other formats or displayed image fidelity.
 - HLG versus HDR10 processing restrictions. The collection currently shares their HDR preset banks; common storage does not prove identical processing choices.
@@ -70,6 +69,16 @@ Expression Enhancer was enabled in Switch HDR with Off/Detail/Brightness choices
 Comparing the same Game profiles while inactive and active exposed 11 incorrectly editable rows across six processing settings. The runtime-verification rule added in 0.15.5 fixes these in both editors and their save validation. Reviewed controller calls include `pq_ux_VideoInfo_isLowLatencySignal`, `pq_ux_getautoLowDelayMode`, `pq_ux_isGameOptimizationMode` and `pq_ux_isEnableTruMotion`. The fix adds no polling or persistent capability writes, preserves saved standards and leaves verified movie processing controls available.
 
 The TV reported `vrrEnabled: true` with `baseRefreshRate: 0`; that metadata does not independently establish variable frame delivery. QFT was configured On but the reported incoming `qftEnabled` was false; DSC was off. This audit does not measure latency, image processing or VRR performance. The user changed games; the audit did not change picture settings, and standards, preferences, management state and empty adjustments stayed intact.
+
+## PlayStation 5 Game verification
+
+The [2026-10-30 PS5 audit](g6-ps5-game-audit.json) checked 37 SDR and 39 HDR controls on HDMI 4 with bridge 0.15.5. Both signals were 3840×2160/60 Hz RGB/full range with incoming ALLM and Game Optimizer active, using the `sdrALLM`/`hdrALLM` storage ranges and Standard genre. Two native captures per sample matched the editor's values, scopes, ranges and availability.
+
+SDR recalled brightness 80, Game Contrast 95 and adjustable-2.2 Gamma at fine offset 0. HDR recalled brightness 100, Game Contrast 100 and HGiG. Both recalled Game Color Depth 50, Game Sharpness 0, Game Black Level 50, stabilizers 10/10 and Fine Tune Dark Areas 0. The real-document grouping checks verified that the separate Game Optimizer values replace the inactive ordinary picture controls, shared SDR game brightness still covers all three inputs, and HDR brightness retains its own input/preset scope.
+
+Expression Enhancer was enabled in PS5 HDR with Off/Detail/Brightness choices and remained Off, matching Switch HDR rather than the PC HDR samples. Prevent Input Delay offered Standard/Boost in both formats; HDMI 4 retained its saved Standard (`auto`), while HDMI 3 uses Boost (`on`). The inactive-versus-active comparison found no incorrectly editable processing controls: the 0.15.5 runtime guards covered the newly tested port correctly. No additional applicability or grouping fix was required.
+
+Neither sample contained `hdmiVrrInfo`, and both remained at 60 Hz. This does not verify PS5 120 Hz or VRR-specific availability, nor measure latency or processing effects. QFT and DSC were off. The user restored HDR after the SDR sample; the final capture confirmed HDR10 gameplay, unchanged standards/preferences/management, no temporary adjustments or pending restores, and an acknowledged backup.
 
 ## Selecting the right context
 

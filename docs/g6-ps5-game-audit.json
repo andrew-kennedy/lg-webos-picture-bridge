@@ -1,0 +1,542 @@
+{
+  "date": "2026-10-30",
+  "model": "OLED77G6WUA",
+  "firmware": "43.21.69",
+  "captured_bridge_version": "0.15.5",
+  "source": "PlayStation 5",
+  "input": "hdmi4",
+  "method": "Two stable independent native settings, descriptions and signal captures around read-only editor inspections; grouping checked using the real saved document.",
+  "samples": [
+    {
+      "label": "ps5-sdr",
+      "captured_at": "2026-10-31T02:45:28.006Z",
+      "context": {
+        "input": "hdmi4",
+        "mode": "game",
+        "range": "sdrALLM",
+        "ready": true
+      },
+      "game_genre": "Standard",
+      "width": 3840,
+      "height": 2160,
+      "frame_rate_reported": 60,
+      "hdr_type": "none",
+      "pixel_encoding": "RGB",
+      "rgb_range": "FULL",
+      "allm_enabled": 1,
+      "is_game_mode": true,
+      "vrr_metadata": null,
+      "qft_enabled": false,
+      "dsc_enabled": false,
+      "control_count": 37,
+      "changes_from_sdr": {},
+      "native_scopes_and_availability_match": true,
+      "state_unchanged": {
+        "document": true,
+        "preferences": true,
+        "revision": true,
+        "enabled": true,
+        "overrides": true
+      },
+      "temporary_count": 0,
+      "grouping": {
+        "format": "sdr",
+        "game_picture_controls_replace_unused_ordinary_controls": true,
+        "game_values_scoped_to_port_range_and_genre": true,
+        "shared_sdr_brightness_affects_all_three_game_profiles": true,
+        "hdr_brightness_is_independent": false,
+        "gamma_fine_adjustment_only_in_sdr": true,
+        "movie_processing_excluded_from_active_game_view": true,
+        "port_controls_not_split_by_format": true,
+        "browsing_did_not_modify_standards": true
+      }
+    },
+    {
+      "label": "ps5-hdr",
+      "captured_at": "2026-10-31T02:47:08.113Z",
+      "context": {
+        "input": "hdmi4",
+        "mode": "hdrGame",
+        "range": "hdrALLM",
+        "ready": true
+      },
+      "game_genre": "Standard",
+      "width": 3840,
+      "height": 2160,
+      "frame_rate_reported": 60,
+      "hdr_type": "HDR10",
+      "pixel_encoding": "RGB",
+      "rgb_range": "FULL",
+      "allm_enabled": 1,
+      "is_game_mode": true,
+      "vrr_metadata": null,
+      "qft_enabled": false,
+      "dsc_enabled": false,
+      "control_count": 39,
+      "changes_from_sdr": {
+        "peakBrightness": {
+          "value": "high",
+          "visible": true,
+          "active": false,
+          "editor": "unavailable"
+        },
+        "expressionEnhancer": {
+          "value": "off",
+          "visible": true,
+          "active": true,
+          "editor": "editable",
+          "options": [
+            "off",
+            "detail",
+            "highlight"
+          ]
+        },
+        "gammaLevel": {
+          "value": 0,
+          "visible": true,
+          "active": true,
+          "editor": "unavailable"
+        },
+        "contrast": {
+          "value": "100",
+          "visible": true,
+          "active": false,
+          "editor": "unavailable"
+        },
+        "gamma": {
+          "value": "mediumHavingLevel",
+          "visible": true,
+          "active": false,
+          "editor": "unavailable"
+        },
+        "backlight": {
+          "value": "100",
+          "visible": true,
+          "active": true,
+          "editor": "editable",
+          "min": 0,
+          "max": 100,
+          "step": 1
+        },
+        "hdrDynamicToneMapping": {
+          "value": "HGIG",
+          "visible": true,
+          "active": true,
+          "editor": "editable",
+          "options": [
+            "on",
+            "off",
+            "HGIG"
+          ]
+        },
+        "gameAdjustContrast": {
+          "value": 100,
+          "visible": true,
+          "active": true,
+          "editor": "editable",
+          "min": 0,
+          "max": 100,
+          "step": 1
+        },
+        "pictureMode": {
+          "value": "hdrGame",
+          "visible": true,
+          "active": true,
+          "editor": "editable",
+          "options": [
+            "hdrGame",
+            "hdrFilmMaker"
+          ]
+        }
+      },
+      "native_scopes_and_availability_match": true,
+      "state_unchanged": {
+        "document": true,
+        "preferences": true,
+        "revision": true,
+        "enabled": true,
+        "overrides": true
+      },
+      "temporary_count": 0,
+      "grouping": {
+        "format": "hdr",
+        "game_picture_controls_replace_unused_ordinary_controls": true,
+        "game_values_scoped_to_port_range_and_genre": true,
+        "shared_sdr_brightness_affects_all_three_game_profiles": false,
+        "hdr_brightness_is_independent": true,
+        "gamma_fine_adjustment_only_in_sdr": true,
+        "movie_processing_excluded_from_active_game_view": true,
+        "port_controls_not_split_by_format": true,
+        "browsing_did_not_modify_standards": true
+      }
+    }
+  ],
+  "baseline_controls": {
+    "dynamicColor": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high",
+        "user"
+      ]
+    },
+    "blackLevel": {
+      "value": {
+        "secam": "auto",
+        "ntsc": "auto",
+        "pal60": "auto",
+        "ntsc443": "auto",
+        "pal": "auto",
+        "unknown": "auto",
+        "paln": "auto",
+        "palm": "auto"
+      },
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "auto",
+        "low",
+        "high"
+      ]
+    },
+    "realCinema": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "peakBrightness": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "nearBlackDetail": {
+      "value": 0,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -10,
+      "max": 10,
+      "step": 1
+    },
+    "colorTemperature": {
+      "value": "-40",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -50,
+      "max": 50,
+      "step": 1
+    },
+    "brightness": {
+      "value": "50",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "sharpness": {
+      "value": "0",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "mpegNoiseReduction": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "gammaLevel": {
+      "value": 0,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -3,
+      "max": 3,
+      "step": 1
+    },
+    "contrast": {
+      "value": "95",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "gamma": {
+      "value": "mediumHavingLevel",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "high2",
+        "mediumHavingLevel"
+      ]
+    },
+    "colorGamut": {
+      "value": "auto",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "auto",
+        "native",
+        "dynamic",
+        "adobeRGB",
+        "dci-p3"
+      ]
+    },
+    "color": {
+      "value": "50",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "superResolution": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "backlight": {
+      "value": 80,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "tint": {
+      "value": "0",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -50,
+      "max": 50,
+      "step": 1
+    },
+    "noiseReduction": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "smoothGradation": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "dynamicContrast": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "truMotionMode": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "freesync": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "on",
+        "off"
+      ]
+    },
+    "enable144HzBooster": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "on"
+      ]
+    },
+    "uhdDeepColor": {
+      "value": "4k",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "4k"
+      ]
+    },
+    "enableALLM": {
+      "value": "on",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "on"
+      ]
+    },
+    "gameGenre": {
+      "value": "Standard",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "Standard",
+        "FPS",
+        "RPG",
+        "RTS",
+        "Sports",
+        "USER"
+      ]
+    },
+    "gameOptimization": {
+      "value": "on",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "on",
+        "off"
+      ]
+    },
+    "inputOptimization": {
+      "value": "auto",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "auto",
+        "on"
+      ]
+    },
+    "enableQFT": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "on"
+      ]
+    },
+    "gameAdjustContrast": {
+      "value": 95,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "blackStabilizer": {
+      "value": 10,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 20,
+      "step": 1
+    },
+    "lowLevelAdjustment": {
+      "value": 0,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -30,
+      "max": 30,
+      "step": 1
+    },
+    "gameColorDepth": {
+      "value": 50,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "gameBlackLevel": {
+      "value": 50,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "gameSharpness": {
+      "value": 0,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 50,
+      "step": 1
+    },
+    "whiteStabilizer": {
+      "value": 10,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 20,
+      "step": 1
+    },
+    "pictureMode": {
+      "value": "game",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "game",
+        "filmMaker"
+      ]
+    }
+  },
+  "inactive_profile_cross_check": {
+    "incorrectly_editable_controls": [],
+    "runtime_game_processing_guards_verified": true
+  },
+  "notes": [
+    "Both signals are 4K/60 RGB Full with incoming ALLM and Game Optimizer. Native settings scopes are sdrALLM/hdrALLM with Standard genre.",
+    "SDR recalled brightness 80, Game Contrast 95 and adjustable-2.2 Gamma with fine offset 0. HDR recalled brightness 100, Game Contrast 100 and HGiG. Both used Game Color Depth 50, Game Sharpness 0, Game Black Level 50, stabilizers 10/10 and Fine Tune Dark Areas 0.",
+    "Ordinary contrast/black-level/color/sharpness are disabled; the editor uses separate Game Optimizer values scoped by port, native range and genre.",
+    "SDR Gamma offers high2 and mediumHavingLevel with a -3 through +3 fine adjustment. HDR Gamma and its fine adjustment are excluded, despite the native child flag remaining active.",
+    "Expression Enhancer is enabled in PS5 HDR with off/detail/highlight choices, like Switch HDR and unlike the earlier PC HDR signals. Its saved Off value is preserved.",
+    "Prevent Input Delay offers Standard/Boost (auto/on). HDMI 4 uses its saved Standard value, unlike HDMI 3 Boost. This was verified without changing the setting or claiming a measured latency benefit.",
+    "Peak Brightness, Dynamic Contrast, both noise-reduction controls, Smooth Gradation, Real Cinema and TruMotion are natively disabled. Bridge 0.15.5 correctly withholds unsupported or unverified inactive processing controls; the inactive/active comparison found no falsely editable controls.",
+    "Shared SDR game brightness covers PC, Nintendo and PS5 even under a narrow port filter. HDR brightness remains an independent input/preset standard. Port controls do not acquire format-specific storage in the editor.",
+    "Neither sample includes hdmiVrrInfo; these are 60 Hz checks without reported VRR metadata. PS5 120 Hz and VRR-specific behavior remain unverified. QFT and DSC are off.",
+    "The user temporarily disabled HDR and then restored it; the final capture confirms HDR10 gameplay. No TV picture setting was changed by the audit, saved standards and preferences are unchanged, and no temporary adjustments or pending restores remain.",
+    "This audit verifies native scopes, values, ranges and availability. It does not measure displayed processing, latency or HDR calibration."
+  ],
+  "restoration": {
+    "hdr_gameplay_verified": true,
+    "context": {
+      "input": "hdmi4",
+      "mode": "hdrGame",
+      "range": "hdrALLM",
+      "ready": true
+    },
+    "saved_standards_and_preferences_unchanged": true,
+    "temporary_count": 0,
+    "pending_restore": false,
+    "backup_acknowledged": true
+  }
+}
