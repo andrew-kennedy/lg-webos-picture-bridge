@@ -89,6 +89,13 @@ module.exports = async function () {
   await e.idle();
   assert.equal(f.operations.length,operationsBefore,'Input/range changes do not reapply profiles');
   assert.deepEqual(e.status().active_devices,['Apple TV','Shield'],'HDMI port capability banks do not identify the active device');
+  // An app covering the picture (such as the bridge's own TV app) keeps the
+  // last confirmed HDMI picture for editors; unconfirmed contexts never replace it.
+  e.contextChanged({ready:false,input:'default',range:'sdr',mode:'standard'});
+  const last=e.status().last_context;
+  assert.deepEqual({input:last.input,mode:last.mode,range:last.range},{input:'hdmi3',mode:'filmMaker',range:'sdr'});
+  assert.equal(typeof last.at,'string');
+  e.contextChanged({ready:true,input:'hdmi3',range:'sdr',mode:'filmMaker'});
   await e.command({action:'set_environment',room:'bright'});
   assert.equal(f.values.movie.backlight,100);
   f.observe(e,'movie','backlight',70);

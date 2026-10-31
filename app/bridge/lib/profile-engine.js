@@ -17,7 +17,7 @@ function create(options) {
   let boot = options.bootId;
   if (!boot) { try { boot = fs.readFileSync('/proc/sys/kernel/random/boot_id','utf8').trim(); } catch (_) { boot = null; } }
   let saved = null, journal = {dirty:{},restore:{},boot_id:boot,power:null,environment:null,revision:0};
-  let overrides = {}, context = {}, observations = {}, versions = {}, own = {}, recovery = true;
+  let overrides = {}, context = {}, lastContext = null, observations = {}, versions = {}, own = {}, recovery = true;
   let power = null, powerEpoch = 0, room = 'dark', loadError = null, lastError = null, changedCount = 0;
   let tail = Promise.resolve(), pending = 0, timer = null, stopped = false, applying = false, sequence = 0;
   let latestBackup = null, acknowledged = null, listeners = new Set(), backupListeners = new Set();
@@ -92,7 +92,7 @@ function create(options) {
   }
   function status() {
     return {configured:!!saved,editor_api:9,profile_schema:document()&&document().schema,selection:selection(),active_profile:activeProfile(),owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
-      enabled:!!(saved && saved.enabled),room,power,context,temporary_count:Object.values(overrides).reduce((n,v) => n + Object.keys(v).length,0),
+      enabled:!!(saved && saved.enabled),room,power,context,last_context:lastContext,temporary_count:Object.values(overrides).reduce((n,v) => n + Object.keys(v).length,0),
       pending_restore:Object.keys(journal.restore).length > 0||!!(journal.native&&journal.native.length),applying,changed_count:changedCount,native_backup_error:nativeError,native_backup_complete:!!browser.captured(),
       error:loadError || lastError,backup_sequence:latestBackup ? sequence : null,backup_acknowledged:acknowledged,
       active_devices:document() ? [...new Set(document().banks.filter(b =>
@@ -871,7 +871,14 @@ function create(options) {
     });
   }
   return {command,status,snapshot,observe,setPower,
-    contextChanged(value) { context = value || {}; notify(); },
+    contextChanged(value) {
+      context = value || {};
+      // The last confirmed HDMI picture survives apps (including the bridge's
+      // own TV app) covering it, so editors can show where the TV returns.
+      if (context.ready && /^hdmi[1-4](_pc)?$/.test(context.input || ''))
+        lastContext = {input:context.input,mode:context.mode,range:context.range,at:new Date(clock()).toISOString()};
+      notify();
+    },
     ownsProfiles() { return !!saved || !!loadError; },
     environment(value) {
       if (value && value.protocol === 1 && ['bright','dark'].includes(value.room) && value.room !== room)

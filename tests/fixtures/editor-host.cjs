@@ -9,7 +9,7 @@ function setup(initial) {
     if(command.action==='get') {
       if(window.delayGet)await new Promise(resolve=>setTimeout(resolve,150));
       if(window.failGet)throw new Error('Disconnected');
-      return {state:structuredClone(window.fixture),status:{editor_api:window.editorApi,offline:!!window.offline,backup_sequence:1,backup_acknowledged:1}};
+      return {state:structuredClone(window.fixture),status:{editor_api:window.editorApi,offline:!!window.offline,backup_sequence:1,backup_acknowledged:1,last_context:window.lastContext||null}};
     }
     if(command.action==='inspect') {
       const bank=window.fixture.document.banks.find(b=>b.id===command.bank_id),controls={};

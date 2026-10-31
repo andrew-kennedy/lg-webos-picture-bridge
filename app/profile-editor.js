@@ -225,7 +225,7 @@
     // (PC-labelled or ordinary video), unless all eight are requested.
     inputs() {
       return this.cached('inputs',()=>{
-        const all=this.records(),ids=new Set(),ports=new Set(),managed=new Set(),c=this.state.context||{};
+        const all=this.records(),ids=new Set(),ports=new Set(),managed=new Set(),c=this.picture()||{};
         for(const r of all){if(r.port)ports.add(r.port);const d=r.bank.target.dimension;if(d.input)ids.add(d.input);}
         for(const bank of this.state.document.banks)if(bank.target.dimension.input&&this.managedBank(bank))managed.add(bank.target.dimension.input);
         const list=[];
@@ -253,9 +253,9 @@
     usage() { return this.cached('usage',()=>model.presetUsage(this.records())); }
     usedPresets() {return this.cached('used',()=>this.computeUsedPresets());}
     computeUsedPresets() {
-      const inputs=new Set(this.inputs()),used=new Set(),c=this.state.context||{};
+      const inputs=new Set(this.inputs()),used=new Set(),p=this.picture();
       for(const [input,set] of this.usage())if(inputs.has(input))set.forEach(v=>used.add(v));
-      if(c.ready&&c.mode)used.add(c.mode);
+      if(p&&p.mode)used.add(p.mode);
       // Managed picture and Game Optimizer banks mark presets you configured.
       for(const r of this.records())if(r.preset&&this.managedBank(r.bank)&&[...inputs].some(i=>model.inColumn(r,i)))used.add(r.preset);
       for(const entry of Object.values(this.draft))if(entry.target.dimension.pictureMode)used.add(entry.target.dimension.pictureMode);
@@ -294,10 +294,23 @@
         return {chosen,linked,affected,editable:affected.filter(r=>status(r).editable),pending:affected.filter(r=>status(r).state==='pending'),excluded:affected.filter(r=>!status(r).editable&&status(r).state!=='pending')};
       });
     }
-    onScreenTarget() {
+    // The HDMI picture the editor centres on: what is on screen, otherwise the
+    // last confirmed HDMI picture. Inside the TV app nothing is ever on screen
+    // (the app covers it), so this is where the TV returns when it closes.
+    picture() {
       const c=this.state.context||{};
-      if(!c.ready||!c.input)return null;
-      return {inputs:[c.input],presets:model.modes[c.mode]?[c.mode]:[],ranges:c.range?[c.range]:null,genres:null,allm:null};
+      if(c.ready&&c.input)return {input:c.input,mode:c.mode,range:c.range,live:true};
+      const last=this.status.last_context;
+      return last&&last.input?{input:last.input,mode:last.mode,range:last.range,live:false}:null;
+    }
+    pictureText(p,detail=false) {
+      const range=p.range?detail?(formatNames[p.range.replace(/ALLM$/,'')]||p.range)+(/ALLM$/.test(p.range)?' with ALLM':''):/ALLM$/.test(p.range)?'ALLM':null:null;
+      return [model.inputName(p.input),model.modes[p.mode]||p.mode,range].filter(Boolean).join(' · ');
+    }
+    onScreenTarget() {
+      const p=this.picture();
+      if(!p)return null;
+      return {inputs:[p.input],presets:model.modes[p.mode]?[p.mode]:[],ranges:p.range?[p.range]:null,genres:null,allm:null};
     }
     ensureTarget() {
       if(this.target)return;
@@ -533,9 +546,11 @@
       return inputs+' · '+(parts.length?parts.join(', '):'no '+(spec.kind==='range'?'signals':'presets')+' selected');
     }
     isLive(column,row,kind) {
-      const c=this.state.context||{};
-      return !!c.ready&&column.inputs.includes(c.input)&&(kind==='preset'?row===c.mode:kind==='range'?row===c.range:true);
+      const p=this.picture();
+      return !!p&&column.inputs.includes(p.input)&&(kind==='preset'?row===p.mode:kind==='range'?row===p.range:true);
     }
+    // Wording for the picture marker: on screen now, or last watched.
+    liveLabel(capital) {const p=this.picture(),text=p&&!p.live?'last watched':'on screen';return capital?text[0].toUpperCase()+text.slice(1):text;}
     // ---- Rendering ---------------------------------------------------------
     narrow() {return !!this.listHost&&!!this.detailHost&&!(this.listHost.getClientRects().length&&this.detailHost.getClientRects().length);}
     showPane(pane) {
@@ -609,10 +624,12 @@
       note.id='edit-context';card.append(note);return card;
     }
     tvCard() {
-      const card=el('section',undefined,'card tv-card'),c=this.state.context||{},temporary=Object.values(this.state.overrides||{}).reduce((n,v)=>n+Object.keys(v).length,0);
-      const line=el('div',undefined,'tv-line');line.append(el('span','On TV now','card-label'));
-      const now=el('strong',this.status.offline?'TV offline':c.ready?[model.inputName(c.input),model.modes[c.mode]||c.mode,/ALLM$/.test(c.range||'')?'ALLM':null].filter(Boolean).join(' · '):'No HDMI picture','now');
-      if(c.ready&&!this.status.offline)now.prepend(el('span','','dot'));
+      const card=el('section',undefined,'card tv-card'),p=this.status.offline?null:this.picture(),temporary=Object.values(this.state.overrides||{}).reduce((n,v)=>n+Object.keys(v).length,0);
+      // Inside the TV app the HDMI picture is always covered, so the card
+      // names the last one watched: where the TV returns when the app closes.
+      const line=el('div',undefined,'tv-line');line.append(el('span',p&&!p.live?'Last watched':'On TV now','card-label'));
+      const now=el('strong',this.status.offline?'TV offline':p?this.pictureText(p):'No HDMI picture yet','now');
+      if(p)now.prepend(el('span','',p.live?'dot':'dot last'));
       line.append(now);card.append(line);
       const using=this.schema2()?'Using '+this.profileName(this.state.active_profile)+' · '+(this.state.selection==='automatic'?'Automatic':'Manual'):'Room: '+this.state.room;
       const second=el('div',undefined,'tv-line');second.append(el('span',using+(this.state.enabled?'':' · paused')+(temporary?' · '+temporary+' temporary':''),'using'),this.button('TV profile & automation',()=>this.openView('tv'),'ghost small','open-tv'));card.append(second);
@@ -686,7 +703,7 @@
     valueBox(alias) {
       const box=el('section',undefined,'valuebox'),t=this.targetsFor(alias),spec=this.gridSpec(alias),title=pretty(alias);
       const heading=el('p',undefined,'for');heading.append(el('span','Set for ','card-label'),el('span',this.targetPhrase(spec)));box.append(heading);
-      const live=this.onScreenTarget(),c=this.state.context||{};
+      const live=this.onScreenTarget(),c=this.picture()||{};
       const onScreen=live&&t.chosen.some(r=>{const k=model.coordinates(r);return model.inColumn(r,c.input)&&(k.kind==='preset'?k.row===c.mode:k.kind==='range'?k.row===c.range:true);});
       if(!t.chosen.length){box.append(el('p','Nothing selected. Choose inputs and presets in the grid below.','note warn'));return box;}
       const ready=!t.pending.length,control=ready&&t.editable.length&&!this.status.offline?model.combinedControl({records:t.editable},this.live):null;
@@ -730,7 +747,7 @@
       box.append(input);
       if(outside)box.append(el('p',outside,'note warn outside'));
       const meta=el('p',t.editable.length+' stored '+(t.editable.length===1?'value':'values')+(t.pending.length&&t.editable.length?' · '+t.pending.length+' still being checked':''),'note');
-      if(onScreen){meta.append(' · ');meta.append(el('span','includes what’s on screen','live-note'));}
+      if(onScreen){meta.append(' · ');meta.append(el('span',c.live?'includes what’s on screen':'includes what you last watched','live-note'));}
       box.append(meta);
       box.append(el('p',this.draftLine(t.editable),'note draft-line'));
       if(t.linked.length||t.chosen.some(r=>r.preference)) {
@@ -782,7 +799,7 @@
       const chosen=new Set(t.chosen.map(r=>r.id)),linked=new Set(t.linked.map(r=>r.id));
       const head=el('div',undefined,'where-head');head.append(el('h4','Where'));
       const quick=el('div',undefined,'chips');
-      if(this.onScreenTarget())quick.append(this.button('On screen now',()=>this.selectOnScreen(),'chip live-chip','target:live'));
+      if(this.onScreenTarget())quick.append(this.button(this.picture().live?'On screen now':'Last watched',()=>this.selectOnScreen(),'chip live-chip','target:live'));
       quick.append(this.button('Everything shown',()=>this.selectEverything(spec),'chip','target:all'));
       if(spec.kind==='preset'){for(const [family,label] of [['game','All Game presets'],['movie','All movie presets']])if(spec.rows.some(r=>model.presetFamily(r)===family))quick.append(this.button(label,()=>this.selectFamily(spec,family),'chip','target:family:'+family));}
       head.append(quick);host.append(head);
@@ -805,7 +822,7 @@
         const on=column.inputs.every(i=>this.target.inputs.includes(i)),b=this.button('',()=>this.toggleColumn(column),'colh','col:'+column.id);
         b.append(el('span',column.label.replace(/ \(PC\)$/,''),'colname'));
         b.append(el('small',/_pc$/.test(column.id)?'PC input':column.devices.length?column.devices.join(', '):spec.kind==='port'?'':'Video input'));
-        if(this.isLive(column,null,'port')&&!this.status.offline)b.append(el('span','','dot'));
+        if(this.isLive(column,null,'port')&&!this.status.offline)b.append(el('span','',this.picture().live?'dot':'dot last'));
         b.setAttribute('aria-pressed',String(on));b.setAttribute('aria-label',column.label+(column.devices.length?' ('+column.devices.join(', ')+')':'')+(on?' · selected':''));
         grid.append(b);
       }
@@ -828,7 +845,7 @@
       wrap.append(grid);host.append(wrap);
       const legend=el('div',undefined,'legend');
       const mark=(cls,text)=>{const s=el('span');s.append(el('i','', 'mk '+cls),document.createTextNode(text));legend.append(s);};
-      mark('sel','Selected');if(this.onScreenTarget())mark('live','On screen');
+      mark('sel','Selected');if(this.onScreenTarget())mark(this.picture().live?'live':'live last',this.liveLabel(true));
       if(this.profileMode())mark('ovr','Override in '+this.profileName(this.variant));else if(this.schema2()&&(this.state.document.profiles||[]).length)mark('prof','A profile overrides this');
       if(spec.records.some(r=>r.preference))mark('link','Linked SDR brightness');
       if(spec.records.some(r=>Object.hasOwn((this.state.overrides||{})[r.bank.id]||{},r.key)))mark('tmp','Temporary on TV');
@@ -847,7 +864,7 @@
       else {sum={text:'n/a',full:'not used'};reason=this.statusOf(records[0]).reason||'';node.classList.add('excluded');}
       const marks=el('span',undefined,'marks'),flags=[];
       const add=(cls,label)=>{marks.append(el('i','', 'mk '+cls));flags.push(label);};
-      if(this.isLive(column,row,spec.kind)&&!this.status.offline)add('live','on screen');
+      if(this.isLive(column,row,spec.kind)&&!this.status.offline)add(this.picture().live?'live':'live last',this.liveLabel());
       if(this.profileMode()&&records.some(r=>!r.inherited))add('ovr','override in '+this.profileName(this.variant));
       else if(!this.profileMode()&&this.schema2()){const p=[...new Set(records.flatMap(r=>this.overriddenBy(r).map(p=>p.name)))];if(p.length)add('prof','overridden in '+p.join(', '));}
       if(records.some(r=>r.preference))add('link','linked SDR brightness');
@@ -941,9 +958,9 @@
       if(backup)sheet.append(backup);
     }
     renderTv(sheet) {
-      const c=this.state.context||{},choices=model.profileOptions(this.state.document);
+      const p=this.status.offline?null:this.picture(),choices=model.profileOptions(this.state.document);
       this.sheetHead(sheet,'TV profile & automation','Choosing what the TV uses is separate from editing. Editing Base or a profile never changes this selection.');
-      const now=el('div',undefined,'section');now.append(el('h4','On screen'),el('p',this.status.offline?'TV offline · showing saved backup':c.ready?[model.inputName(c.input),model.modes[c.mode]||c.mode,c.range?(formatNames[c.range.replace(/ALLM$/,'')]||c.range)+(/ALLM$/.test(c.range)?' with ALLM':''):null].filter(Boolean).join(' · '):'No HDMI picture right now.'));
+      const now=el('div',undefined,'section');now.append(el('h4',p&&!p.live?'Last watched':'On screen'),el('p',this.status.offline?'TV offline · showing saved backup':p?this.pictureText(p,true)+(p.live?'':this.adapter&&this.adapter.tvRemote?' · the TV returns here when you close this app':' · no HDMI picture on screen now'):'No HDMI picture since the bridge started.'));
       sheet.append(now);
       if(this.schema2()) {
         const use=el('div',undefined,'section'),selected=this.applyChoice||this.state.selection||'automatic';
@@ -1117,7 +1134,7 @@
   .edit-card .card-label{color:var(--accent)}
   .edit-note,.using{font-size:.85em;color:var(--muted)}
   .tv-card{justify-content:center}.tv-card .now{display:flex;align-items:center;gap:.45em}
-  .dot{display:inline-block;width:.6em;height:.6em;border-radius:50%;background:var(--live);flex:none}
+  .dot{display:inline-block;width:.6em;height:.6em;border-radius:50%;background:var(--live);flex:none}.dot.last{background:transparent;border:2px solid var(--live);box-sizing:border-box}
   .body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(14em,30%) minmax(0,1fr);gap:.55em}
   .body.single{grid-template-columns:minmax(0,1fr)}
   .list,.detail,.sheet{min-height:0;overflow:auto;border:1px solid var(--line);border-radius:.75em;background:var(--surface);scroll-padding:3.5em .5em .5em}
@@ -1173,7 +1190,7 @@
   .cell.none{border-style:dotted;color:#475a78;background:transparent}
   .marks{position:absolute;top:3px;left:3px;display:flex;gap:2px}
   .mk{display:inline-block;width:.45em;height:.45em;border-radius:50%;flex:none}
-  .mk.live{background:var(--live)}.mk.ovr{background:var(--profile);border-radius:1px;transform:rotate(45deg)}.mk.prof{border:1.5px solid var(--profile);border-radius:1px;transform:rotate(45deg)}
+  .mk.live{background:var(--live)}.mk.live.last{background:transparent;border:1.5px solid var(--live)}.mk.ovr{background:var(--profile);border-radius:1px;transform:rotate(45deg)}.mk.prof{border:1.5px solid var(--profile);border-radius:1px;transform:rotate(45deg)}
   .mk.link{width:.8em;height:.2em;border-radius:1px;background:var(--text);margin-top:.12em}.mk.tmp{background:var(--warn)}
   .legend .mk.sel{width:.9em;height:.9em;border-radius:.2em;border:2px solid var(--accent);background:var(--tint)}
   .legend .mk.na{width:.9em;height:.9em;border-radius:.2em;border:1px solid var(--line);background:repeating-linear-gradient(135deg,transparent 0 2px,rgba(255,255,255,.25) 2px 4px)}

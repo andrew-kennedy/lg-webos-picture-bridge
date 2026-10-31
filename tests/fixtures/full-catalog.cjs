@@ -59,7 +59,7 @@ function install(data) {
     smoothGradation:['off','low','medium','high'],realCinema:['off','on'],truMotionMode:['off','cinemaClear','natural','smooth','user'],motionProOLED:['off','on'],filmmakerAmbientLight:['off','on'],dolbyPrecisionDetail:['off','on'],blackLevel:['auto','high','low'],
     gameGenre:['Standard','FPS','RPG','RTS','Sports','USER'],inputOptimization:['auto','on'],gameOptimization:['off','on'],enableALLM:['off','on'],enableQFT:['off','on'],enable144HzBooster:['off','on'],uhdDeepColor:['off','on'],freesync:['off','on']};
   const mapping={sdr:['personalized','vivid','normal','eco','cinema','game','filmMaker','expert1','expert2'],hdr:['hdrPersonalized','hdrVivid','hdrStandard','hdrEco','hdrCinemaBright','hdrGame','hdrFilmMaker'],dolbyHdr:['dolbyHdrPersonalized','dolbyHdrVivid','dolbyHdrStandard','dolbyHdrCinemaBright','dolbyHdrCinema','dolbyHdrGame']};
-  window.native=data.native;window.editorApi=9;
+  window.native=data.native;window.editorApi=9;if(data.lastContext)window.lastContext=data.lastContext;
   const managed=id=>window.fixture.document.banks.find(b=>b.id===id);
   const values=id=>({...window.native[id].settings,...(managed(id)||{settings:{}}).settings});
   function reason(target,key,settings) {
