@@ -292,6 +292,10 @@ function create(options) {
       }
     }
   }
+  function encodeStandard(key, value, live, bank) {
+    return banks.encode(key,value,live.settings[key],banks.encodingDescription(key,bank,
+      (live.descriptions || []).find(d=>d.key===key),(live.factory_descriptions || {})[key],options.availabilityReviewed),bank);
+  }
   async function initialize(command) {
     if (saved) {
       if (command.migration_id && command.migration_id === saved.migration_id) return status();
@@ -306,7 +310,7 @@ function create(options) {
       for (const bank of doc.banks) {
         const live = await inspect(bank);
         for (const values of [bank.settings,...Object.values(bank.variants || {})])
-          for (const [k,v] of Object.entries(values)) banks.encode(k,v,live.settings[k],(live.descriptions || []).find(d => d.key === k),bank);
+          for (const [k,v] of Object.entries(values)) encodeStandard(k,v,live,bank);
       }
     }
     saved = {schema:1,owner_id:crypto.randomBytes(16).toString('hex'),revision:1,document:doc,preferences:prefs,
@@ -399,7 +403,7 @@ function create(options) {
           const values=(await native({action:'read',banks:[{id:bank.id,target:bank.target,keys}]},check)).banks[0].settings;
           for(const key of keys)bank.settings[key]=values[key];
           const live=await inspect(bank);check();
-          for(const key of keys)bank.settings[key]=banks.encode(key,values[key],live.settings[key],live.descriptions.find(d=>d.key===key),bank);
+          for(const key of keys)bank.settings[key]=encodeStandard(key,values[key],live,bank);
         }
         model.validate(candidate.document);check();
         if(model.canonical(candidate.document)!==model.canonical(saved.document)){saved=candidate;persistStandards();}
@@ -430,7 +434,7 @@ function create(options) {
         for (const bank of doc.banks) {
           const live = await inspect(bank);
           for (const values of [bank.settings,...Object.values(bank.variants || {})])
-            for (const [k,v] of Object.entries(values)) banks.encode(k,v,live.settings[k],(live.descriptions || []).find(d => d.key === k),bank);
+            for (const [k,v] of Object.entries(values)) encodeStandard(k,v,live,bank);
           externalGuard();
         }
         saved.document = doc; overrides = {}; journal.dirty = {}; journal.restore = allKeys();
@@ -456,7 +460,7 @@ function create(options) {
             const identity = bank.id+'/'+variant+'/'+key;
             if (seen.has(identity)) throw new Error('Duplicate setting in batch');
             seen.add(identity);
-            const encoded = banks.encode(key,value,live.settings[key],(live.descriptions || []).find(d=>d.key===key),bank);
+            const encoded = encodeStandard(key,value,live,bank);
             if (key==='backlight' && bank.brightness_role) {
               if (bank.brightness_role==='movie_sdr' && variant==='standard') throw new Error('Choose Bright or Dark to edit shared movie SDR brightness');
               const role = bank.brightness_role==='game_sdr'?'game_sdr':'movie_'+variant;
@@ -504,7 +508,7 @@ function create(options) {
         const bank = candidate.document.banks.find(b => b.id === original.id), variant = input.variant || 'standard', patch = input.settings;
         if (!['standard','bright','dark'].includes(variant) || !patch || !Object.keys(patch).length || Object.keys(patch).some(k => !Object.hasOwn(bank.settings,k))) throw new Error('Invalid bank edit');
         const live = await inspect(bank), encoded = {}, prefValues = {};
-        for (const [k,v] of Object.entries(patch)) encoded[k] = banks.encode(k,v,live.settings[k],(live.descriptions || []).find(d => d.key === k),bank);
+        for (const [k,v] of Object.entries(patch)) encoded[k] = encodeStandard(k,v,live,bank);
         check();
         for (const [k,v] of Object.entries(encoded)) {
           if (k === 'backlight' && bank.brightness_role) {

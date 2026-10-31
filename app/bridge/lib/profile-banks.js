@@ -6,6 +6,7 @@ var settings = require('./settings-controls');
 var executor = require('./luna-executor');
 var availability = require('./profile-availability');
 var factoryDescriptions = require('./profile-descriptions');
+var rules = require('./profile-rules');
 var PRESETS = ['filmMaker', 'hdrFilmMaker', 'game', 'hdrGame', 'dolbyHdrGame',
   'dolbyHdrCinema', 'dolbyHdrCinemaBright'];
 var RANGES = ['sdr', 'sdrALLM', 'hdr', 'hdrALLM', 'dolbyHdr', 'dolbyHdrALLM'];
@@ -17,6 +18,7 @@ var GAME = ['gameAdjustContrast', 'gameBlackLevel', 'gameColorDepth', 'gameSharp
   'blackStabilizer', 'whiteStabilizer', 'lowLevelAdjustment'];
 var PORT = ['gameGenre', 'inputOptimization', 'gameOptimization', 'enableALLM', 'enableQFT',
   'enable144HzBooster', 'uhdDeepColor', 'freesync'];
+var descriptionKeys = PICTURE.concat(GAME,PORT,['pictureMode','truMotionMode']);
 function fail(message, code) { var e = new Error(message); e.code = code || 'invalid_profile_bank'; return e; }
 function plain(value) { return value && typeof value === 'object' && !Array.isArray(value); }
 function same(a, b) {
@@ -101,6 +103,17 @@ function encode(key, value, previous, desc, bank) {
   if (!control) throw fail('TV does not describe a writable value for ' + key);
   return settings.encode(control, value);
 }
+function encodingDescription(key, bank, live, factory, reviewed) {
+  // On the reviewed G6, Game Optimizer replaces these movie descriptors with
+  // hidden M-database placeholders (even dataType becomes empty). Their actual
+  // saved movie banks remain global input/preset values. Use the target's
+  // factory schema, corroborated by the movie audits, only for these controls.
+  if (!['truMotionJudder','truMotionBlur'].includes(key) || bank.target.app_id) return live;
+  if (reviewed === undefined) reviewed=availability.reviewedPlatform().reviewed;
+  const rule=reviewed && rules.resolve(key,bank.target);
+  if (rule && rule.editable && factory && (!live || live.dbtype!=='G' || !live.dataType)) return factory;
+  return live;
+}
 async function run(service, command, guard, context) {
   var results = [];
   for (var bank of command.banks) {
@@ -116,11 +129,13 @@ async function run(service, command, guard, context) {
       // The G6 description schema accepts category/keys, not saved-value dimensions.
       // Validate the returned dimension names and app ownership against our target below.
       var desc = await request(service, 'getSystemSettingDesc', {category:bank.target.category,keys:bank.keys});
+      var factory = bank.keys.some(k=>['truMotionJudder','truMotionBlur'].includes(k)) ? await factoryDescriptions.load(descriptionKeys) : null;
       var patch = {};
       for (var key of bank.keys) {
         if (same(before.settings[key], bank.settings[key])) continue;
         if (!same(before.settings[key], bank.expected[key])) throw fail('Setting changed since it was read: ' + key, 'profile_conflict');
-        patch[key] = encode(key, bank.settings[key], before.settings[key], (desc.results || []).find(function (d) { return d.key === key; }), bank);
+        patch[key] = encode(key, bank.settings[key], before.settings[key], encodingDescription(key,bank,
+          (desc.results || []).find(function (d) { return d.key === key; }),factory && factory.resolve(key,bank.target)), bank);
       }
       guard();
       if (Object.keys(patch).length) {
@@ -171,7 +186,7 @@ function observation(category, key, description, record, context) {
   if (record.value === null || record.value === undefined || JSON.stringify(record.value).length > 2048) return null;
   return {target:scope, key:key, value:record.value, observed_at:new Date(record.observed_at).toISOString()};
 }
-module.exports = {normalize:normalize, target:target, run:run, same:same,
+module.exports = {normalize:normalize, target:target, run:run, same:same, encodingDescription,
   observationKeys:observationKeys, observation:observation, request:request, encode:encode,
   async inspect(service, bank, guard, context, editor) {
     var result = (await run(service, normalize({action:'read',banks:[{
@@ -195,7 +210,7 @@ module.exports = {normalize:normalize, target:target, run:run, same:same,
     }
     guard();
     if (captured !== JSON.stringify(context && context())) throw fail('TV signal changed while checking availability', 'stale_context');
-    var factory = await factoryDescriptions.load(PICTURE.concat(GAME,PORT,['pictureMode','truMotionMode']));
+    var factory = await factoryDescriptions.load(descriptionKeys);
     result.capabilities = await availability.loadCapabilities(service);
     result.factory_descriptions = {};
     result.availability = {};
