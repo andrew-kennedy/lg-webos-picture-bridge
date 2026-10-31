@@ -309,6 +309,60 @@
       },
       "native_control_differences_from_same_format_60hz": {},
       "backup_acknowledged": true
+    },
+    {
+      "label": "switch-sdr-performance",
+      "game": "Metroid Prime 4: Beyond \u2013 Nintendo Switch 2 Edition",
+      "game_display_mode": "Performance",
+      "captured_at": "2026-10-31T06:33:01.487Z",
+      "bridge_version": "0.15.6",
+      "context": {
+        "input": "hdmi3",
+        "mode": "game",
+        "range": "sdrALLM",
+        "ready": true
+      },
+      "game_genre": "Standard",
+      "width": 1920,
+      "height": 1080,
+      "frame_rate_reported": 120,
+      "hdr_type": "none",
+      "pixel_encoding": "RGB",
+      "rgb_range": "FULL",
+      "allm_enabled": 1,
+      "is_game_mode": true,
+      "vrr_metadata": {
+        "fvaFactorM1": 0,
+        "baseVFront": 0,
+        "vrrEnabled": true,
+        "baseRefreshRate": 0
+      },
+      "qft_enabled": false,
+      "dsc_enabled": false,
+      "control_count": 37,
+      "changes_from_sdr": {},
+      "native_scopes_and_availability_match": true,
+      "state_unchanged": {
+        "document": true,
+        "preferences": true,
+        "revision": true,
+        "enabled": true,
+        "overrides": true
+      },
+      "temporary_count": 0,
+      "grouping": {
+        "format": "sdr",
+        "game_picture_controls_replace_unused_ordinary_controls": true,
+        "game_values_scoped_to_port_range_and_genre": true,
+        "shared_sdr_brightness_affects_all_three_game_profiles": true,
+        "hdr_brightness_is_independent": false,
+        "gamma_fine_adjustment_only_in_sdr": true,
+        "movie_processing_excluded_from_active_game_view": true,
+        "port_controls_not_split_by_format": true,
+        "browsing_did_not_modify_standards": true
+      },
+      "native_control_differences_from_same_format_60hz": {},
+      "backup_acknowledged": true
     }
   ],
   "baseline_controls": {
@@ -733,7 +787,8 @@
     "The TV reports vrrEnabled true with baseRefreshRate 0. That metadata is recorded without claiming independent verification of variable frame delivery. QFT is configured on but qftEnabled is false in the initial SDR/HDR signals; DSC is off.",
     "No picture setting was changed during the captures. The user changed games; saved standards, preferences, revision, management and empty adjustments remained unchanged. Audit files are stored on the workstation, not TV internal storage.",
     "Subsequent 120 Hz samples use Metroid Prime 4 Performance Mode on bridge 0.15.6. Their native dimensions, values, visibility/activity, choices and ranges are compared with the matching original 60 Hz format. Each sample states its resolution and HDR format; this does not verify PS5 HDMI 4 or 4K/120 output. Existing reviewed inactive-profile rules remain in force.",
-    "switch-hdr-performance: 39 managed controls verified at 1920x1080/120 Hz HDR10. Native control differences from the matching original 60 Hz format: 0. The native VRR flag remains enabled with baseRefreshRate 0; variable frame delivery is not independently measured."
+    "switch-hdr-performance: 39 managed controls verified at 1920x1080/120 Hz HDR10. Native control differences from the matching original 60 Hz format: 0. The native VRR flag remains enabled with baseRefreshRate 0; variable frame delivery is not independently measured.",
+    "switch-sdr-performance: 37 managed controls verified at 1920x1080/120 Hz none. Native control differences from the matching original 60 Hz format: 0. The native VRR flag remains enabled with baseRefreshRate 0; variable frame delivery is not independently measured."
   ],
   "captured_bridge_versions": [
     "0.15.4",
