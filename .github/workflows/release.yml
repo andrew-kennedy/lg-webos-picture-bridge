@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to rebuild and publish
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -11,17 +17,23 @@ permissions:
   id-token: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Validate release tag
+        run: '[[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]'
       - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -33,24 +45,20 @@ jobs:
       - run: npm run validate
       - run: npm run build
       - run: npm run manifest
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
       - run: npm run site
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
-            gh release upload "${{ github.ref_name }}" \
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
               dist/*.ipk dist/*.manifest.json site/apps.json --clobber
           else
-            gh release create "${{ github.ref_name }}" \
+            gh release create "$RELEASE_TAG" \
               dist/*.ipk dist/*.manifest.json site/apps.json \
               --verify-tag \
               --generate-notes \
-              --title "LG Picture Bridge ${{ github.ref_name }}"
+              --title "LG Picture Bridge $RELEASE_TAG"
           fi
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
@@ -60,11 +68,12 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
       - name: Publish install feed to main
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           feed_copy="${RUNNER_TEMP}/lg-picture-bridge-apps.json"
           cp site/apps.json "$feed_copy"
+          # The generated feed is safely copied above. Clear just this generated
+          # tracked file so a newer feed on main cannot block the checkout.
+          git restore --source=HEAD -- site/apps.json
           git fetch origin main
           git checkout -B main FETCH_HEAD
           cp "$feed_copy" site/apps.json
