@@ -596,6 +596,8 @@
       const status=el('div',undefined,'status');status.append(el('p',this.status.error||this.status.native_backup_error||((ack?'Backup confirmed in Home Assistant':'TV owns standards')+(this.status.native_backup_complete===false?' · Full native snapshot pending':'')),'message'));
       if(this.adapter.tvRemote)status.append(el('p',undefined,'remote-help'));frame.append(status);root.append(frame);
       if(this.listHost)this.fillPanes();
+      // Re-fit the grid when the panel is resized (Home Assistant, phones).
+      if(!this.resizer&&window.ResizeObserver){let width=0;this.resizer=new ResizeObserver(entries=>{const w=Math.round(entries[0].contentRect.width);if(w!==width){width=w;this.fitGrid();}});this.resizer.observe(this);}
       this.updateFooter();this.lockControls();this.restoreScroll(this.listHost?this.editScroll:keepScroll?previous:null);this.restoreFocus(focus);
       this.editing(root.activeElement&&this.editingKey===root.activeElement.dataset.focus?root.activeElement:null);
       this.focusPendingValue();
@@ -852,6 +854,18 @@
       if(spec.records.some(r=>Object.hasOwn((this.state.overrides||{})[r.bank.id]||{},r.key)))mark('tmp','Temporary on TV');
       mark('na','n/a: LG doesn’t use it');if(spec.kind==='preset')mark('unused','Faded: input doesn’t select this preset');
       host.append(legend);
+      this.fitGrid();
+    }
+    // On wide screens the value box sits beside the grid. When that leaves
+    // the grid too narrow for its columns (PC and video inputs shown
+    // separately, or the TV's wider fonts), the value box moves above it: TV
+    // remotes can only scroll vertically. The side-by-side layout is always
+    // what is measured, so moving between cells never flips the layout.
+    fitGrid() {
+      const main=this.shadowRoot.querySelector('.detail-main'),wrap=main&&main.querySelector('.grid-wrap');
+      if(!wrap)return;
+      main.classList.remove('stacked');
+      if(wrap.clientWidth&&wrap.scrollWidth>wrap.clientWidth+1)main.classList.add('stacked');
     }
     cell(spec,column,row,chosen,linked) {
       const records=this.cellRecords(spec,column,row),alias=this.setting,name=column.label+' · '+(spec.kind==='preset'?model.modes[row]||row:spec.kind==='range'?formatNames[model.rowFormat('range',row)]+' '+model.rowLabel('range',row).toLowerCase():'port-wide');
@@ -1221,7 +1235,8 @@
   .control-label{font-size:.8em;color:var(--muted);margin-right:.4em}
   @container frame (min-width:1100px){
     .detail-main{display:grid;grid-template-columns:minmax(0,1fr) minmax(16em,22em);grid-template-areas:'where value' 'extras value';align-items:start;gap:.8em 1em}
-    .detail-main>.valuebox{grid-area:value;position:sticky;top:0;z-index:1}.detail-main>.where{grid-area:where}.detail-main>.extras{grid-area:extras}
+    .detail-main>.valuebox{grid-area:value;position:sticky;top:0;z-index:1}
+    .detail-main.stacked{grid-template-columns:minmax(0,1fr);grid-template-areas:'value' 'where' 'extras'}.detail-main.stacked>.valuebox{position:static}.detail-main>.where{grid-area:where}.detail-main>.extras{grid-area:extras}
   }
   @container frame (max-width:860px){
     .context{grid-template-columns:minmax(0,1fr)}
