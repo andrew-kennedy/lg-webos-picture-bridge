@@ -1,0 +1,72 @@
+{
+  "date": "2026-10-30",
+  "model": "OLED77G6WUA",
+  "firmware": "43.21.69",
+  "bridge": "0.15.6",
+  "controller_sha256": "21f216519afd0db4dc7a57e0a086217634835afc3a74e094a4cc392a07709589",
+  "method": "Home Assistant editor API plus exact native scoped reads; inactive standards edited while PS5 HDR remained active",
+  "installation": {
+    "before_version": "0.15.5",
+    "after_version": "0.15.6",
+    "same_boot": true,
+    "overlay_preserved": true,
+    "hdmi_reload_requested": false,
+    "installed_sha256": "5b7138670e703fc6a91c5390717b1bea459316aa6f8ae4c79c11de46b29e620c",
+    "persistent_files_unchanged": true
+  },
+  "availability": {
+    "bridge_version": "0.15.6",
+    "ha_version": "0.6.1",
+    "installed_files_match_release": true,
+    "saved_standards_and_adjustments_unchanged": true,
+    "active_ps5_hdr_controls_unchanged": true,
+    "inactive_sdr_gamma_editable": true,
+    "inactive_hdr_console_expression_editable": true,
+    "verified_unsupported_game_processing_excluded": true,
+    "gaming_port_preferences_editable": true,
+    "backup_acknowledged": true,
+    "monitor_healthy": true,
+    "cec_filter_preserved": true,
+    "inspected_banks": 21,
+    "context": {
+      "input": "hdmi4",
+      "mode": "hdrGame",
+      "range": "hdrALLM",
+      "ready": true,
+      "gameGenre": "Standard"
+    },
+    "temporary_count": 0
+  },
+  "combined_inactive_save": {
+    "bridge_version": "0.15.6",
+    "combined_inactive_targets": [
+      "hdmi1_pc_game",
+      "hdmi3_game"
+    ],
+    "setting": "gammaLevel",
+    "change": [
+      0,
+      1,
+      0
+    ],
+    "single_revision_per_batch": true,
+    "before_revision": 8,
+    "edited_revision": 9,
+    "restored_revision": 10,
+    "native_scopes_and_readbacks_verified": true,
+    "active_ps5_hdr_banks_unchanged": true,
+    "context": {
+      "input": "hdmi4",
+      "mode": "hdrGame",
+      "range": "hdrALLM",
+      "ready": true,
+      "gameGenre": "Standard"
+    },
+    "standards_preferences_and_adjustments_restored": true,
+    "backup_acknowledged": true
+  },
+  "limitations": [
+    "This verifies saved-value scope, applicability and restoration; it does not measure picture-processing effects or latency.",
+    "Unaudited targets and firmware cannot borrow these reviewed rules."
+  ]
+}
