@@ -22,13 +22,15 @@ Gamma also requires a live check in the target SDR profile, including its depend
 
 HDMI Black Level also requires live verification for an inactive Dolby Vision profile. Both configured Dolby movie presets were locked live, although the inactive Cinema Home factory table offered an editable range. `pq_ux_setBlackLevelMenuInfoToDB` consults runtime HDR status, color system, input and sub-window state. The editor excludes that unverified inactive control without rewriting its stored value. Active profiles continue to use LG's live flag; this is not an assumed ban on every Dolby signal variant.
 
+Inactive Game profiles also require live confirmation for Peak Brightness, Dynamic Contrast, Noise Reduction, MPEG Noise Reduction, Smooth Gradation and TruMotion. The 2026-10-30 Switch comparison found permissive factory metadata for controls locked in the actual SDR/HDR Game signals. The corresponding native menu controllers consult runtime low-latency, Game Optimizer, window and TruMotion state. Active profiles still use LG's flags, and TruMotion requires the matching HDMI app. SDR Game Peak Brightness retains its existing fixed exclusion. This avoids treating stored processing values as usable controls without inventing a permanent ban for every Game signal.
+
 ## Remaining verification
 
 Storage dimensions have been checked against native descriptions for the 47 managed banks. That establishes which settings share storage, rather than proving processing support under every signal condition. Inactive rows marked `native_rules` use reviewed factory and controller rules; `live` rows additionally use current native visibility/activity. The main remaining live matrix is:
 
-- Expression Enhancer in HDR Game on HDMI 3/4. HDMI 1 PC HDR Game was checked at 60/120/165 Hz, and HDMI 3 HDR Filmmaker at 24/60 Hz, as recorded below.
-- Prevent Input Delay on the remaining gaming inputs and physical latency effects. HDMI 1 control availability was checked at 60/120/165 Hz, including VRR comparisons.
-- Gamma choices in the remaining SDR Game inputs, plus movie Gamma under different input-processing conditions. HDMI 1 PC SDR Game was checked at 60 Hz, and HDMI 3 SDR Filmmaker at 24/60 Hz.
+- Expression Enhancer in HDR Game on HDMI 4. HDMI 1 PC HDR Game was checked at 60/120/165 Hz, HDMI 3 Switch HDR Game at 60 Hz, and HDMI 3 HDR Filmmaker at 24/60 Hz, as recorded below.
+- Prevent Input Delay on HDMI 4 and physical latency effects. HDMI 1 control availability was checked at 60/120/165 Hz, including VRR comparisons; Switch SDR/HDR Game was checked at 60 Hz.
+- Gamma choices in HDMI 4 SDR Game, plus movie Gamma under different input-processing conditions. HDMI 1 PC and HDMI 3 Switch SDR Game were checked at 60 Hz, and HDMI 3 SDR Filmmaker at 24/60 Hz.
 - Real Cinema and TruMotion in Dolby Vision at 50/60 Hz, and SDR/HDR at 50 Hz, with low latency, PC processing and VRR/QMS where applicable. HDMI 3 SDR and HDR Filmmaker were checked at 24/60 Hz; Dolby Filmmaker and Cinema Home were checked at 24 Hz.
 - Fine Tune Dark Areas' visible effect with VRR, and QFT with source support, including effects on accepted formats. HDMI 1 accepted 4K/165 Hz RGB HDR10 with DSC and VRR; this does not verify other formats or displayed image fidelity.
 - HLG versus HDR10 processing restrictions. The collection currently shares their HDR preset banks; common storage does not prove identical processing choices.
@@ -56,6 +58,18 @@ Prevent Input Delay offered Standard/Boost (`auto`/`on`) at every tested rate; t
 Picture values matched the saved standards: backlight 100, HGiG, Game Contrast 100, Game Black Level 50, Game Color Depth 50, Game Sharpness 0, stabilizers 10/10 and Fine Tune Dark Areas 0. The only temporary TV change was enabling 165 Hz boost through Home Assistant. Boost was restored to off; the original document, preferences, revision, management state and empty adjustments were verified after returning to 120 Hz HDR with G-SYNC.
 
 These are signal and control-applicability checks, not displayed chroma, bit-depth, gradation, latency or Atmos measurements. In his [G6 review at 12:45](https://www.youtube.com/watch?v=VfD9sOYhDiQ&t=765s), HDTVTest found poorer gradients, some black crush and reduced chroma detail with 165 Hz mode. That review used firmware 43.10.69; this audit uses 43.21.69 and does not establish whether those image-quality findings persist.
+
+## Nintendo Switch 2 Game verification
+
+The [2026-10-30 Switch audit](g6-switch-game-audit.json) checked 37 SDR and 39 HDR managed controls on HDMI 3. Both games supplied 3840×2160/60 Hz RGB/full range with incoming ALLM and Game Optimizer active. LG selected the `sdrALLM`/`hdrALLM` storage ranges and Standard game genre. Values, dimensions and active editor availability matched two stable native captures per mode.
+
+SDR recalled OLED brightness 80, Game Contrast 95 and adjustable-2.2 Gamma with fine offset 0. HDR recalled brightness 100, Game Contrast 100 and HGiG. Both recalled Game Color Depth 50, Game Sharpness 0, Game Black Level 50, stabilizers 10/10 and Fine Tune Dark Areas 0. The ordinary picture contrast/black-level/color/sharpness controls were disabled; the editor correctly used the separate game values, scoped by port, native range and genre. Shared SDR brightness continued to cover all three gaming inputs, while HDR brightness remained independent.
+
+Expression Enhancer was enabled in Switch HDR with Off/Detail/Brightness choices, unlike the earlier PC HDR samples. Its stored Off value was preserved. Prevent Input Delay offered Standard/Boost in both formats; Boost was saved. Peak Brightness, Dynamic Contrast, both noise-reduction controls, Smooth Gradation, Real Cinema and TruMotion were inactive. SDR Gamma exposed the correct G6 choices and −3…+3 fine control; HDR excluded both Gamma controls despite LG leaving the child flag active.
+
+Comparing the same Game profiles while inactive and active exposed 11 incorrectly editable rows across six processing settings. The runtime-verification rule added in 0.15.5 fixes these in both editors and their save validation. Reviewed controller calls include `pq_ux_VideoInfo_isLowLatencySignal`, `pq_ux_getautoLowDelayMode`, `pq_ux_isGameOptimizationMode` and `pq_ux_isEnableTruMotion`. The fix adds no polling or persistent capability writes, preserves saved standards and leaves verified movie processing controls available.
+
+The TV reported `vrrEnabled: true` with `baseRefreshRate: 0`; that metadata does not independently establish variable frame delivery. QFT was configured On but the reported incoming `qftEnabled` was false; DSC was off. This audit does not measure latency, image processing or VRR performance. The user changed games; the audit did not change picture settings, and standards, preferences, management state and empty adjustments stayed intact.
 
 ## Selecting the right context
 

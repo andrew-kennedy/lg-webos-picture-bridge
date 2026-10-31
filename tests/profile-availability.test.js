@@ -55,6 +55,31 @@ module.exports = async function () {
   }
   for (const mode of ['filmMaker','hdrFilmMaker','game','hdrGame'])
     assert.equal(check('blackLevel',mode,{unknown:'auto'},{description:blackLevel}).editable,true,'Verified non-Dolby factory HDMI range controls remain available');
+  for (const key of ['peakBrightness','dynamicContrast','noiseReduction','mpegNoiseReduction','smoothGradation','truMotionMode']) {
+    const description={...base,key,values:{arrayExt:['off','on'].map(value=>({value,visible:true,active:true}))}};
+    for (const mode of key==='peakBrightness'?['hdrGame','dolbyHdrGame']:['game','hdrGame','dolbyHdrGame']) {
+      const target={category:'picture',dimension:{input:'hdmi3',pictureMode:mode}};
+      if(key==='truMotionMode')target.app_id='com.webos.app.hdmi3';
+      const bank={id:'processing',target,settings:{[key]:'off'}};
+      const options={reviewed:true,document:{banks:[bank]},values:b=>b.settings};
+      const inspection={settings:bank.settings,factory_descriptions:{[key]:description}};
+      assert.equal(availability.describe(key,bank,{factory:description,value:'off'},options).state,'unverified','Inactive Game processing must not use permissive factory choices');
+      assert.throws(()=>availability.assertEditable(key,'on',bank,inspection,options),/activate this profile/,'Single and combined edits must reject unverified Game processing');
+      const current={dimension:target.dimension,settings:bank.settings,...(target.app_id?{app_id:target.app_id}:{})};
+      const context={ready:true,input:'hdmi3',mode,range:mode==='game'?'sdrALLM':mode==='hdrGame'?'hdrALLM':'dolbyHdrALLM'};
+      const liveOptions={...options,context};
+      const info={factory:description,live:{...description,ui:{visible:true,active:false}},current,value:'off'};
+      assert.equal(availability.describe(key,bank,info,liveOptions).state,'unavailable','Live Game processing locks remain authoritative');
+      info.live=description;
+      assert.equal(availability.describe(key,bank,info,liveOptions).editable,true,'A verified live context may enable processing; the guard is not a permanent Game-mode ban');
+      if(target.app_id) {
+        info.current={...current,app_id:'com.webos.app.hdmi1'};
+        assert.equal(availability.describe(key,bank,info,liveOptions).state,'unverified','TruMotion requires the matching HDMI application as well as the preset');
+      }
+    }
+    for(const mode of ['filmMaker','hdrFilmMaker','dolbyHdrCinema','dolbyHdrCinemaBright'])
+      assert.equal(check(key,mode,'off',{description}).editable,true,'The Game-specific guard preserves reviewed inactive movie controls');
+  }
   const port={id:'port',target:{category:'other',dimension:{gameInput:'hdmi1'}},settings:{inputOptimization:'auto'}};
   const portDescription={...base,key:'inputOptimization',dimension:['gameInput'],values:{arrayExt:[{value:'auto',visible:true,active:true},{value:'on',visible:true,active:true}]}};
   assert.equal(availability.describe('inputOptimization',port,{factory:portDescription,value:'auto'},{reviewed:true,values:b=>b.settings,context:{ready:false}}).state,'unverified','The hidden factory baseline cannot establish a port runtime gaming control');

@@ -138,6 +138,12 @@ function describe(key, bank, info, options) {
   // their inactive factory descriptions still offered an editable range.
   if (!active && key === 'blackLevel' && format(bank.target.dimension) === 'dolbyHdr')
     return unknown('HDMI Black Level depends on Dolby Vision processing; activate this profile to verify availability.');
+  // Game factory tables still offer processing controls that the runtime
+  // low-latency and Game Optimizer policies disable. The current signal and
+  // matching HDMI app must establish their availability before editing.
+  if (!active && game(bank.target.dimension.pictureMode) &&
+      ['peakBrightness','dynamicContrast','noiseReduction','mpegNoiseReduction','smoothGradation','truMotionMode'].includes(key))
+    return unknown('Game processing depends on the live signal; activate this profile to verify availability.');
   // Runtime-only controls must be confirmed in the actual target context. A
   // hidden factory baseline is not a reliable hardware-support declaration.
   if (!active && ['dolbyPrecisionDetail','expressionEnhancer','ambientLightCompensation','aiHdrRemastering','motionEyeCare','inputOptimization'].includes(key))
