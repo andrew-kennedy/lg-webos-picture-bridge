@@ -1,0 +1,220 @@
+{
+  "captured_at": "2026-10-27T10:33:30.647530+00:00",
+  "source": "Apple TV on HDMI 3",
+  "scope": "Earlier signal and saved-value observation, with five native control descriptions; not a complete availability matrix",
+  "native_source_sha256": "fd87f127779c4cd4a5d6d9fb58b31a5d391a4a0ca05a3c00ab13105a0dab361a",
+  "signal": {
+    "width": 1920,
+    "height": 1080,
+    "frameRate": 60,
+    "appId": "com.webos.app.hdmi3",
+    "hdrType": "DolbyLL",
+    "allmEnabled": 0,
+    "pixelEncoding": "YCbCr422",
+    "rgbRange": "DEFAULT",
+    "ycbcrRange": "LIMITED"
+  },
+  "picture_dimension": {
+    "pictureMode": "dolbyHdrCinema",
+    "dynamicRange": "dolbyHdr",
+    "input": "hdmi3"
+  },
+  "picture_values": {
+    "backlight": "100",
+    "pictureMode": "dolbyHdrCinema",
+    "realCinema": "on",
+    "gamma": "mediumHavingLevel",
+    "colorGamut": "auto",
+    "blackLevel": {
+      "secam": "auto",
+      "ntsc": "auto",
+      "pal60": "auto",
+      "ntsc443": "auto",
+      "pal": "auto",
+      "unknown": "auto",
+      "paln": "auto",
+      "palm": "auto"
+    }
+  },
+  "motion": {
+    "dimension": {
+      "pictureMode": "dolbyHdrCinema",
+      "input": "hdmi3"
+    },
+    "app_id": "com.webos.app.hdmi3",
+    "settings": {
+      "aspectRatioActivePerApp": "auto",
+      "truMotionMode": "off",
+      "aspectRatioPerApp": {
+        "type": "tv"
+      },
+      "pictureModeSettingsActivePerApp": "auto",
+      "videoSource": "hdmi3",
+      "aspectRatioSettingActivePerApp": {
+        "inactiveValue": "16x9",
+        "value": "auto"
+      },
+      "pictureSettingsActivePerApp": {
+        "pictureModeEnable": "auto",
+        "pictureModeSettingsEnable": "auto"
+      }
+    }
+  },
+  "captured_control_descriptions": [
+    {
+      "valueTypeCheck": false,
+      "category": "picture",
+      "values": {
+        "range": {
+          "max": 100,
+          "min": 0,
+          "interval": 1
+        }
+      },
+      "valueCheck": true,
+      "ui": {
+        "displayName": "color",
+        "visible": true,
+        "active": true,
+        "widget": "None"
+      },
+      "vtype": "Range",
+      "volatile": false,
+      "dbtype": "G",
+      "key": "color",
+      "account": false,
+      "dataType": "string",
+      "dimension": [
+        "input",
+        "pictureMode"
+      ]
+    },
+    {
+      "valueTypeCheck": false,
+      "category": "picture",
+      "values": {
+        "range": {
+          "max": 50,
+          "min": -50,
+          "interval": 1
+        }
+      },
+      "valueCheck": true,
+      "ui": {
+        "displayName": "colorTemperature",
+        "visible": true,
+        "active": true,
+        "widget": "None"
+      },
+      "vtype": "Range",
+      "volatile": false,
+      "dbtype": "G",
+      "key": "colorTemperature",
+      "account": false,
+      "dataType": "string",
+      "dimension": [
+        "input",
+        "pictureMode"
+      ]
+    },
+    {
+      "valueTypeCheck": false,
+      "category": "picture",
+      "values": {
+        "range": {
+          "max": 100,
+          "min": 0,
+          "interval": 1
+        }
+      },
+      "valueCheck": true,
+      "ui": {
+        "displayName": "contrast",
+        "visible": true,
+        "active": true,
+        "widget": "None"
+      },
+      "vtype": "Range",
+      "volatile": false,
+      "dbtype": "G",
+      "key": "contrast",
+      "account": false,
+      "dataType": "string",
+      "dimension": [
+        "input",
+        "pictureMode"
+      ],
+      "hasCountryVar": true
+    },
+    {
+      "valueTypeCheck": false,
+      "category": "picture",
+      "values": {
+        "arrayExt": [
+          {
+            "visible": true,
+            "active": true,
+            "value": "on"
+          },
+          {
+            "visible": true,
+            "active": true,
+            "value": "off"
+          }
+        ]
+      },
+      "valueCheck": true,
+      "ui": {
+        "displayName": "dolbyPrecisionDetail",
+        "visible": false,
+        "active": false,
+        "widget": "None"
+      },
+      "vtype": "ArrayExt",
+      "volatile": false,
+      "dbtype": "G",
+      "key": "dolbyPrecisionDetail",
+      "account": false,
+      "dataType": "string",
+      "dimension": [
+        "input",
+        "pictureMode"
+      ]
+    },
+    {
+      "valueTypeCheck": false,
+      "category": "picture",
+      "values": {
+        "range": {
+          "max": 50,
+          "min": 0,
+          "interval": 1
+        }
+      },
+      "valueCheck": true,
+      "ui": {
+        "displayName": "sharpness",
+        "visible": true,
+        "active": true,
+        "widget": "None"
+      },
+      "vtype": "Range",
+      "volatile": false,
+      "dbtype": "G",
+      "key": "sharpness",
+      "account": false,
+      "dataType": "string",
+      "dimension": [
+        "input",
+        "pictureMode"
+      ]
+    }
+  ],
+  "availability_not_captured": [
+    "realCinema",
+    "truMotionMode",
+    "blackLevel",
+    "colorGamut"
+  ],
+  "remaining_comparison": "4K/60 Dolby Vision native control availability in Filmmaker and Cinema Home. The earlier 1080p/60 observation is already established."
+}
