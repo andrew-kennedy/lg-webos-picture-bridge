@@ -13,6 +13,8 @@ module.exports = async function () {
   const initial=messages.find(m=>m.topic.endsWith('/status')).value;
   assert.equal(initial.api_version,2);
   assert(messages.some(m=>m.topic.endsWith('/backup')&&m.retain));
+  channel.refresh();channel.subscribed();
+  assert.equal(messages.filter(m=>m.topic.endsWith('/backup')).length,1,'Announcement, SUBACK and HA availability do not duplicate the same large retained backup');
   const envelope={protocol:1,session_id:initial.session_id,request_id:'test-init',expires_at:Date.now()/1000+40,policy:{action:'get'}};
   channel.receive(JSON.stringify(envelope),{retain:true});
   assert.equal(calls.length,0);
@@ -26,7 +28,7 @@ module.exports = async function () {
   channel.receive(JSON.stringify(batch),{retain:false});
   assert.deepEqual(calls[1],batch.policy,'The complete reviewed batch reaches the TV manager exactly once');
   assert.equal(calls.length,2);
-  for(const action of ['upgrade_profiles','create_profile','rename_profile','delete_profile','reset_profile','set_automatic','apply_profile']) {
+  for(const action of ['capture_native','compact_management','upgrade_profiles','create_profile','rename_profile','delete_profile','reset_profile','set_automatic','apply_profile']) {
     const policy={action,revision:5,profile_id:'p_evening'},message={...envelope,request_id:action,policy},before=calls.length;
     channel.receive(JSON.stringify(message),{retain:true});assert.equal(calls.length,before);
     channel.receive(JSON.stringify(message),{retain:false});await new Promise(resolve=>setImmediate(resolve));

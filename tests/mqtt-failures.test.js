@@ -34,7 +34,13 @@ module.exports = function () {
   rejected([144, 3, 0, 1, 128], true); // rejected subscription
   var test = setup();
   test.socket.emit('data', Buffer.from([32, 2, 0, 0]));
-  test.socket.bufferSize = 300000;
+  test.socket.bufferSize = 700000;
+  assert.strictEqual(test.client.publish('test/state', 'value', false), true,'Status can follow a complete native backup still in the socket');
+  assert.strictEqual(test.socket.destroyed, false);
+  assert.strictEqual(test.client.publish('test/backup', 'x'.repeat(700000), true), false,'Prospective buffered bytes stay bounded');
+  test.client.stop();
+  test=setup();test.socket.emit('data', Buffer.from([32, 2, 0, 0]));
+  test.socket.bufferSize = 1400000;
   assert.strictEqual(test.client.publish('test/state', 'value', false), false);
   assert.strictEqual(test.socket.destroyed, true);
   test.client.stop();

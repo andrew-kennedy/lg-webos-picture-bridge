@@ -2,7 +2,7 @@
 var commands = require('./mqtt-commands');
 var banks = require('./profile-banks');
 function create(options) {
-  var engine = options.engine, online = false;
+  var engine = options.engine, online = false, sentBackup = null;
   function publish(status) {
     if (engine) { status.api_version = 2; status.manager = engine.status(); }
     return online && options.publish(options.base + '/profiles/status', JSON.stringify(status), false);
@@ -11,7 +11,7 @@ function create(options) {
     normalize:function (command) {
       if (command && ['read','apply'].includes(command.action)) return banks.normalize(command);
       if (!engine || !command || !['get','backup','initialize','restore_backup','inspect','set_environment','set_enabled',
-        'set_brightness','set_brightness_links','include_motion_controls','include_native_catalog','inspect_many','restore_scope','import','edit','edit_many','restore','save','reconcile',
+        'set_brightness','set_brightness_links','include_motion_controls','include_native_catalog','capture_native','compact_management','inspect_many','restore_scope','import','edit','edit_many','restore','save','reconcile',
         'upgrade_profiles','create_profile','rename_profile','delete_profile','reset_profile','set_automatic','apply_profile'].includes(command.action)) throw new Error('Unknown profile command');
       return command;
     }, summarizeResult:function (value) { return value; },
@@ -35,9 +35,12 @@ function create(options) {
   }
   var removeChange = engine && engine.onChange(compact);
   var removeBackup = engine && engine.onBackup(value => {
-    if (online) options.publish(options.base + '/profiles/backup',JSON.stringify(value),true);
+    if(!online)return;
+    const payload=JSON.stringify(value),identity=value.sha256||payload;
+    if(identity===sentBackup)return;
+    if(options.publish(options.base + '/profiles/backup',payload,true))sentBackup=identity;
   });
-  return {connect:function () { online = true; channel.connect(); },
+  return {connect:function () { online = true; sentBackup=null; channel.connect(); },
     subscribed:function () { channel.subscribed(); if (engine) engine.republishBackup(); },
     disconnect:function () { online = false; channel.disconnect(); },receive:channel.receive,publish:compact,
     refresh:function () { compact(); if (engine) engine.republishBackup(); },

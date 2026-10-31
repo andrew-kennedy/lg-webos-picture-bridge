@@ -8,6 +8,10 @@ var EventEmitter = require('events').EventEmitter;
 // Complete managed-profile backups are larger than individual setting commands.
 // Still bounded; there is no offline send queue or unbounded receive buffer.
 var MAX_PACKET = 1048576;
+// One maximum-size snapshot may still be in the socket while discovery/status
+// packets follow it. Bound their combined bytes, not just the old small-state
+// allowance. There is still no offline queue.
+var MAX_SEND_BUFFER = MAX_PACKET + 262144;
 
 function buffer(value) { return new Buffer(value); }
 function word(value) { return buffer([value >> 8, value & 255]); }
@@ -58,7 +62,7 @@ function create(options, dependencies) {
   }
   function write(bytes) {
     if (!socket || socket.destroyed) return false;
-    if (socket.bufferSize > 262144) { fail('MQTT send buffer full'); return false; }
+    if ((socket.bufferSize || 0) + bytes.length > MAX_SEND_BUFFER) { fail('MQTT send buffer full'); return false; }
     socket.write(bytes);
     return true;
   }
