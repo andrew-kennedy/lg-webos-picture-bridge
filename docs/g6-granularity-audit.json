@@ -1,0 +1,95 @@
+{
+  "captured_at": "2026-10-31T07:41:35.557Z",
+  "model": "OLED77G6WUA",
+  "firmware": "43.21.69",
+  "bridge": "0.16.1",
+  "companion": "0.7.0",
+  "active_context": {
+    "input": "hdmi4",
+    "mode": "hdrGame",
+    "range": "hdrALLM",
+    "ready": true,
+    "gameGenre": "Standard"
+  },
+  "active_ps5_settings_unchanged": true,
+  "motion": {
+    "profiles": [
+      "hdmi3_filmMaker",
+      "hdmi3_hdrFilmMaker",
+      "hdmi3_dolbyHdrCinema",
+      "hdmi3_dolbyHdrCinemaBright"
+    ],
+    "native_dimensions": [
+      "input",
+      "pictureMode"
+    ],
+    "app_scoped": false,
+    "limits": {
+      "min": 0,
+      "max": 10,
+      "step": 1
+    },
+    "enrolled_values": {
+      "truMotionJudder": 0,
+      "truMotionBlur": 10
+    },
+    "inactive_test": {
+      "truMotionMode": "user",
+      "truMotionJudder": 1,
+      "truMotionBlur": 9
+    },
+    "restored": {
+      "truMotionMode": "off",
+      "truMotionJudder": 0,
+      "truMotionBlur": 10
+    }
+  },
+  "brightness": {
+    "independent_input": "hdmi1_pc",
+    "test_value": 79,
+    "other_gaming_inputs_remained": 80,
+    "restored_linked_game_value": 80,
+    "preferences": {
+      "movie_bright": 100,
+      "movie_dark": 3,
+      "game_sdr": 80
+    }
+  },
+  "ha_restore_selection": {
+    "hdmi1_pc_game": [
+      "backlight",
+      "tint",
+      "colorTemperature",
+      "colorGamut",
+      "gamma",
+      "gammaLevel",
+      "nearBlackDetail",
+      "blackLevel"
+    ],
+    "hdmi4_game": [
+      "backlight"
+    ],
+    "hdmi3_game": [
+      "backlight"
+    ],
+    "hdmi1_sdr_standard_game": [
+      "gameAdjustContrast",
+      "gameBlackLevel",
+      "gameColorDepth",
+      "gameSharpness"
+    ],
+    "hdmi1_sdrALLM_standard_game": [
+      "gameAdjustContrast",
+      "gameBlackLevel",
+      "gameColorDepth",
+      "gameSharpness"
+    ]
+  },
+  "entity_identities_preserved": 8,
+  "standard_revision": 18,
+  "temporary_count": 0,
+  "pending_restore": false,
+  "backup_acknowledged": true,
+  "added_polling": false,
+  "added_persistent_runtime_logs": false
+}
