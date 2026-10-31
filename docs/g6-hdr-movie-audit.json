@@ -1,0 +1,413 @@
+{
+  "date": "2026-10-30",
+  "model": "OLED77G6WUA",
+  "firmware": "43.21.69",
+  "input": "hdmi3",
+  "source": "NVIDIA Shield / HDR10 movie",
+  "method": "Two stable independent native value/description and signal captures surrounding read-only editor inspections.",
+  "samples": [
+    {
+      "label": "shield-hdr10-initial",
+      "captured_at": "2026-10-31T01:58:21.523Z",
+      "context": {
+        "input": "hdmi3",
+        "mode": "hdrFilmMaker",
+        "range": "hdr",
+        "ready": true
+      },
+      "room": "dark",
+      "width": 3840,
+      "height": 2160,
+      "frame_rate_reported": 24,
+      "hdr_type": "HDR10",
+      "pixel_encoding": "YCbCr422",
+      "ycbcr_range": "LIMITED",
+      "allm_enabled": 0,
+      "vrr": null,
+      "qft_enabled": false,
+      "dsc_enabled": false,
+      "control_count": 32,
+      "changes_from_baseline": {},
+      "state_unchanged": {
+        "document": true,
+        "preferences": true,
+        "revision": true,
+        "enabled": true,
+        "overrides": true
+      }
+    },
+    {
+      "label": "shield-hdr10-switching-off",
+      "captured_at": "2026-10-31T02:01:39.444Z",
+      "context": {
+        "input": "hdmi3",
+        "mode": "hdrFilmMaker",
+        "range": "hdr",
+        "ready": true
+      },
+      "room": "dark",
+      "width": 3840,
+      "height": 2160,
+      "frame_rate_reported": 60,
+      "hdr_type": "HDR10",
+      "pixel_encoding": "YCbCr422",
+      "ycbcr_range": "LIMITED",
+      "allm_enabled": 0,
+      "vrr": null,
+      "qft_enabled": false,
+      "dsc_enabled": false,
+      "control_count": 32,
+      "changes_from_baseline": {},
+      "state_unchanged": {
+        "document": true,
+        "preferences": true,
+        "revision": true,
+        "enabled": true,
+        "overrides": true
+      }
+    }
+  ],
+  "baseline_controls": {
+    "blackLevel": {
+      "value": {
+        "secam": "auto",
+        "ntsc": "auto",
+        "pal60": "auto",
+        "ntsc443": "auto",
+        "pal": "auto",
+        "unknown": "auto",
+        "paln": "auto",
+        "palm": "auto"
+      },
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "auto",
+        "low",
+        "high"
+      ]
+    },
+    "realCinema": {
+      "value": "on",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "on",
+        "off"
+      ]
+    },
+    "peakBrightness": {
+      "value": "high",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "dynamicColor": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high",
+        "user"
+      ]
+    },
+    "brightness": {
+      "value": "50",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "nearBlackDetail": {
+      "value": 0,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -10,
+      "max": 10,
+      "step": 1
+    },
+    "colorTemperature": {
+      "value": "-40",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -50,
+      "max": 50,
+      "step": 1
+    },
+    "expressionEnhancer": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "detail",
+        "highlight"
+      ]
+    },
+    "sharpness": {
+      "value": "0",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 50,
+      "step": 1
+    },
+    "mpegNoiseReduction": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high",
+        "auto"
+      ]
+    },
+    "gammaLevel": {
+      "value": 0,
+      "visible": true,
+      "active": true,
+      "editor": "unavailable"
+    },
+    "contrast": {
+      "value": "100",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "gamma": {
+      "value": "mediumHavingLevel",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "backlight": {
+      "value": "100",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "color": {
+      "value": "50",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "superResolution": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "colorGamut": {
+      "value": "auto",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "auto",
+        "native",
+        "dynamic",
+        "adobeRGB",
+        "dci-p3"
+      ]
+    },
+    "tint": {
+      "value": "0",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -50,
+      "max": 50,
+      "step": 1
+    },
+    "noiseReduction": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high",
+        "auto"
+      ]
+    },
+    "hdrDynamicToneMapping": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "on",
+        "off"
+      ]
+    },
+    "smoothGradation": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "dynamicContrast": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "truMotionMode": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "cinemaClear",
+        "natural",
+        "smooth",
+        "user"
+      ]
+    },
+    "freesync": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "on",
+        "off"
+      ]
+    },
+    "enable144HzBooster": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "on"
+      ]
+    },
+    "uhdDeepColor": {
+      "value": "4k",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "4k"
+      ]
+    },
+    "enableALLM": {
+      "value": "on",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "on"
+      ]
+    },
+    "gameGenre": {
+      "value": "Standard",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "gameOptimization": {
+      "value": "on",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "on",
+        "off"
+      ]
+    },
+    "inputOptimization": {
+      "value": "on",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "enableQFT": {
+      "value": "on",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "on"
+      ]
+    },
+    "pictureMode": {
+      "value": "hdrFilmMaker",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "hdrGame",
+        "hdrFilmMaker"
+      ]
+    }
+  },
+  "notes": [
+    "The HDR movie bank belongs to both Apple TV and Shield. That binding is shared storage, not a claim that both devices are awake.",
+    "Real Cinema uses input/pictureMode scope and is grouped under Motion. TruMotion mode additionally requires the HDMI 3 application scope.",
+    "HDMI connection options remain port-wide, including settings saved for Nintendo. The incoming movie has no ALLM or active QFT despite those port options being on.",
+    "Expression Enhancer offers off/detail/highlight. HDR tone mapping offers on/off; the native HGiG choice is hidden in this movie preset.",
+    "Gamma and Gamma fine adjustment are excluded in HDR even though LG leaves the fine control active in its description.",
+    "Inactive Game and SDR banks did not inherit this movie signal as live applicability evidence.",
+    "Filmmaker Ambient Light Compensation was visible and active, stored off, at the tested HDR movie signal. It is not part of the saved collection and its sensor behavior was not measured.",
+    "TruMotion de-judder/de-blur descriptions remain active while TruMotion is off. Those unused values are not in this collection; the editor policy requires User Selection before offering them.",
+    "This audit checks grouping, values, scopes, choices and native availability. It does not measure image processing or physical latency."
+  ]
+}

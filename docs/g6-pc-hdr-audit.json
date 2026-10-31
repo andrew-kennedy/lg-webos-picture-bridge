@@ -1,0 +1,488 @@
+{
+  "date": "2026-10-30",
+  "model": "OLED77G6WUA",
+  "firmware": "43.21.69",
+  "input": "hdmi1_pc",
+  "preset": "hdrGame",
+  "source": "RTX 5090 / Windows HDR desktop",
+  "method": "Two stable independent Settings Service value/description captures bracketing read-only editor inspections for each sample. No image or latency measurements.",
+  "samples": [
+    {
+      "label": "hdr-120-vrr",
+      "captured_at": "2026-10-30T22:34:39.482Z",
+      "width": 3840,
+      "height": 2160,
+      "frame_rate_reported": 120,
+      "hdr_type": "HDR10",
+      "pixel_encoding": "RGB",
+      "rgb_range": "FULL",
+      "vrr": {
+        "fvaFactorM1": 0,
+        "baseVFront": 0,
+        "vrrEnabled": true,
+        "baseRefreshRate": 0
+      },
+      "allm_enabled": 1,
+      "avi_content_type": "GAME",
+      "is_game_mode": true,
+      "dsc_enabled": false,
+      "settings_range": "hdrALLM",
+      "control_count": 38,
+      "control_differences_from_baseline": {}
+    },
+    {
+      "label": "hdr-gsync-off",
+      "captured_at": "2026-10-30T22:36:43.183Z",
+      "width": 3840,
+      "height": 2160,
+      "frame_rate_reported": 120,
+      "hdr_type": "HDR10",
+      "pixel_encoding": "RGB",
+      "rgb_range": "FULL",
+      "vrr": null,
+      "allm_enabled": 0,
+      "avi_content_type": "GAME",
+      "is_game_mode": true,
+      "dsc_enabled": false,
+      "settings_range": "hdrALLM",
+      "control_count": 38,
+      "control_differences_from_baseline": {}
+    },
+    {
+      "label": "hdr-60-gsync-off",
+      "captured_at": "2026-10-30T22:37:59.753Z",
+      "width": 3840,
+      "height": 2160,
+      "frame_rate_reported": 60,
+      "hdr_type": "HDR10",
+      "pixel_encoding": "RGB",
+      "rgb_range": "FULL",
+      "vrr": null,
+      "allm_enabled": 0,
+      "avi_content_type": "GRAPHICS",
+      "is_game_mode": false,
+      "dsc_enabled": false,
+      "settings_range": "hdr",
+      "control_count": 38,
+      "control_differences_from_baseline": {}
+    },
+    {
+      "label": "hdr-165-gsync-off",
+      "captured_at": "2026-10-30T22:40:10.747Z",
+      "width": 3840,
+      "height": 2160,
+      "frame_rate_reported": 164,
+      "hdr_type": "HDR10",
+      "pixel_encoding": "RGB",
+      "rgb_range": "FULL",
+      "vrr": null,
+      "allm_enabled": 0,
+      "avi_content_type": "GAME",
+      "is_game_mode": true,
+      "dsc_enabled": true,
+      "settings_range": "hdrALLM",
+      "control_count": 38,
+      "control_differences_from_baseline": {
+        "enable144HzBooster": {
+          "value": "on"
+        }
+      }
+    },
+    {
+      "label": "hdr-165-vrr",
+      "captured_at": "2026-10-30T22:41:39.057Z",
+      "width": 3840,
+      "height": 2160,
+      "frame_rate_reported": 165,
+      "hdr_type": "HDR10",
+      "pixel_encoding": "RGB",
+      "rgb_range": "FULL",
+      "vrr": {
+        "fvaFactorM1": 0,
+        "baseVFront": 3,
+        "vrrEnabled": true,
+        "baseRefreshRate": 165
+      },
+      "allm_enabled": 1,
+      "avi_content_type": "GRAPHICS",
+      "is_game_mode": true,
+      "dsc_enabled": true,
+      "settings_range": "hdrALLM",
+      "control_count": 38,
+      "control_differences_from_baseline": {
+        "enable144HzBooster": {
+          "value": "on"
+        }
+      }
+    },
+    {
+      "label": "restored-hdr-120-vrr",
+      "captured_at": "2026-10-30T22:44:24.519Z",
+      "width": 3840,
+      "height": 2160,
+      "frame_rate_reported": 120,
+      "hdr_type": "HDR10",
+      "pixel_encoding": "RGB",
+      "rgb_range": "FULL",
+      "vrr": {
+        "fvaFactorM1": 0,
+        "baseVFront": 0,
+        "vrrEnabled": true,
+        "baseRefreshRate": 0
+      },
+      "allm_enabled": 1,
+      "avi_content_type": "GAME",
+      "is_game_mode": true,
+      "dsc_enabled": false,
+      "settings_range": "hdrALLM",
+      "control_count": 38,
+      "control_differences_from_baseline": {}
+    }
+  ],
+  "baseline_controls": {
+    "blackLevel": {
+      "value": {
+        "secam": "high",
+        "ntsc": "high",
+        "pal60": "high",
+        "ntsc443": "high",
+        "pal": "high",
+        "unknown": "high",
+        "paln": "high",
+        "palm": "high"
+      },
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "auto",
+        "low",
+        "high"
+      ]
+    },
+    "realCinema": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "peakBrightness": {
+      "value": "high",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "dynamicColor": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "brightness": {
+      "value": "50",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "nearBlackDetail": {
+      "value": 0,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -10,
+      "max": 10,
+      "step": 1
+    },
+    "colorTemperature": {
+      "value": "-40",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -50,
+      "max": 50,
+      "step": 1
+    },
+    "expressionEnhancer": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "sharpness": {
+      "value": "0",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "mpegNoiseReduction": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "gammaLevel": {
+      "value": 0,
+      "visible": true,
+      "active": true,
+      "editor": "unavailable"
+    },
+    "contrast": {
+      "value": "100",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "gamma": {
+      "value": "mediumHavingLevel",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "backlight": {
+      "value": "100",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "color": {
+      "value": "50",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "superResolution": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "colorGamut": {
+      "value": "auto",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "auto",
+        "native",
+        "dynamic",
+        "adobeRGB",
+        "dci-p3"
+      ]
+    },
+    "tint": {
+      "value": "0",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -50,
+      "max": 50,
+      "step": 1
+    },
+    "noiseReduction": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "hdrDynamicToneMapping": {
+      "value": "HGIG",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "on",
+        "off",
+        "HGIG"
+      ]
+    },
+    "smoothGradation": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "dynamicContrast": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "truMotionMode": {
+      "value": "off",
+      "visible": true,
+      "active": false,
+      "editor": "unavailable"
+    },
+    "freesync": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "on",
+        "off"
+      ]
+    },
+    "enable144HzBooster": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "on"
+      ]
+    },
+    "uhdDeepColor": {
+      "value": "4k",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "4k"
+      ]
+    },
+    "enableALLM": {
+      "value": "on",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "on"
+      ]
+    },
+    "gameGenre": {
+      "value": "Standard",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "Standard",
+        "FPS",
+        "RPG",
+        "RTS",
+        "Sports",
+        "USER"
+      ]
+    },
+    "gameOptimization": {
+      "value": "on",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "on",
+        "off"
+      ]
+    },
+    "inputOptimization": {
+      "value": "auto",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "auto",
+        "on"
+      ]
+    },
+    "enableQFT": {
+      "value": "off",
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "options": [
+        "off",
+        "on"
+      ]
+    },
+    "gameAdjustContrast": {
+      "value": 100,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "blackStabilizer": {
+      "value": 10,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 20,
+      "step": 1
+    },
+    "lowLevelAdjustment": {
+      "value": 0,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": -30,
+      "max": 30,
+      "step": 1
+    },
+    "gameColorDepth": {
+      "value": 50,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "gameBlackLevel": {
+      "value": 50,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    "gameSharpness": {
+      "value": 0,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 50,
+      "step": 1
+    },
+    "whiteStabilizer": {
+      "value": 10,
+      "visible": true,
+      "active": true,
+      "editor": "editable",
+      "min": 0,
+      "max": 20,
+      "step": 1
+    }
+  },
+  "verification": {
+    "all_controls_match_native_availability_with_hdr_gamma_dependency": true,
+    "all_samples_preserved_saved_standards": true,
+    "restored_state": {
+      "document": true,
+      "preferences": true,
+      "revision": true,
+      "enabled": true,
+      "overrides": true
+    },
+    "remaining_temporary_adjustments": 0
+  },
+  "notes": [
+    "A missing hdmiVrrInfo object is recorded as null, not converted into an explicit false returned by LG.",
+    "Fine Tune Dark Areas remained enabled with PC G-SYNC off while the TV port VRR and G-Sync setting remained on; this does not establish a visible effect without VRR.",
+    "The incoming ALLM flag alone does not determine LG storage: the 120 Hz G-SYNC-off sample still used hdrALLM, whereas 60 Hz G-SYNC-off used hdr.",
+    "Gamma fine adjustment had an active native flag, but its Gamma parent was disabled in HDR. The editor correctly excluded both.",
+    "All sampled signals used RGB/full range and HDR10. Signal acceptance does not establish output bit depth, displayed chroma resolution, smooth gradation, or physical latency.",
+    "Prevent Input Delay offered auto/on in every sample. No physical latency difference was measured.",
+    "165 Hz boost was a temporary HA setting adjustment, then restored to off at the user request. No standards were changed."
+  ]
+}

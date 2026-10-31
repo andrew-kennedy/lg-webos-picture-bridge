@@ -41,6 +41,20 @@ module.exports = async function () {
   for (const preset of ['dolbyHdrCinema','dolbyHdrCinemaBright','dolbyHdrStandard','dolbyHdrVivid','dolbyHdrGame','dolbyHdrPersonalized'])
     assert.equal(check('dolbyPrecisionDetail',preset,'medium',{options:{capabilities:{dolbyPrecisionDetail:false}}}).state,'unavailable','An explicit model capability denial applies in every preset');
   assert.equal(check('dolbyPrecisionDetail','dolbyHdrCinemaBright','medium',{options:{capabilities:{dolbyPrecisionDetail:true}}}).state,'unverified','Hardware support alone cannot prove support in an inactive preset');
+  const blackLevel={...base,key:'blackLevel',dataType:'object',values:{arrayExt:['auto','low','high'].map(value=>({value,visible:true,active:true}))}};
+  for (const mode of ['dolbyHdrCinema','dolbyHdrCinemaBright','dolbyHdrGame']) {
+    const bank={id:'dv',target:{category:'picture',dimension:{input:'hdmi3',pictureMode:mode}},settings:{blackLevel:{unknown:'auto'}}};
+    const inspection={settings:bank.settings,factory_descriptions:{blackLevel}};
+    const options={reviewed:true,document:{banks:[bank]},values:b=>b.settings};
+    assert.equal(availability.describe('blackLevel',bank,{factory:blackLevel,value:bank.settings.blackLevel},options).state,'unverified','Factory metadata cannot establish an inactive Dolby Vision HDMI range control');
+    assert.throws(()=>availability.assertEditable('blackLevel',{unknown:'high'},bank,inspection,options),/activate this profile/,'Saving and combined edits must reject unverified Dolby Vision HDMI range changes');
+    const context={ready:true,input:'hdmi3',mode,range:'dolbyHdr'};
+    const current={dimension:bank.target.dimension,settings:bank.settings};
+    assert.equal(availability.describe('blackLevel',bank,{factory:blackLevel,live:{...blackLevel,ui:{visible:true,active:false}},current,value:bank.settings.blackLevel},{...options,context}).state,'unavailable','The active Dolby Vision controller lock overrides permissive factory metadata');
+    assert.equal(availability.describe('blackLevel',bank,{factory:blackLevel,live:blackLevel,current,value:bank.settings.blackLevel},{...options,context}).editable,true,'The inactive-profile guard does not invent a model-wide ban if a future live context permits the control');
+  }
+  for (const mode of ['filmMaker','hdrFilmMaker','game','hdrGame'])
+    assert.equal(check('blackLevel',mode,{unknown:'auto'},{description:blackLevel}).editable,true,'Verified non-Dolby factory HDMI range controls remain available');
   const port={id:'port',target:{category:'other',dimension:{gameInput:'hdmi1'}},settings:{inputOptimization:'auto'}};
   const portDescription={...base,key:'inputOptimization',dimension:['gameInput'],values:{arrayExt:[{value:'auto',visible:true,active:true},{value:'on',visible:true,active:true}]}};
   assert.equal(availability.describe('inputOptimization',port,{factory:portDescription,value:'auto'},{reviewed:true,values:b=>b.settings,context:{ready:false}}).state,'unverified','The hidden factory baseline cannot establish a port runtime gaming control');

@@ -133,6 +133,11 @@ function describe(key, bank, info, options) {
   // confirmation; a stored mediumHavingLevel value is not that confirmation.
   if (!active && ['gamma','gammaLevel'].includes(key))
     return unknown('LG updates Gamma choices at runtime; activate this SDR profile to verify its Gamma controls.');
+  // Dolby Vision's HDMI range lock is applied by the native controller, not
+  // the factory preset table. Both G6 movie presets were locked live while
+  // their inactive factory descriptions still offered an editable range.
+  if (!active && key === 'blackLevel' && format(bank.target.dimension) === 'dolbyHdr')
+    return unknown('HDMI Black Level depends on Dolby Vision processing; activate this profile to verify availability.');
   // Runtime-only controls must be confirmed in the actual target context. A
   // hidden factory baseline is not a reliable hardware-support declaration.
   if (!active && ['dolbyPrecisionDetail','expressionEnhancer','ambientLightCompensation','aiHdrRemastering','motionEyeCare','inputOptimization'].includes(key))
