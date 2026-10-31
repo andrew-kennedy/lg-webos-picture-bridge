@@ -35,7 +35,9 @@ module.exports = function () {
   };
   var config = store.validate({mqtt: {host:'broker'}, device_id:'test'});
   var bridge = holder.exports.start(service, {
-    config: config, healthStore: {save: function () {}},
+    config: config, healthStore: {save: function () {}, load: function () {
+      return {last_hdmi_picture: {input:'hdmi2', mode:'expert1', range:'sdr', at:'2026-10-31T13:00:00Z'}};
+    }},
     settingsMonitor:{start:function(){},stop:function(){},contextChanged:function(){},snapshot:function(){return {controls:{}};}},
     webhook: {postJson: function () { webhookCalls++; }},
     signalMonitor: {create: function (unused, callback, unusedHealth, options) {
@@ -65,7 +67,11 @@ module.exports = function () {
     pictureSub.emit('response', {payload:{returnValue:true, subscribed:true,
       dimension:{input:'hdmi3', dynamicRange:'sdr', _3dStatus:'2d'}, settings:{pictureMode:mode}}});
   }
+  assert.strictEqual(bridge.profiles.status().last_context.input, 'hdmi2',
+    'A restarted bridge restores the last HDMI picture from tmpfs health');
   picture('expert1'); picture('expert2');
+  assert.strictEqual(bridge.health.last_hdmi_picture.input, 'hdmi2',
+    'Unconfirmed pictures (no aligned signal) never replace the last HDMI picture');
   assert.strictEqual(mqttApply, bridge.applyPolicy, 'HTTP and MQTT must share the same queue');
   var refused = false;
   mqttApply({}, function (error) { refused = error.message === 'stale at queue entry'; },

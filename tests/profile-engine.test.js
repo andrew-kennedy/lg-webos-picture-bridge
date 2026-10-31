@@ -95,7 +95,14 @@ module.exports = async function () {
   const last=e.status().last_context;
   assert.deepEqual({input:last.input,mode:last.mode,range:last.range},{input:'hdmi3',mode:'filmMaker',range:'sdr'});
   assert.equal(typeof last.at,'string');
+  assert.deepEqual(e.lastContext(),last,'The bridge copies it into tmpfs health');
   e.contextChanged({ready:true,input:'hdmi3',range:'sdr',mode:'filmMaker'});
+  // A restarted bridge restores it from tmpfs health; only HDMI pictures count.
+  const restored=fixture(doc,{lastContext:{input:'hdmi2',mode:'expert1',range:'sdr',at:'2026-10-31T13:00:00Z'}}).create();
+  assert.deepEqual(restored.status().last_context,{input:'hdmi2',mode:'expert1',range:'sdr',at:'2026-10-31T13:00:00Z'});
+  restored.stop();
+  const ignored=fixture(doc,{lastContext:{input:'default',mode:'standard',range:'sdr'}}).create();
+  assert.equal(ignored.status().last_context,null);ignored.stop();
   await e.command({action:'set_environment',room:'bright'});
   assert.equal(f.values.movie.backlight,100);
   f.observe(e,'movie','backlight',70);

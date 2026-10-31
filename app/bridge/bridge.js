@@ -49,7 +49,11 @@ function start(service, dependencies) {
   var commandQueue = [];
   var commandRunning = false;
   var heartbeatTimer = null;
-  var profileManager = (injected.profileEngine || profileEngine).create({service:service,enqueue:enqueueSetting});
+  // The last confirmed HDMI picture outlives bridge restarts within a boot
+  // through tmpfs health, so the TV app can still name where the TV returns.
+  var previousHealth = healthClient.load ? healthClient.load() : null;
+  var profileManager = (injected.profileEngine || profileEngine).create({service:service,enqueue:enqueueSetting,
+    lastContext:previousHealth && previousHealth.last_hdmi_picture || null});
   var powerMonitor = (injected.profilePower || profilePower).create(service,profileManager.setPower);
   var settingsListeners = new Set();
   function settingsContext() {
@@ -71,7 +75,10 @@ function start(service, dependencies) {
       callback(error,result);
     },guard);
   };
-  function pictureContextChanged() { profileManager.contextChanged(settingsContext()); settingsMonitor.contextChanged(); }
+  function pictureContextChanged() {
+    profileManager.contextChanged(settingsContext()); settingsMonitor.contextChanged();
+    if (profileManager.lastContext) health.last_hdmi_picture = profileManager.lastContext();
+  }
   var health = {
     bridge_version: appInfo.version,
     service_registered: true,
@@ -96,6 +103,7 @@ function start(service, dependencies) {
     last_source: null,
     last_raw_value: null,
     current_picture_context: null,
+    last_hdmi_picture: previousHealth && previousHealth.last_hdmi_picture || null,
     last_observed_at: null,
     last_delivery_at: null,
     last_delivery_status: null,
