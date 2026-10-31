@@ -122,7 +122,25 @@
     }
     configure(adapter) { this.adapter=adapter;this.refresh(true); }
     request(command) { return this.adapter.request(command); }
-    records() { return this.state?model.records(this.state,this.variant):[]; }
+    records() {
+      if(!this.state)return [];
+      if(!this.recordCache||this.recordCache.state!==this.state||this.recordCache.variant!==this.variant)this.recordCache={state:this.state,variant:this.variant,records:model.records(this.state,this.variant)};
+      return this.recordCache.records;
+    }
+    adoptCatalog(catalog) {
+      if(!catalog||!this.state.document)return;
+      this.managedDocument=this.state.document;
+      const managed=new Map(this.managedDocument.banks.map(b=>[b.id,b]));
+      this.state={...this.state,document:{...this.managedDocument,banks:catalog.map(b=>{
+        const saved=managed.get(b.id),values=(this.live[b.id]||{}).settings||{};
+        return {...b,...saved,settings:{...b.settings,...values,...(saved?saved.settings:{})},managed_keys:Object.keys(saved?saved.settings:{})};
+      })}};
+    }
+    hydrate(id,values) {
+      const bank=this.state.document.banks.find(b=>b.id===id);
+      if(bank&&bank.managed_keys)for(const [key,value] of Object.entries(values))if(Object.hasOwn(bank.settings,key)&&!bank.managed_keys.includes(key))bank.settings[key]=value;
+      this.recordCache=null;
+    }
     overridesOnly() {return !!this.onlyOverrides&&this.state.document.schema===2&&this.variant!=='standard';}
     shownRecords() {return this.records().filter(r=>!this.overridesOnly()||!r.inherited||this.draft[this.entryId(r)]);}
     selectedRows() { return model.scopeRows(model.partition(this.shownRecords(),this.live).visible,this.scope,this.category,this.split); }
@@ -136,6 +154,8 @@
         if(force||!this.state||this.state.instance_id!==result.state.instance_id||this.state.revision!==result.state.revision||
           JSON.stringify(this.state.context)!==JSON.stringify(result.state.context)||this.state.room!==result.state.room||this.state.active_profile!==result.state.active_profile)this.live={};
         this.state=result.state;this.status=result.status||{};
+        this.managedDocument=null;
+        this.adoptCatalog(result.catalog||((this.state.native_snapshot||{}).document||{}).banks);
         if(this.state.document&&this.state.document.schema===2) {
           if(!this.namedReady){this.variant=this.state.active_profile||'standard';this.namedReady=true;}
           const choices=model.profileOptions(this.state.document);
@@ -158,7 +178,7 @@
         try {
           const result=await this.request(size===1?{action:'inspect',bank_id:chunk[0].id,variant:this.variant}:{action:'inspect_many',bank_ids:chunk.map(b=>b.id),variant:this.variant});if(epoch!==this.epoch)return;
           const items=size===1?[result]:result.banks;
-          for(const bank of chunk){const item=items.find(r=>r.id===bank.id);if(!item)throw new Error('The TV did not return every requested bank');this.live[bank.id]={...item,target:bank.target};}
+          for(const bank of chunk){const item=items.find(r=>r.id===bank.id);if(!item)throw new Error('The TV did not return every requested bank');this.live[bank.id]={...item,target:bank.target};this.hydrate(bank.id,item.settings);}
           if(!this.review)this.renderRows();
         } catch(error){if(epoch!==this.epoch)return;this.error(model.inputName(chunk[0])+': '+error.message);return;}
       }
@@ -192,7 +212,7 @@
         const id=this.entryId(r),before=r.preference?model.preferenceValue(this.state,r.preference):r.value;
         const encoded=value!==undefined&&r.key==='blackLevel'?Object.fromEntries(Object.keys(before).map(k=>[k,value])):value;
         if(value===undefined||model.same(before,encoded))delete this.draft[id];
-        else this.draft[id]={...(this.draft[id]||{id,bank_id:r.bank.id,key:r.key,variant:this.variant,target:r.bank.target,preference:r.preference,before}),inherit:false,value:encoded,label:pretty(r.alias),targets:cell.records.filter(t=>r.preference?t.preference===r.preference:t.id===r.id).map(t=>({id:t.id,scope:model.storedScope(t)})),excluded:this.excludedForCell(cell)};
+        else this.draft[id]={...(this.draft[id]||{id,bank_id:r.bank.id,key:r.key,variant:this.variant,target:r.bank.target,preference:r.preference,before,nativeOnly:!r.managed}),inherit:false,value:encoded,label:pretty(r.alias),targets:cell.records.filter(t=>r.preference?t.preference===r.preference:t.id===r.id).map(t=>({id:t.id,scope:model.storedScope(t)})),excluded:this.excludedForCell(cell)};
       }
       this.review=null;this.updateFooter();
     }
@@ -305,7 +325,7 @@
       @media(min-width:1500px){:host{font-size:21px}.top h2{font-size:30px}.chip{font-size:19px}.muted,.notice,.message,.comparison,.targets,.scope-note,.counts,.remote-help,summary,.cell-label{font-size:17px}legend,.choice>span,.badge{font-size:16px}button,select,input[type=number],input[type=text]{min-height:48px}.cells{grid-template-columns:repeat(auto-fit,minmax(min(285px,100%),1fr))}.frame{padding:24px;gap:14px}}
       @media(max-width:650px){.frame{padding:12px;gap:9px}.top h2{font-size:22px}.top .actions{gap:5px}.top button{padding:6px 8px}.filters,.grouping,.categories,.review{padding:12px}.filter-grid{grid-template-columns:1fr}.row{grid-template-columns:1fr;padding:12px}.cells{grid-template-columns:1fr}.footer .actions{width:100%}.footer button{font-size:13px;padding:6px 8px}.counts{font-size:12px}.message{font-size:12px}.body{min-height:100px}}
       </style>`;
-      const frame=el('div',undefined,'frame'),top=el('div',undefined,'top'),heading=el('div');heading.append(el('h2','Picture standards'),el('p','Saved on your TV. Everyday adjustments reset after a power cycle.','muted'));top.append(heading);
+      const frame=el('div',undefined,'frame'),top=el('div',undefined,'top'),heading=el('div');heading.append(el('h2','Picture standards'),el('p',this.status.editor_api>=9?'Edit LG’s native values or add profile overrides. Managed settings reset temporary adjustments after a power cycle.':'Saved on your TV. Everyday adjustments reset after a power cycle.','muted'));top.append(heading);
       const actions=el('div',undefined,'actions');actions.append(this.button('Refresh',()=>this.refresh(true)));
       if(this.adapter.fileTransfer!==false){actions.append(this.button('Download backup',async()=>{try{this.download(await this.request({action:'backup'}));}catch(e){this.error(e.message);}}));const file=el('input');file.type='file';file.accept='.json,application/json';file.hidden=true;file.onchange=async()=>{try{const selected=file.files[0];if(!selected||selected.size>1000000)throw new Error('Choose a JSON profile or backup smaller than 1 MB');const data=JSON.parse(await selected.text());if(!window.confirm('Replace saved standards with this file?'))return;await this.mutate(data.format==='lg-picture-bridge-backup'?{action:'restore_backup',backup:data,revision:this.state.revision}:{action:this.state.document?'import':'initialize',document:data,revision:this.state.revision,enabled:true,room:this.state.room});}catch(e){this.error(e.message);}};const importButton=this.button('Import',()=>file.click());importButton.disabled=!!this.status.offline;actions.append(importButton,file);}
       top.append(actions);frame.append(top);
@@ -316,9 +336,9 @@
         const all=this.records(),opts=model.options(all),filters=el('div',undefined,'filters');
         if(this.status.editor_api>=8) {
           const native=el('div',undefined,'filters');
-          native.append(el('p','Discover every preset and game genre offered by this TV. Existing values become Base without changing the picture. Your saved standards and overrides are preserved; newly discovered brightness values start independent.','scope-note'));
-          const discover=this.button('Discover native presets and genres',()=>this.mutate({action:'include_native_catalog',revision:this.state.revision}),undefined,'native-catalog');discover.dataset.profileAction='';native.append(discover);
-          filters.append(this.details('Native settings catalog · '+this.state.document.banks.length+' stored groups','native-catalog-options',native));
+          native.append(el('p',this.status.editor_api>=9?'Browsing reads LG’s values without adding them to profile management. In Base, native-only edits save directly to LG. Adding a named override or brightness link saves only the baseline needed to restore that setting. Home Assistant receives a complete native backup.':'Discover every preset and game genre offered by this TV. Existing values become Base without changing the picture.','scope-note'));
+          const discover=this.button(this.status.editor_api>=9?'Refresh native catalog':'Discover native presets and genres',()=>this.mutate({action:'include_native_catalog',revision:this.state.revision}),undefined,'native-catalog');discover.dataset.profileAction='';native.append(discover);
+          filters.append(this.details('Native settings catalog · '+this.state.document.banks.length+' browsable groups','native-catalog-options',native));
         }
         filters.append(this.chips('Select ports','port',opts.port,v=>model.inputName(v)));
         const family=this.chips('Preset family','family',opts.family,v=>model.families[v]||v);
@@ -351,7 +371,7 @@
       footerActions.append(this.reviewButton,this.discardButton,this.restoreButton,this.keepButton,manage);footer.append(this.counts,footerActions);frame.append(footer);
       const ack=this.status.backup_sequence&&this.status.backup_sequence===this.status.backup_acknowledged;
       frame.append(el('p',this.status.offline?'TV offline · showing saved backup':this.status.editor_api<4||!this.status.editor_api?'Update LG Picture Bridge to 0.15.0 or newer to verify which controls apply to each profile.':this.state.enabled?'Management applies the selected profile and restores temporary adjustments after a power cycle.':'Management is paused; profile selections are saved but will apply only when management resumes.','muted'));
-      frame.append(el('p',this.status.error||('Current room: '+this.state.room+' · '+(ack?'Backup confirmed in HA':'TV owns standards')),'message'));
+      frame.append(el('p',this.status.error||this.status.native_backup_error||('Current room: '+this.state.room+' · '+(ack?'Backup confirmed in HA':'TV owns standards')+(this.status.native_backup_complete===false?' · Full native snapshot pending':'')),'message'));
       if(this.adapter.tvRemote)frame.append(el('p',undefined,'remote-help'));root.append(frame);
       if(!this.review)this.renderRows();this.updateFooter();this.lockControls();this.restoreFocus(focus);this.editing(root.activeElement&&this.editingKey===root.activeElement.dataset.focus?root.activeElement:null);
     }
@@ -378,6 +398,7 @@
             for(const value of control.options){const option=el('option',row.key==='pictureMode'?(model.modes[value]||value):row.key==='truMotionMode'&&value==='user'?'User Selection':value);option.value=value;input.append(option);}input.value=mixed?'':unique[0];input.disabled=disabled;input.onchange=()=>update(input.value);
           } else input=el('span',mixed?'Mixed: '+unique.join(' / '):unique[0],mixed?'mixed':'');
           group.append(input);
+          if(this.status.editor_api>=9&&cell.records.some(r=>!r.managed))group.append(el('p',this.variant==='standard'?'Native values: saves go directly to LG. They are not reset by profile management.':'New overrides capture only these settings’ native Base values for restoration.','scope-note'));
           const excludedForCell=this.excludedForCell(cell);
           if(excludedForCell.length)group.append(el('p',excludedForCell.length+' disabled or unverified values excluded from this control. Review shows the affected and excluded targets.','scope-note'));
           if(this.state.document.schema===2&&this.variant!=='standard') {
@@ -422,7 +443,7 @@
       const stale=entries.length&&this.draftRevision!==this.state.revision;
       this.counts.textContent=this.selectedRecords().length+' selected values · '+this.excludedRecords().length+' excluded · '+entries.length+' staged changes'+(outside?' ('+outside+' outside this selection)':'');
       this.reviewButton.textContent=stale?'Review against latest':entries.length?'Review '+entries.length+' changes':'Review changes';this.reviewButton.disabled=!this.writable()||!entries.length||!!this.review;
-      this.discardButton.disabled=!entries.length||!!this.review;this.restoreButton.disabled=!this.writable()||!shown.size||this.selectedRecords().some(r=>!(r.availability||model.applicability(r,this.live)).editable)||!!entries.length||!!this.review;this.keepButton.disabled=this.restoreButton.disabled;
+      this.discardButton.disabled=!entries.length||!!this.review;this.restoreButton.disabled=!this.writable()||!this.selectedRecords().some(r=>r.managed)||this.selectedRecords().some(r=>r.managed&&!(r.availability||model.applicability(r,this.live)).editable)||!!entries.length||!!this.review;this.keepButton.disabled=this.restoreButton.disabled;
       this.shadowRoot.querySelectorAll('[data-profile-action]').forEach(b=>b.disabled=!this.writable()||!!entries.length||!!this.review);
       this.shadowRoot.querySelectorAll('[data-link-action]').forEach(b=>b.disabled=!this.writable()||this.status.editor_api<5||!!entries.length||!!this.review);
       this.shadowRoot.querySelectorAll('[data-inherit-cell]').forEach(b=>{
@@ -446,7 +467,7 @@
     }
     async openActionReview(action) {
       if(this.busy)return;
-      const chosen=this.selectedRecords().map(r=>({id:r.id,target:JSON.stringify(r.bank.target)}));
+      const chosen=this.selectedRecords().filter(r=>r.managed).map(r=>({id:r.id,target:JSON.stringify(r.bank.target)}));
       this.busy=true;this.lockControls();const refreshed=await this.refresh();this.busy=false;
       if(!refreshed||!this.writable()){this.render();if(!refreshed)this.error('Could not refresh the TV. Try again before reviewing adjustments.');return;}
       const selection={},expected={},entries=[];
@@ -469,11 +490,12 @@
     }
     closeReview() {const key=this.review.action==='set_brightness_links'?'brightness-links':this.review.action==='edit_many'?'review':this.review.action==='restore'?'restore':'promote';this.review=null;this.render({key,neighbors:[],scroll:0});}
     renderReview() {
-      const box=el('section',undefined,'review'),r=this.review;box.append(el('h3',r.action==='delete_profile'?'Delete profile':r.action==='reset_profile'?'Reset profile to base':r.action==='set_brightness_links'?'Review brightness links':r.action==='edit_many'?'Review saved standards':r.action==='restore'?'Restore '+this.profileName(this.state.active_profile||this.state.room)+' standards':'Keep adjustments in '+this.profileName(this.state.active_profile||this.state.room)));
+      const box=el('section',undefined,'review'),r=this.review;box.append(el('h3',r.action==='delete_profile'?'Delete profile':r.action==='reset_profile'?'Reset profile to base':r.action==='set_brightness_links'?'Review brightness links':r.action==='edit_many'?(this.status.editor_api>=9?'Review settings changes':'Review saved standards'):r.action==='restore'?'Restore '+this.profileName(this.state.active_profile||this.state.room)+' standards':'Keep adjustments in '+this.profileName(this.state.active_profile||this.state.room)));
       for(const entry of r.entries) {
         const row=el('div',undefined,'diff'),label=el('div');label.append(el('strong',entry.label),el('p',entry.preference?'Shared preference: '+entry.preference:'Profile: '+this.profileName(entry.variant),'muted'));
         const list=el('ul',undefined,'targets');entry.targets.forEach(t=>list.append(el('li',t.scope)));label.append(list);
         if(entry.inherit)label.append(el('p','Remove the override and follow future Base changes. Other profile overrides remain saved.','muted'));
+        if(entry.nativeOnly)label.append(el('p',entry.variant==='standard'?'Save directly to LG’s native storage; this does not enroll a managed standard.':'Save this override and its native baseline for profile restoration.','muted'));
         row.append(label,el('span',display(entry.before)+' → '+(entry.inherit?'Base: ':'')+display(entry.value),'value'));box.append(row);
       }
       const excluded=[...new Map(r.entries.flatMap(e=>e.excluded||[]).map(e=>[e.id,e])).values()];
@@ -481,7 +503,7 @@
         box.append(el('h3','Excluded from these edits'));
         const list=el('ul',undefined,'targets');for(const item of excluded)list.append(el('li',item.scope+' — '+item.reason));box.append(list);
       }
-      const actions=el('div',undefined,'actions');actions.append(this.button('Back to editing',()=>this.closeReview(),undefined,'review-back'),this.button(r.action==='delete_profile'?'Delete profile':r.action==='reset_profile'?'Reset profile':r.action==='set_brightness_links'?'Save brightness links':r.action==='edit_many'?'Save standards':r.action==='restore'?'Restore selected settings':'Keep these adjustments',()=>this.confirmReview(),'primary','review-confirm'));box.append(actions);this.rows.append(box);
+      const actions=el('div',undefined,'actions');actions.append(this.button('Back to editing',()=>this.closeReview(),undefined,'review-back'),this.button(r.action==='delete_profile'?'Delete profile':r.action==='reset_profile'?'Reset profile':r.action==='set_brightness_links'?'Save brightness links':r.action==='edit_many'?(this.status.editor_api>=9?'Save changes':'Save standards'):r.action==='restore'?'Restore selected settings':'Keep these adjustments',()=>this.confirmReview(),'primary','review-confirm'));box.append(actions);this.rows.append(box);
     }
     async confirmReview() {
       const r=this.review;if(!r)return;
@@ -493,7 +515,7 @@
         if(entry.inherit&&this.status.editor_api<7){this.error('Update LG Picture Bridge to 0.17.1 to remove individual overrides.');return;}
         if(entry.preference&&this.state.document.schema!==2){preferences[entry.preference]=Number(entry.value);continue;}
         const id=entry.bank_id+':'+entry.variant;if(!edits.has(id))edits.set(id,{bank_id:entry.bank_id,variant:entry.variant,settings:{}});
-        const edit=edits.get(id);if(entry.inherit){edit.inherit=edit.inherit||[];edit.inherit.push(entry.key);}else edit.settings[entry.key]=entry.value;
+        const edit=edits.get(id);if(entry.inherit){edit.inherit=edit.inherit||[];edit.inherit.push(entry.key);}else {edit.settings[entry.key]=entry.value;if(this.status.editor_api>=9)(edit.expected||(edit.expected={}))[entry.key]=entry.before;}
       }
       await this.mutate({action:'edit_many',edits:[...edits.values()],preferences,revision:r.revision});
     }
@@ -508,7 +530,7 @@
         if(!await this.refresh())throw new Error('Command accepted, but the saved state could not be refreshed');
         message=this.status.pending_restore?'Standards saved. TV application is pending; the bridge will retry.':'Saved on the TV. Backup is sent to Home Assistant.';
       } catch(e) {
-        error=true;this.review=null;await this.refresh();
+        error=true;this.review=null;await this.refresh(true);
         // A lost reply may follow a successful atomic commit. Re-read before
         // retrying, retaining only edits not confirmed in the saved document.
         for(const entry of Object.values(this.draft))try{if(this.entryApplied(entry))delete this.draft[entry.id];}catch(_){}

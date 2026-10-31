@@ -8,7 +8,7 @@ const disk = require('./profile-store');
 const availability = require('./profile-availability');
 const view = require('../../profile-view');
 const catalog = require('./profile-catalog');
-const nativeCatalog = require('./profile-native-catalog');
+const nativeState = require('./profile-native-state');
 
 function create(options) {
   const store = options.store || disk.create(), clock = options.now || Date.now;
@@ -23,6 +23,9 @@ function create(options) {
   let latestBackup = null, acknowledged = null, listeners = new Set(), backupListeners = new Set();
   let latestObservations = [];
   let recoveryTimer = null, retryDelay = 5000;
+  let captureTimer = null, nativeError = null;
+  let catalogueReady=false;
+  const browser = nativeState.create({document,now:clock,index:options.nativeDescriptions,read:command=>native(command)});
   const defaults = {movie_bright:100,movie_dark:3,game_sdr:80};
   try {
     saved = store.read('profiles');
@@ -32,6 +35,7 @@ function create(options) {
       if (saved.schema !== 1 || typeof saved.owner_id !== 'string' || !Number.isSafeInteger(saved.revision) || saved.revision < 1 || typeof saved.enabled !== 'boolean') throw new Error('Invalid profile storage');
       journal = Object.assign(journal,store.read('profile-session') || {});
       validateScopes(journal.dirty); validateScopes(journal.restore);
+      if(journal.native)for(const entry of journal.native)banks.normalize({action:'apply',banks:[entry]});
       if (journal.revision !== saved.revision) journal.restore = allKeys();
       if (journal.power === 'off' || (boot && journal.boot_id && boot !== journal.boot_id)) mergeScopes(journal.restore,journal.dirty);
       room = journal.room || (journal.environment && journal.environment.room) || 'dark';
@@ -78,17 +82,18 @@ function create(options) {
     if (model.canonical(next) !== model.canonical(journal.dirty)) { journal.dirty = next; writeJournal(); return true; }
     return false;
   }
-  function snapshot() {
+  function snapshot(complete = false) {
     return {schema:1,owner_id:saved && saved.owner_id,instance_id:instance,sequence,revision:saved ? saved.revision : 0,
       document:model.clone(document()),preferences:model.clone(preferences()),enabled:!!(saved && saved.enabled),
       room,selection:selection(),active_profile:activeProfile(),environment:model.clone(journal.environment),overrides:model.clone(overrides),
       recovery:{dirty:model.clone(journal.dirty),restore:model.clone(journal.restore),boot_id:boot,power,reconstructing:recovery},
-      migration_id:saved && saved.migration_id || null,context:model.clone(context),created_at:new Date(clock()).toISOString()};
+      migration_id:saved && saved.migration_id || null,context:model.clone(context),created_at:new Date(clock()).toISOString(),
+      ...(complete?{native_snapshot:browser.backup()}:{}),storage_mode:'native'};
   }
   function status() {
-    return {configured:!!saved,editor_api:8,profile_schema:document()&&document().schema,selection:selection(),active_profile:activeProfile(),owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
+    return {configured:!!saved,editor_api:9,profile_schema:document()&&document().schema,selection:selection(),active_profile:activeProfile(),owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
       enabled:!!(saved && saved.enabled),room,power,context,temporary_count:Object.values(overrides).reduce((n,v) => n + Object.keys(v).length,0),
-      pending_restore:Object.keys(journal.restore).length > 0,applying,changed_count:changedCount,
+      pending_restore:Object.keys(journal.restore).length > 0||!!(journal.native&&journal.native.length),applying,changed_count:changedCount,native_backup_error:nativeError,native_backup_complete:!!browser.captured(),
       error:loadError || lastError,backup_sequence:latestBackup ? sequence : null,backup_acknowledged:acknowledged,
       active_devices:document() ? [...new Set(document().banks.filter(b =>
         (Object.hasOwn(b.target.dimension,'pictureMode') || Object.hasOwn(b.target.dimension,'dynamicRange')) &&
@@ -99,7 +104,7 @@ function create(options) {
     cancel(timer); timer = null;
     if (!saved || loadError) return null;
     sequence++;
-    latestBackup = model.backup(snapshot());
+    latestBackup = model.backup(snapshot(true));
     for (const fn of backupListeners) fn(latestBackup);
     notify(); return latestBackup;
   }
@@ -119,6 +124,12 @@ function create(options) {
       if (options.runBanks) options.runBanks(command,check,() => context).then(resolve,reject);
       else if (options.enqueue) options.enqueue(run,(e,v) => e ? reject(e) : resolve(v));
       else run((e,v) => e ? reject(e) : resolve(v));
+    }).then(result=>{
+      for(const item of result.banks||[]) {
+        const bank=command.banks.find(b=>b.id===item.id);
+        if(bank&&item.settings)browser.remember(bank.target,item.settings);
+      }
+      return result;
     });
   }
   function serial(run) {
@@ -129,7 +140,18 @@ function create(options) {
     return result;
   }
   function queueSync() {
-    serial(reconcile).catch(error => { lastError = error.message; changed(); });
+    return serial(reconcile).catch(error => { lastError = error.message; changed(); });
+  }
+  function queueCapture() {
+    cancel(captureTimer);
+    // Allow startup restoration to finish first. This is power-event work,
+    // never polling, and the full snapshot is kept in RAM only.
+    captureTimer=later(()=>{captureTimer=null;serial(async()=>{
+      if(!saved||power!=='on')return;
+      const epoch=powerEpoch;
+      try {await browser.capture(()=>{guard();if(epoch!==powerEpoch)throw new Error('TV power session changed');});catalogueReady=true;nativeError=null;changed(true);}
+      catch(error){nativeError=error.message;notify();}
+    }).catch(()=>{});},1500);
   }
   function selected(scope) {
     if (!document()) throw new Error('Import a profile collection first');
@@ -148,6 +170,12 @@ function create(options) {
   }
   function observe(items) {
     latestObservations = items || [];
+    let nativeChanged=false;
+    for(const item of items||[]) {
+      if(!item.target||!Number.isFinite(Date.parse(item.observed_at)))continue;
+      try {model.observedValue(item.key,item.value,item.target);nativeChanged=browser.remember(item.target,{[item.key]:item.value},Date.parse(item.observed_at))||nativeChanged;}catch(_){}
+    }
+    if(nativeChanged)changed();
     if (!saved || !saved.enabled || loadError || recovery) return;
     let modified = false, restoreModified = false;
     for (const item of items || []) {
@@ -233,9 +261,11 @@ function create(options) {
     } finally { for (const k of Object.keys(patch)) delete own[id + '/' + k]; }
   }
   async function reconcile() {
-    if (!saved || !saved.enabled || power !== 'on' || loadError) return status();
+    if (!saved || power !== 'on' || loadError || !saved.enabled&&!(journal.native&&journal.native.length)) return status();
     applying = true; changedCount = 0; notify();
     try {
+      await applyNativePending();
+      if(!saved.enabled)return status();
       await recover();
       const envChanged = model.canonical(journal.environment) !== model.canonical(environment());
       for (const bank of document().banks) {
@@ -262,11 +292,11 @@ function create(options) {
   function setPower(value) {
     if (!['on','off'].includes(value) || power === value) return;
     const previous = power; power = value; powerEpoch++;
-    if (value === 'off') { cancel(recoveryTimer); recoveryTimer = null; }
+    if (value === 'off') { cancel(recoveryTimer); recoveryTimer = null; cancel(captureTimer);captureTimer=null; }
     if (value === 'off') mergeScopes(journal.restore,journal.dirty);
     if (saved && (journal.power !== value || previous === 'off')) { journal.power = value; writeJournal(); }
     changed(true);
-    if (value === 'on') queueSync();
+    if (value === 'on') {queueSync();queueCapture();}
   }
   function checkRevision(command) {
     if (!saved || command.revision !== saved.revision) throw new Error('Profiles changed; refresh before saving');
@@ -281,7 +311,8 @@ function create(options) {
   function commitCandidate(candidate) {
     const affected={};
     for(const bank of candidate.document.banks) {
-      const before=resolved(bankById(bank.id)),after=resolved(bank,activeProfile(candidate),candidate);
+      const old=document().banks.find(b=>b.id===bank.id);
+      const before=old?resolved(old):{},after=resolved(bank,activeProfile(candidate),candidate);
       const keys=Object.keys(after).filter(k=>!model.same(before[k],after[k]));
       if(keys.length)affected[bank.id]=keys;
     }
@@ -293,7 +324,7 @@ function create(options) {
   }
   function editorOptions(variant = 'standard', candidate = saved) {
     if (candidate&&!catalog.valid(candidate.document,variant)) throw new Error('Unknown profile');
-    return {document:candidate && candidate.document,context,
+    return {document:candidate && browser.browser(candidate.document),context,
       reviewed:options.availabilityReviewed,
       values:bank => {
         if(candidate&&candidate.document.schema===2)return resolved(bank,variant,candidate);
@@ -312,6 +343,28 @@ function create(options) {
       const run = done => banks.inspect(options.service,bank,check,() => context,{...editorOptions(variant),readCache}).then(v => done(null,v),done);
       if (options.enqueue) options.enqueue(run,(e,v) => e ? reject(e) : resolve(v)); else run((e,v) => e ? reject(e) : resolve(v));
     });
+  }
+  async function inspectNative(id,variant='standard',readCache=new Map()) {
+    const [bank]=await browser.prepare([id],readCache);
+    const result=await inspect(bank,variant,readCache);
+    browser.remember(bank.target,result.settings);
+    return {bank,result};
+  }
+  async function applyNativePending() {
+    if(!journal.native||!journal.native.length)return;
+    const conflicts=[];
+    for(const entry of journal.native) {
+      const keys=Object.keys(entry.settings),actual=(await native({action:'read',banks:[{id:entry.id,target:entry.target,keys}]})).banks[0].settings;
+      const settings={},expected={};
+      for(const key of keys) {
+        if(model.same(actual[key],entry.settings[key]))continue;
+        if(!model.same(actual[key],entry.expected[key])) {conflicts.push(entry.id+'/'+key);delete entry.settings[key];delete entry.expected[key];continue;}
+        settings[key]=entry.settings[key];expected[key]=actual[key];
+      }
+      if(Object.keys(settings).length)await native({action:'apply',banks:[{id:entry.id,target:entry.target,settings,expected}]});
+    }
+    delete journal.native;writeJournal();changed(true);
+    if(conflicts.length)throw new Error('Native values changed after review; newer values were preserved. Refresh and review again: '+conflicts.join(', '));
   }
   async function validateSharedBrightness(candidate, patch, inspected, check) {
     if(candidate.document.schema===2) {
@@ -369,20 +422,44 @@ function create(options) {
     if (!input || typeof input !== 'object' || typeof input.action !== 'string' || JSON.stringify(input).length > 900000) throw new Error('Invalid profile command');
     return serial(async () => {
       externalGuard();
-      if(saved&&document().schema===2&&input.action==='edit')input={action:'edit_many',revision:input.revision,edits:[{bank_id:input.bank_id,variant:input.variant,settings:input.settings}]};
-      if (input.action === 'get') return {state:snapshot(),status:status()};
+      if(saved&&document().schema===2&&input.action==='edit')input={action:'edit_many',revision:input.revision,edits:[{bank_id:input.bank_id,variant:input.variant,settings:input.settings,expected:input.expected}]};
+      if (input.action === 'get') {
+        if(saved&&power==='on')try{await browser.load();catalogueReady=true;}catch(error){nativeError=error.message;}
+        return {state:snapshot(),status:status(),...(catalogueReady?{catalog:browser.metadata()}: {})};
+      }
       if (input.action === 'backup') return publishBackup();
+      if (input.action === 'capture_native') {
+        guard();if(!saved)throw new Error('Import a profile collection first');
+        const epoch=powerEpoch;
+        await browser.capture(()=>{externalGuard();guard();if(epoch!==powerEpoch)throw new Error('TV power session changed');});
+        catalogueReady=true;nativeError=null;publishBackup();return status();
+      }
       if (input.action === 'initialize') return initialize(input);
       if (input.action === 'restore_backup') {
         const backup = model.decodeBackup(input.backup);
         if (saved) checkRevision(input);
         const doc = model.validate(backup.document);
-        // Restore standards deliberately. Historical temporary values never get
-        // silently applied as the new viewing session's preferences.
+        const nativeRestore=[],epoch=powerEpoch;
+        if(backup.native_snapshot) {
+          guard();
+          // A full restore is a bounded, transient intent. Native-only values
+          // never become permanent profile standards after restoration.
+          for(const bank of backup.native_snapshot.document.banks) {
+            const managed=doc.banks.find(b=>model.canonical(b.target)===model.canonical(bank.target));
+            const keys=Object.keys(bank.settings).filter(k=>!managed||!Object.hasOwn(managed.settings,k));
+            if(!keys.length)continue;
+            const actual=(await native({action:'read',banks:[{id:bank.id,target:bank.target,keys}]})).banks[0].settings;
+            externalGuard();guard();if(epoch!==powerEpoch)throw new Error('TV power session changed');if(saved)checkRevision(input);
+            const settings=Object.fromEntries(keys.filter(k=>!model.same(actual[k],bank.settings[k])).map(k=>[k,bank.settings[k]]));
+            if(Object.keys(settings).length)nativeRestore.push({id:bank.id,target:bank.target,settings,expected:Object.fromEntries(Object.keys(settings).map(k=>[k,actual[k]]))});
+          }
+        }
+        // Commit only after every read succeeds. Historical temporary values
+        // never get silently applied as the new session's preferences.
         saved = {schema:1,owner_id:saved ? saved.owner_id : crypto.randomBytes(16).toString('hex'),
           revision:(saved ? saved.revision : 0),document:doc,preferences:model.preferences(backup.preferences),enabled:backup.enabled === true};
         overrides = {}; recovery = false; loadError = null;
-        journal.selection=backup.selection||'automatic';
+        journal.selection=backup.selection||'automatic';journal.native=nativeRestore;
         journal.dirty = {}; journal.restore = allKeys(); journal.environment = null;
         persistStandards(); await reconcile(); return status();
       }
@@ -439,9 +516,11 @@ function create(options) {
       if (input.action === 'inspect'||input.action==='inspect_many') {
         const ids=input.action==='inspect'?[input.bank_id]:input.bank_ids;
         if(!Array.isArray(ids)||!ids.length||ids.length>32||new Set(ids).size!==ids.length)throw new Error('Inspect 1–32 unique native banks');
-        const chosen=ids.map(bankById),results=[],readCache=new Map(),captured=model.canonical(context),epoch=powerEpoch;
+        const results=[],readCache=new Map(),captured=model.canonical(context),epoch=powerEpoch;
+        const chosen=catalogueReady?await browser.prepare(ids,readCache):ids.map(bankById);
         for(const bank of chosen) {
           const result=await inspect(bank,input.variant||'standard',readCache);
+          browser.remember(bank.target,result.settings);
           externalGuard();guard();if(epoch!==powerEpoch||captured!==model.canonical(context))throw new Error('TV signal changed while checking availability');
           for(const key of ['descriptions','factory_descriptions','active_values','preset_description','genre_description'])delete result[key];
           results.push(result);
@@ -450,13 +529,26 @@ function create(options) {
       }
       if(input.action==='include_native_catalog') {
         guard();checkRevision(input);
-        if(options.availabilityReviewed!==true&&!availability.reviewedPlatform().reviewed)throw new Error('Native catalog enrollment requires the reviewed TV software');
-        const epoch=powerEpoch;
-        const check=()=>{externalGuard();guard();checkRevision(input);if(epoch!==powerEpoch)throw new Error('TV power session changed');};
-        const expanded=await nativeCatalog.expand(document(),command=>native(command,check),check,{inputs:input.inputs,index:options.nativeDescriptions});
-        model.validate(expanded.document);check();
-        if(expanded.added_settings) {saved.document=expanded.document;persistStandards();}
-        return {...status(),added_banks:expanded.added_banks,added_settings:expanded.added_settings};
+        if(options.availabilityReviewed!==true&&!availability.reviewedPlatform().reviewed)throw new Error('Native catalog requires the reviewed TV software');
+        await browser.load(true);externalGuard();catalogueReady=true;
+        return {...status(),catalog:browser.metadata()};
+      }
+      if(input.action==='compact_management') {
+        guard();checkRevision(input);validateScopes(input.keep);
+        if(!browser.backup()||acknowledged!==sequence)throw new Error('Capture a complete native backup and wait for Home Assistant to acknowledge it before compacting');
+        if(journal.native&&journal.native.length)throw new Error('Finish pending native edits first');
+        const keep=model.clone(input.keep),candidate=model.clone(saved);
+        mergeScopes(keep,journal.dirty);mergeScopes(keep,journal.restore);
+        mergeScopes(keep,Object.fromEntries(Object.entries(overrides).map(([id,v])=>[id,Object.keys(v)])));
+        for(const bank of document().banks)mergeScopes(keep,{[bank.id]:model.environmentKeys(bank)});
+        candidate.document.banks=candidate.document.banks.filter(b=>(keep[b.id]||[]).length).map(b=>{
+          b.settings=Object.fromEntries(Object.entries(b.settings).filter(([k])=>keep[b.id].includes(k)));return b;
+        });
+        model.validate(candidate.document);externalGuard();checkRevision(input);
+        if(model.canonical(candidate.document)===model.canonical(document()))return status();
+        saved=candidate;
+        for(const scopes of [journal.dirty,journal.restore,overrides])for(const id of Object.keys(scopes))if(!Object.keys(scopes[id]).length)delete scopes[id];
+        persistStandards();return status();
       }
       if (input.action === 'set_environment') {
         if (!['bright','dark'].includes(input.room)) throw new Error('Expected bright or dark room');
@@ -488,9 +580,13 @@ function create(options) {
         const check = () => { externalGuard(); guard(); checkRevision(input); if (powerEpoch !== epoch) throw new Error('TV power session changed'); };
         for (const link of input.links) {
           if (!link || Object.keys(link).some(k=>!['bank_id','linked'].includes(k)) || seen.has(link.bank_id)) throw new Error('Invalid or duplicate brightness link');
-          const original = bankById(link.bank_id), bank = candidate.document.banks.find(b=>b.id===original.id);
+          const info=catalogueReady?await inspectNative(link.bank_id):null;
+          const original=info?info.bank:bankById(link.bank_id);
+          let bank=candidate.document.banks.find(b=>b.id===original.id);
+          if(!bank) {bank={id:original.id,name:original.name,devices:original.devices||[],target:model.clone(original.target),settings:{}};candidate.document.banks.push(bank);}
+          if(!Object.hasOwn(bank.settings,'backlight'))bank.settings.backlight=info?info.result.settings.backlight:original.settings.backlight;
           seen.add(bank.id); view.setBrightnessLink(bank,link.linked,preferences(candidate),room,candidate.document);
-          const live = await inspect(original); check();
+          const live = info?info.result:await inspect(original); check();
           for (const variant of ['standard',...catalog.ids(candidate.document)]) {
             const opts = editorOptions(variant,candidate);
             availability.assertEditable('backlight',opts.values(bank).backlight,bank,live,opts);
@@ -554,8 +650,9 @@ function create(options) {
       }
       if (input.action === 'edit_many') {
         guard(); checkRevision(input);
+        if(journal.native&&journal.native.length)throw new Error('Finish pending native edits before saving another batch');
         const edits = input.edits === undefined ? [] : input.edits, prefPatch = input.preferences === undefined ? {} : input.preferences;
-        const candidate = model.clone(saved), seen = new Set(), prefValues = {}, inspected = new Map(), epoch = powerEpoch;
+        const candidate = model.clone(saved), seen = new Set(), prefValues = {}, inspected = new Map(), epoch = powerEpoch, direct=new Map(), readCache=new Map(), originals=new Map();
         const check = () => { externalGuard(); guard(); checkRevision(input); if (epoch !== powerEpoch) throw new Error('TV power session changed'); };
         if (!prefPatch || typeof prefPatch !== 'object' || Array.isArray(prefPatch)) throw new Error('Invalid brightness preferences');
         if (!Array.isArray(edits) || edits.length > 768 || (!edits.length && !Object.keys(prefPatch).length)) throw new Error('Choose settings to edit');
@@ -568,7 +665,13 @@ function create(options) {
         } else Object.assign(prefValues,prefPatch);
         for (const edit of edits) {
           if (!edit || typeof edit !== 'object' || Array.isArray(edit)) throw new Error('Invalid bank edit');
-          const original = bankById(edit.bank_id), bank = candidate.document.banks.find(b=>b.id===original.id), variant = edit.variant || 'standard', patch = edit.settings===undefined?{}:edit.settings, inherit=edit.inherit===undefined?[]:edit.inherit;
+          if(!originals.has(edit.bank_id)) {
+            if(catalogueReady||!document().banks.some(b=>b.id===edit.bank_id)) {
+              const info=await inspectNative(edit.bank_id,'standard',readCache);catalogueReady=true;
+              originals.set(edit.bank_id,info.bank);inspected.set(edit.bank_id,info.result);
+            } else originals.set(edit.bank_id,bankById(edit.bank_id));
+          }
+          const original=originals.get(edit.bank_id),bank=original,variant=edit.variant||'standard',patch=edit.settings===undefined?{}:edit.settings,inherit=edit.inherit===undefined?[]:edit.inherit;
           if (!catalog.valid(candidate.document,variant) || !patch || typeof patch !== 'object' || Array.isArray(patch) ||
               !Array.isArray(inherit) || inherit.length>40 || new Set(inherit).size!==inherit.length ||
               (!Object.keys(patch).length&&!inherit.length) || [...Object.keys(patch),...inherit].some(k=>typeof k!=='string'||!Object.hasOwn(bank.settings,k))) throw new Error('Invalid bank edit');
@@ -581,23 +684,42 @@ function create(options) {
             if (seen.has(identity)) throw new Error('Duplicate setting in batch');
             seen.add(identity);
             const encoded = encodeStandard(key,value,live,bank);
+            let destination=candidate.document.banks.find(b=>b.id===bank.id);
+            const managed=destination&&Object.hasOwn(destination.settings,key);
+            if(!managed) {
+              if(!edit.expected||!Object.hasOwn(edit.expected,key)||!model.same(edit.expected[key],live.settings[key]))throw new Error('Native values changed or were not reviewed; refresh before saving');
+              if(variant==='standard') {
+                if(!model.same(encoded,live.settings[key])) {
+                  if(!direct.has(bank.id))direct.set(bank.id,{id:bank.id,target:bank.target,settings:{},expected:{}});
+                  direct.get(bank.id).settings[key]=encoded;direct.get(bank.id).expected[key]=live.settings[key];
+                }
+                continue;
+              }
+              if(!destination) {
+                destination={id:bank.id,name:bank.name,devices:bank.devices||[],target:model.clone(bank.target),settings:{}};
+                candidate.document.banks.push(destination);
+              }
+              // First explicit overlay owns only this key and its native
+              // baseline. Merely inspecting a bank never takes ownership.
+              destination.settings[key]=model.clone(live.settings[key]);
+            }
             if(candidate.document.schema===2) {
-              if(key==='backlight'&&bank.brightness_role) {
-                const shared=variant+'/'+bank.brightness_role;
+              if(key==='backlight'&&destination.brightness_role) {
+                const shared=variant+'/'+destination.brightness_role;
                 if(Object.hasOwn(prefValues,shared)&&(prefValues[shared]===null||!model.same(prefValues[shared],encoded)))throw new Error('Conflicting shared brightness values');
                 prefValues[shared]=encoded;
               }
-              catalog.edit(candidate.document,bank,variant,key,encoded);
-            } else if (key==='backlight' && bank.brightness_role) {
-              if (bank.brightness_role==='movie_sdr' && variant==='standard') throw new Error('Choose Bright or Dark to edit shared movie SDR brightness');
-              const role = bank.brightness_role==='game_sdr'?'game_sdr':'movie_'+variant;
+              catalog.edit(candidate.document,destination,variant,key,encoded);
+            } else if (key==='backlight' && destination.brightness_role) {
+              if (destination.brightness_role==='movie_sdr' && variant==='standard') throw new Error('Choose Bright or Dark to edit shared movie SDR brightness');
+              const role = destination.brightness_role==='game_sdr'?'game_sdr':'movie_'+variant;
               if (Object.hasOwn(prefValues,role) && !model.same(prefValues[role],encoded)) throw new Error('Conflicting shared brightness values');
               prefValues[role] = Number(encoded); candidate.preferences[role] = Number(encoded);
             } else {
-              const previous = variant==='standard'?bank.settings[key]:Object.assign({},bank.settings,(bank.variants || {})[variant])[key];
+              const previous = variant==='standard'?destination.settings[key]:Object.assign({},destination.settings,(destination.variants || {})[variant])[key];
               if (model.same(previous,encoded)) continue;
-              if (variant==='standard') bank.settings[key]=encoded;
-              else { bank.variants=bank.variants || {}; bank.variants[variant]=bank.variants[variant] || {}; bank.variants[variant][key]=encoded; }
+              if (variant==='standard') destination.settings[key]=encoded;
+              else { destination.variants=destination.variants || {}; destination.variants[variant]=destination.variants[variant] || {}; destination.variants[variant][key]=encoded; }
             }
           }
           for(const key of inherit) {
@@ -609,26 +731,41 @@ function create(options) {
               if(Object.hasOwn(prefValues,shared)&&prefValues[shared]!==null)throw new Error('Conflicting shared brightness values');
               prefValues[shared]=null;
             }
-            catalog.edit(candidate.document,bank,variant,key,undefined,true);
+            const destination=candidate.document.banks.find(b=>b.id===bank.id);
+            if(destination&&Object.hasOwn(destination.settings,key))catalog.edit(candidate.document,destination,variant,key,undefined,true);
           }
           check();
+        }
+        // A batch may edit Base and add its first named override together.
+        // In that case the explicit Base edit is the new managed baseline.
+        for(const [id,entry] of direct) {
+          const bank=candidate.document.banks.find(b=>b.id===id);
+          if(bank)for(const key of Object.keys(entry.settings))if(Object.hasOwn(bank.settings,key)) {
+            bank.settings[key]=entry.settings[key];delete entry.settings[key];delete entry.expected[key];
+          }
+          if(!Object.keys(entry.settings).length)direct.delete(id);
         }
         model.validate(candidate.document); model.preferences(preferences(candidate));
         // Validate the completed candidate, so dependency edits in the same
         // transaction are independent of their order. Nothing is persisted or
         // applied until every target passes its own applicability check.
+        const validation={...candidate,document:browser.browser(candidate.document)};
+        for(const entry of direct.values())Object.assign(validation.document.banks.find(b=>b.id===entry.id).settings,entry.settings);
         for (const edit of edits) {
-          const bank = candidate.document.banks.find(b=>b.id===edit.bank_id), live = inspected.get(bank.id);
+          const bank = validation.document.banks.find(b=>b.id===edit.bank_id), live = inspected.get(bank.id);
           for (const [key,value] of Object.entries(edit.settings||{}))
-            availability.assertEditable(key,value,bank,live,editorOptions(edit.variant || 'standard',candidate));
+            availability.assertEditable(key,value,bank,live,editorOptions(edit.variant || 'standard',validation));
           // Removing an override can also clean up a dormant/unused setting.
           // Validate Base's storage scope and range without treating cleanup
           // as permission to introduce a new processing value in that mode.
-          for(const key of edit.inherit||[])encodeStandard(key,resolved(bank,edit.variant,candidate)[key],live,bank);
+          for(const key of edit.inherit||[])encodeStandard(key,resolved(bank,edit.variant,validation)[key],live,bank);
         }
         await validateSharedBrightness(candidate,prefValues,inspected,check);
         check();
-        if (model.canonical(candidate.document)===model.canonical(saved.document) && model.canonical(candidate.preferences)===model.canonical(saved.preferences)) return status();
+        if(direct.size)journal.native=[...direct.values()];
+        if (model.canonical(candidate.document)===model.canonical(saved.document) && model.canonical(candidate.preferences)===model.canonical(saved.preferences)) {
+          if(direct.size){writeJournal();await reconcile();}return status();
+        }
         // Persist once after validating the entire candidate. Native writes
         // remain compared, verified and journaled by the shared commit path.
         return commitCandidate(candidate);
@@ -747,7 +884,7 @@ function create(options) {
     onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     onBackup(fn) { backupListeners.add(fn); return () => backupListeners.delete(fn); },
     republishBackup() { if (latestBackup) { for (const fn of backupListeners) fn(latestBackup); } else publishBackup(); },
-    stop() { stopped = true; cancel(timer); cancel(recoveryTimer); if (saved && !loadError) publishBackup(); listeners.clear(); backupListeners.clear(); },
+    stop() { stopped = true; cancel(timer); cancel(recoveryTimer);cancel(captureTimer); if (saved && !loadError) publishBackup(); listeners.clear(); backupListeners.clear(); },
     idle() { return tail; }
   };
 }

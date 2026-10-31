@@ -2,6 +2,8 @@
 
 LG Picture Bridge connects a **rooted 2026 LG G6 (webOS 11)** to Home Assistant. It reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision through MQTT discovery, and applies picture profiles without notification dialogs.
 
+Version **0.19.0**, with Home Assistant companion **0.10.0**, separates the native editor from profile ownership. Browse LG’s supported presets and genres without copying their settings into the bridge’s saved collection. Native-only Base edits save directly to LG; named overrides and brightness links retain just their required baseline keys. Existing managed settings still restore temporary adjustments after power cycles. Complete native snapshots stay in TV RAM and are backed up through MQTT to Home Assistant, alongside the smaller managed collection. See [profile ownership and migration](docs/profile-ownership.md).
+
 Version **0.17.0** replaces the Device/Format/View dropdowns with a scope editor shared with Home Assistant companion **0.7.0**. Preset families group related modes as Gaming or Movies; an exact preset is one LG picture mode, such as HDR Game or Dolby Vision Filmmaker. Select ports, formats and preset families, then choose Picture, Motion, Gaming, HDMI connection or Preset selection. Split controls by the factors you want to edit separately, or combine them to apply one value more widely. Unequal standards show **Mixed**. **Real Cinema** is under Motion. SDR, HDR and Dolby Vision OLED brightness appear together in one row; shared SDR preferences remain separate from native HDR/Dolby Vision values. Short descriptions beneath setting names explain their effects and tradeoffs, including Dolby Precision Detail, Expression Enhancer and gaming controls. Every edit has an exact target preview before saving; shared brightness preferences list all affected profiles. A batch validates completely and saves the standards document once. Native TV writes are verified and recoverable.
 
 **SDR brightness links** let each gaming or movie profile share a brightness standard or retain independent per-input/preset/room values. Unlinking preserves its effective standards; relinking previews the shared values it will adopt. Shared Home Assistant brightness sliders affect linked profiles only. Under **Motion**, **Include TruMotion adjustments** captures existing de-judder/de-blur values without changing processing. Save TruMotion **User Selection** to edit their verified 0–10 ranges. Apple TV and Shield continue sharing native movie banks on HDMI 3. Companion 0.7 adds the same scope filters to its restore action for automations.
@@ -24,7 +26,7 @@ For manual installation, download the IPK from [Releases](https://github.com/and
 
 ```sh
 luna-send-pub -i luna://com.webos.appInstallService/dev/install \
-  '{"id":"com.ares.defaultName","ipkUrl":"/home/root/io.github.andrewkennedy.lgpicturebridge_0.17.0_all.ipk","subscribe":true}'
+  '{"id":"com.ares.defaultName","ipkUrl":"/home/root/io.github.andrewkennedy.lgpicturebridge_0.19.0_all.ipk","subscribe":true}'
 ```
 
 Wait for `state: installed`, then interrupt the subscription. Homebrew Channel must already be elevated. No system partition flashing is involved.

@@ -191,7 +191,8 @@ module.exports = {normalize:normalize, target:target, run:run, same:same, encodi
   descriptionKeys, PICTURE, GAME, PORT, RANGES,
   observationKeys:observationKeys, observation:observation, request:request, encode:encode,
   async inspect(service, bank, guard, context, editor) {
-    var result = (await run(service, normalize({action:'read',banks:[{
+    const prepared=editor&&editor.readCache&&editor.readCache.get('native:'+bank.id);
+    var result = prepared?{id:bank.id,settings:JSON.parse(JSON.stringify(prepared))}:(await run(service, normalize({action:'read',banks:[{
       id:bank.id,target:bank.target,keys:Object.keys(bank.settings)}]}),guard,context)).banks[0];
     guard();
     var captured = JSON.stringify(context && context());

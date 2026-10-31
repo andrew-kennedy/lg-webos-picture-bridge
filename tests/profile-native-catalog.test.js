@@ -17,48 +17,82 @@ const index={size:()=>1,resolve(key,target){
   return null;
 }};
 module.exports=async()=>{
-  const f=fixture(doc,{nativeDescriptions:index}),e=f.create();e.setPower('on');await e.idle();
+  const f=fixture(doc,{nativeDescriptions:index});let e=f.create();e.setPower('on');await e.idle();
   await e.command({action:'initialize',document:doc,enabled:true,migration_id:'catalog-test'});
-  const before=e.snapshot();f.observe(e,'movie','color',54);
+  await e.command({action:'upgrade_profiles',revision:e.status().revision});await e.idle();
   f.hook((command,bank)=>{
     if(command.action!=='read')return;
     f.values[bank.id]=f.values[bank.id]||{};
     for(const key of bank.keys)if(f.values[bank.id][key]===undefined){const d=index.resolve(key,bank.target);f.values[bank.id][key]=d.vtype==='Range'?42:d.values.arrayExt.find(v=>v.visible&&v.active).value;}
   });
-  const op=f.operations.length,writes=f.writes.length;
+  const before=e.snapshot(),op=f.operations.length,writes=f.writes.length;
   const result=await e.command({action:'include_native_catalog',revision:e.status().revision});
-  assert(result.added_banks>100,'Native scope is no longer bounded by the 100-bank curated collection');
-  assert.equal(result.editor_api,8);assert.equal(f.writes.slice(writes).filter(v=>v==='profiles').length,1);
-  assert(f.operations.slice(op).every(o=>o.action==='read'),'Catalog enrollment never writes native values');
-  for(const old of before.document.banks){const next=e.snapshot().document.banks.find(b=>b.id===old.id);for(const [k,v] of Object.entries(old.settings))assert.deepEqual(next.settings[k],v);assert.deepEqual(next.variants,old.variants);assert.equal(next.brightness_role,old.brightness_role);}
-  assert.equal(e.snapshot().overrides.movie.color,54,'Enrollment preserves current temporary adjustments');
-  const all=view.records(e.snapshot()),options=view.options(all);
-  for(const preset of ['expert1','expert2','normal','hdrCinemaBright','dolbyHdrGame'])assert(options.preset.includes(preset));
-  assert(!options.preset.includes('hdrCinema'),'A hidden native preset is not invented from its recognized ID');
-  assert.deepEqual(options.port,['hdmi1','hdmi2','hdmi3','hdmi4']);assert.deepEqual(options.input_type,['video','pc']);assert(options.genre.includes('FPS'));
-  const sdrGames=all.filter(r=>r.bank.target.dimension.gameGenre&&r.format==='sdr');
-  assert(sdrGames.every(r=>r.preset==='game'&&r.family==='game'),'The stored Game bank does not depend on a movie preset mapping');
-  assert(all.filter(r=>r.bank.target.dimension.pictureMode).every(r=>r.signals.length===2),'Picture banks are shared across ALLM');
-  const writesAfter=f.writes.length,opsAfter=f.operations.length;
-  const again=await e.command({action:'include_native_catalog',revision:e.status().revision});
-  assert.equal(again.added_settings,0);assert.equal(f.writes.length,writesAfter);assert.equal(f.operations.length,opsAfter,'Repeated discovery needs no value reads when the catalog is complete');
+  assert(result.catalog.length>100);assert.equal(result.editor_api,9);
+  assert.equal(f.writes.length,writes,'Discovery never writes bridge storage');assert.equal(f.operations.length,op,'Discovery reads metadata, not values');
+  assert.deepEqual(e.snapshot().document,before.document,'Browsing never enrolls standards');
+  const virtual={...e.snapshot(),document:{...e.snapshot().document,banks:result.catalog}};
+  const all=view.records(virtual),opts=view.options(all);
+  for(const preset of ['expert1','expert2','normal','hdrCinemaBright','dolbyHdrGame'])assert(opts.preset.includes(preset));
+  assert(!opts.preset.includes('hdrCinema'));assert.deepEqual(opts.port,['hdmi1','hdmi2','hdmi3','hdmi4']);assert(opts.genre.includes('FPS'));
+  const target=result.catalog.find(b=>b.target.dimension.pictureMode==='expert1'&&b.target.dimension.input==='hdmi1'&&!b.target.app_id);
+  await e.command({action:'inspect',bank_id:target.id});
+  assert.equal(f.writes.length,writes,'Inspecting unused presets never writes persistent storage');
+  const edit=(settings,variant='standard',expected={backlight:42,color:42})=>({bank_id:target.id,settings,variant,expected});
+  const batch=edits=>e.command({action:'edit_many',revision:e.status().revision,edits});
+  await assert.rejects(batch([edit({backlight:51},'standard',{backlight:41})]),/Native values changed/);
+  await assert.rejects(batch([edit({backlight:51}),edit({color:101})]),/range/);
+  assert.equal(f.values[target.id].backlight,42);assert.equal(f.writes.length,writes,'Validation is all-or-nothing');
+  await batch([edit({backlight:51})]);await e.idle();
+  assert.equal(f.values[target.id].backlight,51);assert.deepEqual(e.snapshot().document,before.document);
+  assert.equal(f.writes.slice(writes).filter(v=>v==='profiles').length,0,'Native Base saves do not grow or rewrite the managed collection');
+  const created=await e.command({action:'create_profile',name:'Evening',revision:e.status().revision});await e.idle();
+  await batch([edit({backlight:61},created.profile_id,{backlight:51})]);await e.idle();
+  let bank=e.snapshot().document.banks.find(b=>b.id===target.id);
+  assert.deepEqual(bank.settings,{backlight:51});assert.deepEqual(bank.variants,{[created.profile_id]:{backlight:61}},'First overlay captures only its one baseline');
+  assert.equal(f.values[target.id].backlight,51,'Editing an inactive profile does not apply it');
+  await e.command({action:'apply_profile',profile_id:created.profile_id});await e.idle();assert.equal(f.values[target.id].backlight,61);
+  await e.command({action:'apply_profile',profile_id:'automatic'});await e.idle();assert.equal(f.values[target.id].backlight,51);
+  // Persistence failures leave a bounded native-write intent, not new standards.
+  let fail=true;f.hook((command,b)=>{if(!f.values[b.id])f.values[b.id]={};if(command.action==='read')for(const key of b.keys)if(f.values[b.id][key]===undefined){const d=index.resolve(key,b.target);f.values[b.id][key]=d.vtype==='Range'?42:d.values.arrayExt.find(v=>v.visible&&v.active).value;}if(command.action==='apply'&&b.id===target.id&&fail){fail=false;throw new Error('Lost native connection');}});
+  await assert.rejects(batch([edit({color:53})]),/Lost native/);
+  assert(f.files['profile-session'].native.length);assert(!Object.hasOwn(e.snapshot().document.banks.find(b=>b.id===target.id).settings,'color'));
+  e.stop();e=f.create();e.setPower('on');await e.idle();
+  assert.equal(f.values[target.id].color,53,'A process restart completes a compared native edit');assert(!f.files['profile-session'].native);
+  await e.command({action:'capture_native'});
+  const full=await e.command({action:'backup'}),decoded=model.decodeBackup(full);
+  assert(decoded.native_snapshot.document.banks.length>100);assert(decoded.document.banks.length<10);
+  assert.equal(decoded.native_snapshot.document.banks.find(b=>b.id===target.id).settings.color,53);
+  const rev=e.status().revision;f.values[target.id].color=54;
+  await e.command({action:'restore_backup',revision:rev,backup:full});await e.idle();
+  assert.equal(f.values[target.id].color,53,'Complete backup restores native-only values');assert.deepEqual(e.snapshot().document,decoded.document,'Restoring the full backup does not enroll native-only settings');
+  // Explicit compaction preserves overlays, links, originals, and temporary keys.
+  const backup=await e.command({action:'backup'}),state=model.decodeBackup(backup);e.acknowledge({...state,sha256:backup.sha256});
+  const keep=Object.fromEntries(before.document.banks.map(b=>[b.id,Object.keys(b.settings)]));
+  const nativeOps=f.operations.length;
+  await e.command({action:'compact_management',revision:e.status().revision,keep});
+  assert(e.snapshot().document.banks.some(b=>b.id===target.id),'An override keeps its baseline even if omitted from keep');
+  assert.equal(f.operations.length,nativeOps,'Compaction does not change native values');
   await assert.rejects(e.command({action:'inspect_many',bank_ids:Array(33).fill('movie')}),/1–32/);
-  const inspected=await e.command({action:'inspect_many',bank_ids:['movie','mapping']});assert.equal(inspected.banks.length,2);
-  await assert.rejects(e.command({action:'include_native_catalog',revision:0}),/refresh/);
   assert.throws(()=>native.plan(doc,index,['hdmi5']),/valid native HDMI/);
-  // A failed read must not commit partial discovery.
-  const failure=fixture(doc,{nativeDescriptions:index}),failed=failure.create();failed.setPower('on');await failed.idle();
-  await failed.command({action:'initialize',document:doc,enabled:true,migration_id:'failure-test'});
-  const original=failed.snapshot().document;failure.hook(()=>{throw new Error('Lost native connection');});
-  await assert.rejects(failed.command({action:'include_native_catalog',revision:failed.status().revision}),/Lost/);assert.deepEqual(failed.snapshot().document,original);
-  // Model recognition alone must never override an explicit native denial.
-  const bank={id:'hidden',target:{category:'picture',dimension:{input:'hdmi3',pictureMode:'hdrCinema'}},settings:{backlight:50}};
-  const d=description('backlight',bank.target),preset=index.resolve('pictureMode',{category:'picture',dimension:{input:'hdmi3',dynamicRange:'hdr'}});
-  assert.equal(availability.describe('backlight',bank,{factory:d,value:50,preset},{reviewed:true,values:b=>b.settings}).editable,false);
-  const newGame={id:'unused_game',target:{category:'other',dimension:{gameInput:'hdmi3',dynamicRange:'sdr',gameGenre:'FPS'}},settings:{gameColorDepth:42}};
-  const gameInfo={factory:description('gameColorDepth',newGame.target),value:42};
-  const gameOptions={reviewed:true,document:e.snapshot().document,values:b=>b.settings};
-  assert.equal(availability.describe('gameColorDepth',newGame,gameInfo,gameOptions).editable,true,'A native Game genre remains editable while that signal maps to Filmmaker');
-  assert.throws(()=>availability.assertEditable('backlight',101,{...bank,target:{category:'picture',dimension:{input:'hdmi3',pictureMode:'hdrCinemaBright'}}},{settings:{backlight:50},factory_descriptions:{backlight:d}},gameOptions),/range/,'New presets retain native numeric bounds');
-  assert(model.validate(e.snapshot().document));e.stop();failed.stop();
+  const hidden={id:'hidden',target:{category:'picture',dimension:{input:'hdmi3',pictureMode:'hdrCinema'}},settings:{backlight:50}};
+  const d=description('backlight',hidden.target),preset=index.resolve('pictureMode',{category:'picture',dimension:{input:'hdmi3',dynamicRange:'hdr'}});
+  assert.equal(availability.describe('backlight',hidden,{factory:d,value:50,preset},{reviewed:true,values:b=>b.settings}).editable,false);
+  const expanded=model.clone(e.snapshot().document);
+  for(const nativeBank of decoded.native_snapshot.document.banks) {
+    const managed=expanded.banks.find(b=>b.id===nativeBank.id);
+    if(managed)managed.settings={...nativeBank.settings,...managed.settings};else expanded.banks.push(model.clone(nativeBank));
+  }
+  const migration=fixture(expanded,{nativeDescriptions:index}),m=migration.create();m.setPower('on');await m.idle();
+  await m.command({action:'initialize',document:expanded,enabled:true,migration_id:'expanded-release'});
+  const adjusted=expanded.banks.find(b=>b.target.dimension.input==='hdmi2'&&b.target.dimension.pictureMode==='expert2'&&!b.target.app_id);
+  migration.observe(m,adjusted.id,'color',60);
+  await m.command({action:'capture_native'});const archive=await m.command({action:'backup'}),archiveState=model.decodeBackup(archive);
+  m.acknowledge({...archiveState,sha256:archive.sha256});const nativeBefore=model.clone(migration.values),opsBefore=migration.operations.length;
+  await m.command({action:'compact_management',revision:m.status().revision,keep});
+  assert(m.snapshot().document.banks.length<10,'Compaction removes the copied native collection');
+  assert.deepEqual(migration.values,nativeBefore);assert.equal(migration.operations.length,opsBefore);
+  assert.deepEqual(m.snapshot().document.banks.find(b=>b.id===adjusted.id).settings,{color:42},'Temporary native deviations retain only their required original baseline');
+  assert.deepEqual(m.snapshot().document.banks.find(b=>b.id===target.id).settings,{backlight:51},'Overlay baselines survive while their copied siblings are removed');
+  m.stop();
+  e.stop();
 };

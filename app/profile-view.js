@@ -127,6 +127,7 @@
           gameKeys[key]?'picture':d.gameGenre||['gameGenre','inputOptimization'].includes(key)?'game':'port';
         const preference=key==='backlight'&&bank.brightness_role?(doc.schema===2?variant+'/'+bank.brightness_role:bank.brightness_role==='game_sdr'?'game_sdr':variant==='standard'?null:'movie_'+variant):null;
         result.push({id:bank.id+':'+key,bank,key,alias:gameKeys[key]||key,category,port,format:family,preset,
+          managed:!bank.managed_keys||bank.managed_keys.includes(key),
           input_type:d.input?(/_pc$/.test(d.input)?'pc':'video'):null,
           family:d.gameGenre?'game':preset?presetFamily(preset):d.dynamicRange?presetFamily(values(bank,state,variant).pictureMode):null,
           genre:d.gameGenre||null,signals:signals.length?signals:['off','on'],devices:deviceIds,
@@ -201,13 +202,18 @@
   }
   function partition(all,live) {
     const visible=[],excluded=[];
+    const sharedStatus=new Map();
+    for(const r of all)if(r.preference) {
+      const status=applicability(r,live),prior=sharedStatus.get(r.preference);
+      if(!prior||prior.editable||prior.state==='pending'&&!status.editable&&status.state!=='pending')sharedStatus.set(r.preference,status);
+    }
     for(const record of all) {
       let status=applicability(record,live);
       if(record.preference) {
-        const shared=all.filter(r=>r.preference===record.preference).map(r=>applicability(r,live));
-        const blocked=shared.find(a=>!a.editable&&a.state!=='pending');
+        const shared=sharedStatus.get(record.preference);
+        const blocked=shared&&!shared.editable&&shared.state!=='pending'?shared:null;
         if(blocked)status={...blocked,reason:'Shared brightness affects another profile: '+blocked.reason};
-        else if(shared.some(a=>a.state==='pending'))status={state:'pending',editable:false,reason:'Checking all profiles affected by shared brightness…'};
+        else if(shared&&shared.state==='pending')status={state:'pending',editable:false,reason:'Checking all profiles affected by shared brightness…'};
       }
       if(status.editable||status.state==='pending')visible.push({...record,availability:status});
       else excluded.push({...record,availability:status});

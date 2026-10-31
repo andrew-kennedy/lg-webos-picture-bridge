@@ -25,7 +25,7 @@ function fixture(collection = doc, extra = {}) {
           {dataType:'int',vtype:'Range',values:{range:{min:0,max:100,interval:1}}}:
           {dataType:'string',vtype:'ArrayExt',values:{arrayExt:['off','on','filmMaker','game','hdrGame','hdrFilmMaker','dolbyHdrCinema','dolbyHdrCinemaBright','dolbyHdrGame'].map(value=>({value,visible:true,active:true}))}})}));
         if (descriptionHook) descriptionHook(bank,descriptions);
-        return {settings:clone(values[bank.id]),descriptions,factory_descriptions:Object.fromEntries(descriptions.map(d=>[d.key,d]))};
+        return {id:bank.id,settings:clone(values[bank.id]),descriptions,factory_descriptions:Object.fromEntries(descriptions.map(d=>[d.key,d]))};
       },
       runBanks:async (command,guard) => {
         guard(); operations.push(clone(command));

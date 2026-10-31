@@ -42,7 +42,7 @@ function validate(document) {
   if (!plain(devices) || Object.keys(devices).length > 20 || Object.keys(devices).some(k =>
     !/^[a-z][a-z0-9_]{0,39}$/.test(k) || ['constructor','prototype','__proto__'].includes(k) ||
     typeof devices[k] !== 'string' || devices[k].length > 80)) fail('Invalid device names');
-  if (!Array.isArray(document.banks) || !document.banks.length || document.banks.length > 768) fail('Expected 1–768 native banks');
+  if (!Array.isArray(document.banks) || document.schema===1&&!document.banks.length || document.banks.length > 768) fail('Expected up to 768 native banks');
   for (const bank of document.banks) {
     fields(bank, ['id','name','devices','target','settings','variants','brightness_role']);
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(bank.id || '') || ['constructor','prototype','__proto__'].includes(bank.id) || ids.has(bank.id)) fail('Bank IDs must be unique');
@@ -111,6 +111,12 @@ function decodeBackup(envelope) {
   const state = JSON.parse(envelope.state_json);
   if (state.schema !== 1 || !Number.isSafeInteger(state.revision) || state.revision < 1) fail('Invalid backup state');
   validate(state.document); preferences(state.preferences); scopedValues(state.document,state.overrides || {});
+  if(state.native_snapshot) {
+    fields(state.native_snapshot,['captured_at','updated_at','document']);
+    if(!Number.isFinite(Date.parse(state.native_snapshot.captured_at))||!Number.isFinite(Date.parse(state.native_snapshot.updated_at))||state.native_snapshot.document.schema!==1)fail('Invalid native snapshot');
+    validate(state.native_snapshot.document);
+    if(state.native_snapshot.document.banks.some(b=>b.variants||b.brightness_role))fail('Native snapshot must contain values, not profile policy');
+  }
   if(state.document.schema===2&&state.selection!==undefined&&state.selection!=='automatic'&&!catalog.valid(state.document,state.selection))fail('Invalid selected profile');
   return state;
 }

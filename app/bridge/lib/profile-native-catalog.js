@@ -1,8 +1,7 @@
 'use strict';
 
-// Discover storage identities from the model's native declarations. This is
-// enrollment, not a picture recipe: existing native values become Base and no
-// setting is written. Availability is still checked separately for every edit.
+// The browser catalog describes storage, not ownership. Enumerating it never
+// reads values, enrolls standards or writes LG settings.
 const crypto=require('crypto');
 const banks=require('./profile-banks');
 const view=require('../../profile-view');
@@ -12,14 +11,14 @@ const visible=d=>d&&d.ui&&d.ui.visible===true&&d.ui.active===true;
 const choices=d=>visible(d)?(d.values&&d.values.arrayExt||[]).filter(v=>v.visible===true&&v.active===true).map(v=>v.value):[];
 const omitted=new Set(['motionEyeCare','aiHdrRemastering','ambientLightCompensation']);
 
-function plan(document,index,inputs) {
+function plan(document,index,inputs,all=false) {
   inputs=inputs||[1,2,3,4].flatMap(n=>['hdmi'+n,'hdmi'+n+'_pc']);
   if(!Array.isArray(inputs)||!inputs.length||inputs.length>8||new Set(inputs).size!==inputs.length||inputs.some(v=>!/^hdmi[1-4](_pc)?$/.test(v)))throw new Error('Choose valid native HDMI input identities');
   const result=[],seen=new Set();
   function add(target,keys,name) {
     const identity=canonical(target);if(seen.has(identity))return;seen.add(identity);
     const existing=document.banks.find(b=>canonical(b.target)===identity);
-    const missing=keys.filter(k=>!existing||!Object.hasOwn(existing.settings,k)).filter(k=>index.resolve(k,target));
+    const missing=keys.filter(k=>all||!existing||!Object.hasOwn(existing.settings,k)).filter(k=>index.resolve(k,target));
     if(!missing.length)return;
     const port=(target.dimension.input||target.dimension.gameInput).replace(/_pc$/,'');
     const peers=document.banks.filter(b=>(b.target.dimension.input||b.target.dimension.gameInput||'').replace(/_pc$/,'')===port);
@@ -52,23 +51,9 @@ function plan(document,index,inputs) {
   return result;
 }
 
-async function expand(document,read,guard,options={}) {
+async function discover(document,options={}) {
   const index=options.index||await descriptions.load(banks.descriptionKeys);
   if(!index.size())throw new Error('The TV did not supply its native preset catalog');
-  const candidate=JSON.parse(JSON.stringify(document)),pending=plan(document,index,options.inputs);
-  let added=0,settings=0;
-  for(let offset=0;offset<pending.length;offset+=8) {
-    guard();const chunk=pending.slice(offset,offset+8);
-    const result=await read({action:'read',banks:chunk.map(p=>({id:p.bank.id,target:p.bank.target,keys:p.keys}))});
-    guard();
-    for(const item of chunk) {
-      const values=result.banks.find(b=>b.id===item.bank.id);
-      if(!values||item.keys.some(k=>values.settings[k]===undefined))throw new Error('Incomplete native catalog read');
-      let bank=candidate.banks.find(b=>b.id===item.bank.id);
-      if(!bank){bank=JSON.parse(JSON.stringify(item.bank));candidate.banks.push(bank);added++;}
-      for(const key of item.keys){bank.settings[key]=values.settings[key];settings++;}
-    }
-  }
-  return {document:candidate,added_banks:added,added_settings:settings};
+  return plan(document,index,options.inputs,true).map(({bank,keys})=>({id:bank.id,name:bank.name,devices:bank.devices||[],target:bank.target,settings:Object.fromEntries(keys.map(k=>[k,null]))}));
 }
-module.exports={plan,expand};
+module.exports={plan,discover};
