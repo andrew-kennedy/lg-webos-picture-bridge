@@ -99,6 +99,7 @@ async function mount(page,state,options={}) {
   await page.setContent('<style>html,body{height:100%;margin:0}lg-profile-editor{height:100%}</style><lg-profile-editor></lg-profile-editor>');
   for(const file of ['profile-view.js','profile-editor.js'])await page.addScriptTag({path:path.join(appRoot,file)});
   await page.evaluate(setup,state);
-  await page.evaluate(options=>document.querySelector('lg-profile-editor').configure({...options,request:window.requestProfile}),options);
+  // A deferred mount lets a test wrap the transport before the first request.
+  if(!options.deferred)await page.evaluate(options=>document.querySelector('lg-profile-editor').configure({...options,request:window.requestProfile}),options);
 }
 module.exports={setup,mount};

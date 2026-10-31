@@ -2,6 +2,7 @@
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 const {mount}=require('./fixtures/editor-host.cjs');
+const {actions}=require('./fixtures/editor-actions.cjs');
 const fixture=require('./fixtures/profile-formats.cjs');
 const catalog=require('../app/bridge/lib/profile-catalog');
 (async()=>{
@@ -14,75 +15,80 @@ const catalog=require('../app/bridge/lib/profile-catalog');
     initial.document.banks.find(b=>b.id==='movie_filmMaker').variants={dark:{color:50}};
     initial.document.banks.find(b=>b.id==='movie_hdrFilmMaker').variants={dark:{color:60}};
     await mount(page,initial,{tvRemote:true});
-    const button=name=>page.getByRole('button',{name,exact:true}),saved=()=>page.getByText('Saved on the TV.',{exact:false}).waitFor();
-    await page.evaluate(async()=>{const e=document.querySelector('lg-profile-editor');e.scope={port:['hdmi3'],format:['sdr','hdr'],family:['movie']};await e.refresh(true);});
-    await button('Edit profile').click();
-    await page.getByRole('spinbutton',{name:'Color depth · SDR',exact:true}).waitFor();
-    const inspections=await page.evaluate(()=>window.calls.filter(c=>c.action==='inspect').length);
-    await button('Show only overrides').click();
-    assert.equal(await page.getByRole('spinbutton',{name:'OLED pixel brightness · HDR',exact:true}).count(),0);
-    assert.equal(await page.getByRole('spinbutton',{name:'Color depth · SDR',exact:true}).inputValue(),'50','Equal-valued pins are shown');
-    assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.action==='inspect').length),inspections,'Filtering reuses cached descriptions');
-    assert.equal(await page.evaluate(()=>window.calls.filter(c=>c.action==='edit_many').length),0,'Filtering is read-only');
-    await button('Remove override for Color depth · SDR').focus();await page.keyboard.press('Enter');
+    const a=actions(page),{q,button}=a,drafts=()=>page.evaluate(()=>Object.keys(document.querySelector('lg-profile-editor').draft).length);
+    const refresh=fn=>page.evaluate(fn);
+    await a.focusKey('edit:standard').waitFor();await a.target({inputs:['hdmi3'],presets:['filmMaker']});
+    await a.focusKey('edit:dark').click();await a.open('color');
+    const inspections=(await a.calls('inspect')).length;
+    await a.focusKey('only-overrides').click();
+    assert(await a.setting('color').isVisible());assert(await a.setting('backlight').isVisible(),'Dark overrides SDR movie brightness');
+    assert.equal(await a.setting('contrast').count(),0,'Settings without overrides are hidden');
+    assert.equal(await a.number('color').inputValue(),'50','Equal-valued pins are shown');
+    assert.equal((await a.calls('inspect')).length,inspections,'Filtering reuses cached descriptions');
+    assert.equal((await a.calls('edit_many')).length,0,'Filtering is read-only');
+    await button('Remove override for Color depth').focus();await page.keyboard.press('Enter');
     assert.equal(await page.evaluate(()=>Object.values(document.querySelector('lg-profile-editor').draft)[0].inherit),true);
     await button('Review 1 changes').click();assert(await page.getByText('50 → Base: 50',{exact:true}).isVisible());
-    await page.evaluate(()=>{window.failNextBatch='before';});await button('Save Dark room overrides').click();
+    await refresh(()=>{window.failNextBatch='before';});await button('Save Dark room overrides').click();
     await page.getByText(/Unsaved drafts remain/).waitFor();
-    assert.equal(await page.evaluate(()=>Object.keys(document.querySelector('lg-profile-editor').draft).length),1,'Equal-value reset is not mistaken for a successful save');
+    assert.equal(await drafts(),1,'Equal-value reset is not mistaken for a successful save');
     await button('Review against latest').click();assert(await page.getByText('50 → Base: 50',{exact:true}).isVisible());
-    await page.evaluate(()=>{window.failNextBatch='after';});await button('Save Dark room overrides').click();
+    await refresh(()=>{window.failNextBatch='after';});await button('Save Dark room overrides').click();
     await page.getByText('Reply lost',{exact:true}).waitFor();
-    assert.equal(await page.evaluate(()=>Object.keys(document.querySelector('lg-profile-editor').draft).length),0,'Lost reply reconciles membership, not just numbers');
-    assert.equal(await page.getByRole('spinbutton',{name:'Color depth · SDR',exact:true}).count(),0);
+    assert.equal(await drafts(),0,'Lost reply reconciles membership, not just numbers');
+    assert(await a.setting('color').isVisible(),'Only-overrides lists everything the profile changes, here HDR Filmmaker');
+    assert.doesNotMatch(await a.cell('hdmi3','filmMaker').getAttribute('aria-label'),/override in Dark room/,'SDR Filmmaker follows Base again');
+    assert.match(await a.cell('hdmi3','hdrFilmMaker').getAttribute('aria-label'),/override in Dark room/);
     assert.equal(await page.evaluate(()=>window.fixture.document.profiles.find(p=>p.id==='dark').brightness.movie_sdr),3,'Single reset keeps other overrides');
-    // A grouped control resets each native value to its distinct base.
-    await page.evaluate(async()=>{
+    // One action resets each native value to its own Base.
+    await refresh(async()=>{
       const e=document.querySelector('lg-profile-editor'),banks=window.fixture.document.banks;
       const sdr=banks.find(b=>b.id==='movie_filmMaker'),hdr=banks.find(b=>b.id==='movie_hdrFilmMaker');
       sdr.settings.color=51;sdr.variants={dark:{color:55}};hdr.settings.color=48;
-      window.fixture.revision++;e.split=[];await e.refresh(true);
+      window.fixture.revision++;e.target.presets=['filmMaker','hdrFilmMaker'];await e.refresh(true);
     });
-    await button('Remove override for Color depth · All selected values').click();
-    await button('Remove override for OLED pixel brightness · Linked SDR movie values').click();
+    await a.open('color');await button('Remove override for Color depth').click();
+    await a.open('backlight');await button('Remove override for OLED pixel brightness').click();
     await button('Review 3 changes').click();
     for(const text of ['55 → Base: 51','60 → Base: 48','3 → Base: 3'])assert(await page.getByText(text,{exact:true}).isVisible());
-    await button('Save Dark room overrides').click();await saved();
-    assert(await page.getByText(/^No overrides in this selection/).isVisible());
-    const edits=await page.evaluate(()=>window.calls.filter(c=>c.action==='edit_many').at(-1).edits);
+    await button('Save Dark room overrides').click();await a.saved();
+    assert.deepEqual(await q('.list .item').evaluateAll(n=>n.map(i=>i.dataset.focus)),['setting:pictureMode'],'Only the Dolby Vision preset mapping override remains');
+    const edits=(await a.calls('edit_many')).at(-1).edits;
     assert.deepEqual(edits.map(e=>[e.bank_id,e.inherit]),[['movie_filmMaker',['color','backlight']],['movie_hdrFilmMaker',['color']]]);
-    await button('Show only overrides').click();
-    const color=page.getByRole('spinbutton',{name:'Color depth · All selected values',exact:true});
-    assert.equal(await color.inputValue(),'','Different inherited Base values remain Mixed');
+    await a.focusKey('only-overrides').click();await a.open('color');
+    assert.equal(await a.number('color').inputValue(),'','Different inherited Base values remain Mixed');
     // A pending reset re-reviews the latest Base, never pins its old number.
-    await page.evaluate(async()=>{const b=window.fixture.document.banks.find(b=>b.id==='movie_filmMaker');b.variants={dark:{color:55}};window.fixture.revision++;const e=document.querySelector('lg-profile-editor');e.scope.format=['sdr'];e.split=['format'];await e.refresh(true);});
-    await button('Remove override for Color depth · SDR').click();
-    await page.evaluate(async()=>{window.fixture.document.banks.find(b=>b.id==='movie_filmMaker').settings.color=53;window.fixture.revision++;await document.querySelector('lg-profile-editor').refresh();});
+    await refresh(async()=>{const b=window.fixture.document.banks.find(b=>b.id==='movie_filmMaker');b.variants={dark:{color:55}};window.fixture.revision++;const e=document.querySelector('lg-profile-editor');e.target.presets=['filmMaker'];await e.refresh(true);});
+    await a.ready();await button('Remove override for Color depth').click();
+    await refresh(async()=>{window.fixture.document.banks.find(b=>b.id==='movie_filmMaker').settings.color=53;window.fixture.revision++;await document.querySelector('lg-profile-editor').refresh();});
     await button('Review against latest').click();assert(await page.getByText('55 → Base: 53',{exact:true}).isVisible());
-    await button('Save Dark room overrides').click();await saved();assert.equal(await page.getByRole('spinbutton',{name:'Color depth · SDR',exact:true}).inputValue(),'53');
-    // A narrow port filter still previews every linked gaming brightness bank.
-    await page.evaluate(async()=>{window.fixture.document.profiles.find(p=>p.id==='dark').brightness.game_sdr=70;window.fixture.revision++;const e=document.querySelector('lg-profile-editor');e.scope={port:['hdmi1'],format:['sdr'],family:['game']};e.onlyOverrides=true;await e.refresh(true);});
-    await button('Remove override for OLED pixel brightness · Linked SDR gaming values').click();await button('Review 1 changes').click();
+    await button('Save Dark room overrides').click();await a.saved();await a.ready();assert.equal(await a.number('color').inputValue(),'53');
+    // Resetting linked gaming brightness from one input previews every linked preset.
+    await refresh(async()=>{window.fixture.document.profiles.find(p=>p.id==='dark').brightness.game_sdr=70;window.fixture.revision++;const e=document.querySelector('lg-profile-editor');e.target={inputs:['hdmi1_pc'],presets:['game'],ranges:null,genres:null,allm:null};e.onlyOverrides=true;await e.refresh(true);});
+    await a.open('backlight');await button('Remove override for OLED pixel brightness').click();await button('Review 1 changes').click();
     assert.equal(await page.evaluate(()=>document.querySelector('lg-profile-editor').review.entries[0].targets.length),3);
-    await button('Save Dark room overrides').click();await saved();assert.equal(await page.evaluate(()=>window.fixture.document.profiles.find(p=>p.id==='dark').brightness.game_sdr),undefined);
-    // Unused overrides remain visible in the excluded list and can be removed.
-    await page.evaluate(async()=>{window.fixture.document.banks.find(b=>b.id==='movie_hdrFilmMaker').variants={dark:{color:59}};window.unavailable={movie_hdrFilmMaker:{color:'Unavailable in this signal'}};window.fixture.revision++;const e=document.querySelector('lg-profile-editor');e.scope={port:['hdmi3'],format:['hdr'],family:['movie']};await e.refresh(true);});
-    await page.locator('[data-focus="excluded-settings"]').click();
-    await button('Remove override for Color depth · HDMI 3 · HDR Filmmaker · Picture').click();await button('Review 1 changes').click();await button('Save Dark room overrides').click();await saved();
-    assert(await page.getByText(/^No overrides in this selection/).isVisible());
-    // Read-only / older bridge views cannot submit an unsupported reset.
-    await page.evaluate(async()=>{window.editorApi=6;window.unavailable={};window.fixture.document.banks.find(b=>b.id==='movie_hdrFilmMaker').variants={dark:{color:59}};window.fixture.revision++;await document.querySelector('lg-profile-editor').refresh(true);});
-    assert(await button('Remove override for Color depth · HDR').isDisabled());
-    await page.evaluate(async()=>{window.editorApi=7;window.offline=true;await document.querySelector('lg-profile-editor').refresh();});
-    assert(await button('Remove override for Color depth · HDR').isDisabled());assert(await button('Show only overrides').isEnabled());
-    await page.evaluate(async()=>{window.offline=false;await document.querySelector('lg-profile-editor').refresh(true);});
-    await button('Edit Base').click();
-    assert.equal(await button('Show only overrides').count(),0);assert.equal(await page.getByRole('button',{name:/^Remove override for/}).count(),0);
-    await button('Edit profile').click();
+    await button('Save Dark room overrides').click();await a.saved();
+    assert.equal(await page.evaluate(()=>window.fixture.document.profiles.find(p=>p.id==='dark').brightness.game_sdr),undefined);
+    // An override on a target LG no longer uses can still be removed.
+    await refresh(async()=>{window.fixture.document.banks.find(b=>b.id==='movie_hdrFilmMaker').variants={dark:{color:59}};window.unavailable={movie_hdrFilmMaker:{color:'Unavailable in this signal'}};window.fixture.revision++;const e=document.querySelector('lg-profile-editor');e.target={inputs:['hdmi3'],presets:['hdrFilmMaker'],ranges:null,genres:null,allm:null};e.setting='color';await e.refresh(true);});
+    await a.ready();assert.equal(await a.number('color').count(),0,'No value control for an excluded target');
+    await a.focusKey('excluded-settings').click();assert(await page.getByText(/Saved override: 59 · Base: 48/).isVisible());
+    await button('Remove override for Color depth').click();await button('Review 1 changes').click();await button('Save Dark room overrides').click();await a.saved();
+    assert.deepEqual(await q('.list .item').evaluateAll(n=>n.map(i=>i.dataset.focus)),['setting:pictureMode'],'Only the Dolby Vision preset mapping override remains');
+    // Read-only and older bridge views cannot submit an unsupported reset.
+    await refresh(async()=>{window.editorApi=6;window.unavailable={};window.fixture.document.banks.find(b=>b.id==='movie_hdrFilmMaker').variants={dark:{color:59}};window.fixture.revision++;await document.querySelector('lg-profile-editor').refresh(true);});
+    await a.ready();assert(await button('Remove override for Color depth').isDisabled());
+    await refresh(async()=>{window.editorApi=7;window.offline=true;await document.querySelector('lg-profile-editor').refresh();});
+    assert(await button('Remove override for Color depth').isDisabled());assert(await a.focusKey('only-overrides').isEnabled());
+    await refresh(async()=>{window.offline=false;await document.querySelector('lg-profile-editor').refresh(true);});
+    await a.focusKey('edit:standard').click();
+    assert.equal(await a.focusKey('only-overrides').count(),0);assert.equal(await page.getByRole('button',{name:/^Remove override for/}).count(),0);
+    await a.focusKey('edit:dark').click();await a.ready();
     for(const width of [1920,1280,390,320]) {
       await page.setViewportSize({width,height:width>=1000?720:844});
-      await button('Remove override for Color depth · HDR').scrollIntoViewIfNeeded();
-      assert(await page.evaluate(()=>{const body=document.querySelector('lg-profile-editor').shadowRoot.querySelector('.body');return document.documentElement.scrollWidth<=innerWidth&&body.scrollWidth<=body.clientWidth;}),'No horizontal overflow at '+width);
+      if(width<700&&await a.setting('color').isVisible())await a.open('color');
+      await button('Remove override for Color depth').scrollIntoViewIfNeeded();
+      await a.noOverflow(width);
       await page.screenshot({path:'/tmp/lg-inheritance-'+width+'.png'});
     }
     assert.deepEqual(errors,[]);

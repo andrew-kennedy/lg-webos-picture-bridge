@@ -232,5 +232,59 @@
     if(!Object.keys(selection).length)throw new Error('No managed settings match this scope');
     return selection;
   }
-  return {values,brightness,profileOptions,preferenceValue,isInherited,control,same,inputName,brightnessRole,setBrightnessLink,scopeSelection,modes,families,presetsFor,presetFamily,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition};
+  // Target grid. Every stored value has one row and belongs to one or more
+  // input columns. Picture, motion and preset-selection banks use a native
+  // input identity (hdmi1 or hdmi1_pc). Game Optimizer and connection banks
+  // belong to the physical port, so they appear under each input of that port.
+  const ranges=['sdr','sdrALLM','hdr','hdrALLM','dolbyHdr','dolbyHdrALLM'];
+  const rangeFormat=range=>range.replace(/ALLM$/,'');
+  function coordinates(record) {
+    const d=record.bank.target.dimension;
+    if(record.preset)return {kind:'preset',row:record.preset};
+    if(d.dynamicRange)return {kind:'range',row:d.dynamicRange};
+    return {kind:'port',row:'port'};
+  }
+  function inColumn(record,input) {
+    const d=record.bank.target.dimension;
+    return d.input?d.input===input:physical(input)===record.port;
+  }
+  // A target is the Cartesian product of inputs and rows, narrowed by Game
+  // Optimizer genre and ALLM where those dimensions exist. Unknown rows never
+  // match: a range row cannot select a picture preset or the reverse.
+  function targeted(record,target) {
+    if(!target||!(target.inputs||[]).some(input=>inColumn(record,input)))return false;
+    const {kind,row}=coordinates(record);
+    if(kind==='preset'&&!(target.presets||[]).includes(row))return false;
+    if(kind==='range'&&!rangesFor(target).includes(row))return false;
+    const d=record.bank.target.dimension;
+    if(d.gameGenre&&Array.isArray(target.genres)&&!target.genres.includes(d.gameGenre))return false;
+    if(d.gameGenre&&Array.isArray(target.allm)&&!record.signals.some(v=>target.allm.includes(v)))return false;
+    return true;
+  }
+  // Explicit range rows win. Otherwise follow the selected presets' formats.
+  function rangesFor(target) {
+    if(Array.isArray(target.ranges))return target.ranges;
+    const wanted=new Set((target.presets||[]).map(presetFormat));
+    return ranges.filter(range=>wanted.has(rangeFormat(range)));
+  }
+  // Presets that an input's preset-selection banks recall for any signal, in
+  // Base or any profile. Unknown (unread) mappings contribute nothing.
+  function presetUsage(all) {
+    const usage=new Map();
+    for(const record of all)if(record.key==='pictureMode'&&record.bank.target.dimension.dynamicRange) {
+      const input=record.bank.target.dimension.input,set=usage.get(input)||new Set();
+      for(const value of [record.bank.settings.pictureMode,...Object.values(record.bank.variants||{}).map(v=>v.pictureMode)])if(typeof value==='string'&&modes[value])set.add(value);
+      usage.set(input,set);
+    }
+    return usage;
+  }
+  const shortPreset=mode=>(modes[mode]||mode).replace(/^(SDR|HDR|Dolby Vision) /,'');
+  function rowLabel(kind,row) {
+    if(kind==='preset')return shortPreset(row);
+    if(kind==='range')return /ALLM$/.test(row)?'With ALLM':'Without ALLM';
+    return 'Port-wide';
+  }
+  const rowFormat=(kind,row)=>kind==='preset'?presetFormat(row):kind==='range'?rangeFormat(row):null;
+  return {values,brightness,profileOptions,preferenceValue,isInherited,control,same,inputName,brightnessRole,setBrightnessLink,scopeSelection,modes,families,presetsFor,presetFamily,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition,
+    ranges,coordinates,inColumn,targeted,rangesFor,presetUsage,shortPreset,rowLabel,rowFormat,physical};
 });
