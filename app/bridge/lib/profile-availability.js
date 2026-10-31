@@ -6,6 +6,7 @@
 const fs = require('fs');
 const crypto = require('crypto');
 const controls = require('./settings-controls');
+const rules = require('./profile-rules');
 const clone = value => JSON.parse(JSON.stringify(value));
 const game = mode => /game$/i.test(mode || '');
 const format = d => d.dynamicRange ? d.dynamicRange.replace(/ALLM$/, '') :
@@ -49,7 +50,7 @@ function reviewedPlatform() {
     const env = JSON.parse(fs.readFileSync('/var/luna/preferences/environmentCondition','utf8'));
     const hash = crypto.createHash('sha256').update(fs.readFileSync('/usr/lib/libpqc-ux-plugin.so.1.0.0')).digest('hex');
     platform = {reviewed:hash === reviewedHash && env.panelType === 'OLED' && env.initialPlatformVersion === '11' &&
-      /O26/.test(String(env.boardTypeStr || '')),environment:env};
+      /O26/.test(String(env.boardTypeStr || '')) && env.toolType === 'G6',environment:env};
   } catch (_) { platform = {reviewed:false,environment:{}}; }
   return platform;
 }
@@ -126,30 +127,40 @@ function describe(key, bank, info, options) {
     for (const [group,keys] of Object.entries(groups))
       if (active && keys.has(key) && Object.hasOwn(values,group) && !values[group]) return unavailable('LG has disabled this picture settings group in the current context.');
   }
+  // A standards editor describes the target's supported settings, not only
+  // the controls unlocked by today's signal. Preserve reviewed applicability
+  // across input changes; live flags remain useful context, not a cache reset.
+  const rule = rules.resolve(key,bank.target);
+  if (rule) {
+    if (!rule.editable) return {...unavailable(rule.reason),source:'audited'};
+    const control = {...clone(rule.control),available:true};
+    return {state:'editable',editable:true,source:'audited',control,
+      ...(rule.condition?{condition:rule.condition}:{}),
+      ...(active && info.live && info.live.ui?{current_available:info.live.ui.visible===true && info.live.ui.active===true}:{})};
+  }
   let description = active ? info.live : info.factory;
   if (!description) return unknown('LG applicability has not been verified for this profile.');
-  // The G6 runtime replaces the factory Gamma choices (including whether
-  // adjustable 2.2 is offered). Its dependent fine control needs the same
-  // confirmation; a stored mediumHavingLevel value is not that confirmation.
+  // For targets without a reviewed rule, factory metadata cannot substitute
+  // for the G6's runtime choices or prove that a processing control is used.
+  // A stored mediumHavingLevel value alone does not verify Gamma support.
   if (!active && ['gamma','gammaLevel'].includes(key))
-    return unknown('LG updates Gamma choices at runtime; activate this SDR profile to verify its Gamma controls.');
+    return unknown('Gamma choices have not been audited for this input and preset.');
   // Dolby Vision's HDMI range lock is applied by the native controller, not
   // the factory preset table. Both G6 movie presets were locked live while
   // their inactive factory descriptions still offered an editable range.
   if (!active && key === 'blackLevel' && format(bank.target.dimension) === 'dolbyHdr')
-    return unknown('HDMI Black Level depends on Dolby Vision processing; activate this profile to verify availability.');
-  // Game factory tables still offer processing controls that the runtime
-  // low-latency and Game Optimizer policies disable. The current signal and
-  // matching HDMI app must establish their availability before editing.
+    return unknown('HDMI input range has not been audited for this Dolby Vision profile.');
+  // Game factory tables can offer processing controls disabled by runtime
+  // policy. Unaudited targets still need the matching native context.
   if (!active && game(bank.target.dimension.pictureMode) &&
       ['peakBrightness','dynamicContrast','noiseReduction','mpegNoiseReduction','smoothGradation','truMotionMode'].includes(key))
-    return unknown('Game processing depends on the live signal; activate this profile to verify availability.');
+    return unknown('This processing control has not been audited for this Game Optimizer profile.');
   // Runtime-only controls must be confirmed in the actual target context. A
   // hidden factory baseline is not a reliable hardware-support declaration.
   if (!active && ['dolbyPrecisionDetail','expressionEnhancer','ambientLightCompensation','aiHdrRemastering','motionEyeCare','inputOptimization'].includes(key))
-    return unknown('This control depends on the live signal; activate this profile to verify availability.');
+    return unknown('This signal-dependent control has not been audited for the selected profile.');
   if (!active && /_pc$/.test(bank.target.dimension.input || '') && ['realCinema','truMotionJudder','truMotionBlur'].includes(key))
-    return unknown('PC motion processing depends on the live signal; activate this profile to verify availability.');
+    return unknown('Motion processing has not been audited for this PC profile.');
   if (!description.ui || description.ui.visible !== true || description.ui.active !== true)
     return unavailable(active ? 'LG disables or hides this control for the current signal and settings.' : 'LG does not enable this control in this input and preset.');
   description = clone(description);

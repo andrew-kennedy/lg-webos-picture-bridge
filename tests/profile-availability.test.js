@@ -29,9 +29,9 @@ module.exports = async function () {
   }
   assert.equal(check('gamma','hdrGame','medium').editable,false);
   assert.equal(check('gamma','dolbyHdrCinema','medium').editable,false);
-  assert.equal(check('gamma','filmMaker','medium').state,'unverified','Inactive SDR Gamma cannot inherit stale factory choices');
+  assert.deepEqual(check('gamma','filmMaker','medium').control.options,['high2','mediumHavingLevel'],'Inactive SDR Gamma uses reviewed G6 choices, not the stale factory list');
   assert.equal(check('backlight','filmMaker','medium').editable,true,'Other inactive valid SDR controls must not inherit the active HDR lock');
-  assert.equal(check('gammaLevel','filmMaker',0,{settings:{gamma:'mediumHavingLevel'}}).state,'unverified','A saved adjustable Gamma value does not establish that the inactive profile offers it');
+  assert.equal(check('gammaLevel','filmMaker',0,{settings:{gamma:'mediumHavingLevel'}}).source,'audited','Verified inactive SDR Gamma fine adjustment remains editable');
   assert.equal(check('gammaLevel','filmMaker','medium',{settings:{gamma:'high2'}}).editable,false);
   assert.equal(check('gamma','filmMaker','medium',{options:{reviewed:false}}).state,'unverified');
   for (const key of ['contrast','brightness','sharpness','color']) assert.equal(check(key,'hdrGame','medium').state,'unavailable');
@@ -46,12 +46,13 @@ module.exports = async function () {
     const bank={id:'dv',target:{category:'picture',dimension:{input:'hdmi3',pictureMode:mode}},settings:{blackLevel:{unknown:'auto'}}};
     const inspection={settings:bank.settings,factory_descriptions:{blackLevel}};
     const options={reviewed:true,document:{banks:[bank]},values:b=>b.settings};
-    assert.equal(availability.describe('blackLevel',bank,{factory:blackLevel,value:bank.settings.blackLevel},options).state,'unverified','Factory metadata cannot establish an inactive Dolby Vision HDMI range control');
-    assert.throws(()=>availability.assertEditable('blackLevel',{unknown:'high'},bank,inspection,options),/activate this profile/,'Saving and combined edits must reject unverified Dolby Vision HDMI range changes');
+    const audited=mode!=='dolbyHdrGame';
+    assert.equal(availability.describe('blackLevel',bank,{factory:blackLevel,value:bank.settings.blackLevel},options).state,audited?'unavailable':'unverified','Audited Dolby movie locks persist when inactive; an unaudited preset stays unknown');
+    assert.throws(()=>availability.assertEditable('blackLevel',{unknown:'high'},bank,inspection,options),/manages HDMI|not been audited/,'Saving and combined edits reject unsupported or unverified Dolby range changes');
     const context={ready:true,input:'hdmi3',mode,range:'dolbyHdr'};
     const current={dimension:bank.target.dimension,settings:bank.settings};
     assert.equal(availability.describe('blackLevel',bank,{factory:blackLevel,live:{...blackLevel,ui:{visible:true,active:false}},current,value:bank.settings.blackLevel},{...options,context}).state,'unavailable','The active Dolby Vision controller lock overrides permissive factory metadata');
-    assert.equal(availability.describe('blackLevel',bank,{factory:blackLevel,live:blackLevel,current,value:bank.settings.blackLevel},{...options,context}).editable,true,'The inactive-profile guard does not invent a model-wide ban if a future live context permits the control');
+    assert.equal(availability.describe('blackLevel',bank,{factory:blackLevel,live:blackLevel,current,value:bank.settings.blackLevel},{...options,context}).editable,!audited,'Verified Dolby movie rules cannot inherit a permissive runtime/factory table; other presets still use their live context');
   }
   for (const mode of ['filmMaker','hdrFilmMaker','game','hdrGame'])
     assert.equal(check('blackLevel',mode,{unknown:'auto'},{description:blackLevel}).editable,true,'Verified non-Dolby factory HDMI range controls remain available');
@@ -63,18 +64,19 @@ module.exports = async function () {
       const bank={id:'processing',target,settings:{[key]:'off'}};
       const options={reviewed:true,document:{banks:[bank]},values:b=>b.settings};
       const inspection={settings:bank.settings,factory_descriptions:{[key]:description}};
-      assert.equal(availability.describe(key,bank,{factory:description,value:'off'},options).state,'unverified','Inactive Game processing must not use permissive factory choices');
-      assert.throws(()=>availability.assertEditable(key,'on',bank,inspection,options),/activate this profile/,'Single and combined edits must reject unverified Game processing');
+      const audited=mode!=='dolbyHdrGame';
+      assert.equal(availability.describe(key,bank,{factory:description,value:'off'},options).state,audited?'unavailable':'unverified','Known Game exclusions persist when inactive; unaudited profiles remain unverified');
+      assert.throws(()=>availability.assertEditable(key,'on',bank,inspection,options),/does not use|not been audited/,'Single and combined edits reject unsupported or unverified Game processing');
       const current={dimension:target.dimension,settings:bank.settings,...(target.app_id?{app_id:target.app_id}:{})};
       const context={ready:true,input:'hdmi3',mode,range:mode==='game'?'sdrALLM':mode==='hdrGame'?'hdrALLM':'dolbyHdrALLM'};
       const liveOptions={...options,context};
       const info={factory:description,live:{...description,ui:{visible:true,active:false}},current,value:'off'};
       assert.equal(availability.describe(key,bank,info,liveOptions).state,'unavailable','Live Game processing locks remain authoritative');
       info.live=description;
-      assert.equal(availability.describe(key,bank,info,liveOptions).editable,true,'A verified live context may enable processing; the guard is not a permanent Game-mode ban');
+      assert.equal(availability.describe(key,bank,info,liveOptions).editable,!audited,'Audited mode exclusions stay stable; unaudited presets still use live metadata');
       if(target.app_id) {
         info.current={...current,app_id:'com.webos.app.hdmi1'};
-        assert.equal(availability.describe(key,bank,info,liveOptions).state,'unverified','TruMotion requires the matching HDMI application as well as the preset');
+        assert.equal(availability.describe(key,bank,info,liveOptions).state,audited?'unavailable':'unverified','An unrelated live HDMI app cannot replace the target app’s audited rule');
       }
     }
     for(const mode of ['filmMaker','hdrFilmMaker','dolbyHdrCinema','dolbyHdrCinemaBright'])
@@ -82,20 +84,23 @@ module.exports = async function () {
   }
   const port={id:'port',target:{category:'other',dimension:{gameInput:'hdmi1'}},settings:{inputOptimization:'auto'}};
   const portDescription={...base,key:'inputOptimization',dimension:['gameInput'],values:{arrayExt:[{value:'auto',visible:true,active:true},{value:'on',visible:true,active:true}]}};
-  assert.equal(availability.describe('inputOptimization',port,{factory:portDescription,value:'auto'},{reviewed:true,values:b=>b.settings,context:{ready:false}}).state,'unverified','The hidden factory baseline cannot establish a port runtime gaming control');
+  assert.equal(availability.describe('inputOptimization',port,{factory:portDescription,value:'auto'},{reviewed:true,values:b=>b.settings,context:{ready:false}}).source,'audited','The verified gaming port preference remains editable without an active game');
   const active={dimension:{input:'hdmi3',pictureMode:'filmMaker'}};
   const ctx={ready:true,input:'hdmi3',mode:'filmMaker',range:'sdr'};
-  assert.equal(check('gamma','filmMaker','medium',{info:{current:active,live:{...base,ui:{active:false,visible:true}}},options:{context:ctx}}).editable,false,'A live native lock takes precedence over factory rules');
+  const temporarilyLocked=check('gamma','filmMaker','medium',{info:{current:active,live:{...base,ui:{active:false,visible:true}}},options:{context:ctx}});
+  assert.equal(temporarilyLocked.editable,true,'A transient native control flag does not erase verified support for the saved standard');
+  assert.equal(temporarilyLocked.current_available,false,'Current runtime availability is reported separately');
   assert.equal(check('gamma','filmMaker','medium',{info:{current:{...active,settings:{brightnessActive:false}}},options:{context:ctx}}).editable,false,'LG settings-group locks apply even when the individual description is enabled');
   assert.equal(check('gamma','filmMaker','medium',{info:{current:{...active,settings:{isfMode:{filmMaker:'locked'}}}},options:{context:ctx}}).editable,false,'The editor cannot bypass the native calibration lock');
   assert.equal(check('gamma','filmMaker','medium',{info:{current:{...active,settings:{isfMode:{filmMaker:'locked'}}}}}).editable,false,'A preset calibration lock also protects that inactive preset');
-  assert.equal(check('gamma','filmMaker','medium',{info:{current:active},options:{context:{...ctx,ready:false}}}).state,'unverified','A stale or absent signal cannot supply Gamma choices');
+  assert.equal(check('gamma','filmMaker','medium',{info:{current:active},options:{context:{...ctx,ready:false}}}).source,'audited','Inactive standards use durable reviewed choices rather than stale live metadata');
   const currentGamma={...base,values:{arrayExt:['low','medium','high1','high2','mediumHavingLevel'].map(value=>({value,active:true,visible:['high2','mediumHavingLevel'].includes(value)}))}};
   const confirmedGamma=check('gamma','filmMaker','mediumHavingLevel',{info:{current:active,live:currentGamma},options:{context:ctx}});
   assert.deepEqual(confirmedGamma.control.options,['high2','mediumHavingLevel'],'Active Gamma exposes only the choices actually offered by the G6');
   const gammaBank={id:'sdr_movie',target:{category:'picture',dimension:{input:'hdmi3',pictureMode:'filmMaker'}},settings:{gamma:'mediumHavingLevel'}};
-  assert.throws(()=>availability.assertEditable('gamma','medium',gammaBank,{settings:gammaBank.settings,factory_descriptions:{gamma:base}},
-    {reviewed:true,document:{banks:[gammaBank]},values:b=>b.settings}),/activate this SDR profile/,'The save path also rejects unverified factory Gamma choices');
+  const gammaInspection={settings:gammaBank.settings,factory_descriptions:{gamma:base}},gammaOptions={reviewed:true,document:{banks:[gammaBank]},values:b=>b.settings};
+  assert.equal(availability.assertEditable('gamma','mediumHavingLevel',gammaBank,gammaInspection,gammaOptions),'mediumHavingLevel','The save path supports a verified inactive SDR Gamma choice');
+  assert.throws(()=>availability.assertEditable('gamma','medium',gammaBank,gammaInspection,gammaOptions),/unavailable/,'The obsolete factory Gamma choice is still rejected');
   assert.equal(availability.matchesActive({category:'picture',dimension:{input:'hdmi1_pc',pictureMode:'game'}},
     {ready:true,input:'hdmi1',mode:'game',range:'sdr'},{dimension:{input:'hdmi1_pc',pictureMode:'game'}}),false,'PC and ordinary HDMI are distinct native inputs');
   assert.equal(availability.matchesActive({category:'picture',dimension:{input:'hdmi3',pictureMode:'filmMaker'},app_id:'com.webos.app.hdmi3'},
