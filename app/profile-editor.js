@@ -848,6 +848,7 @@
       mark('sel','Selected');if(this.onScreenTarget())mark(this.picture().live?'live':'live last',this.liveLabel(true));
       if(this.profileMode())mark('ovr','Override in '+this.profileName(this.variant));else if(this.schema2()&&(this.state.document.profiles||[]).length)mark('prof','A profile overrides this');
       if(spec.records.some(r=>r.preference))mark('link','Linked SDR brightness');
+      if(t.linked.length)mark('also','Also changes (linked)');
       if(spec.records.some(r=>Object.hasOwn((this.state.overrides||{})[r.bank.id]||{},r.key)))mark('tmp','Temporary on TV');
       mark('na','n/a: LG doesn’t use it');if(spec.kind==='preset')mark('unused','Faded: input doesn’t select this preset');
       host.append(legend);
@@ -1192,7 +1193,7 @@
   .mk{display:inline-block;width:.45em;height:.45em;border-radius:50%;flex:none}
   .mk.live{background:var(--live)}.mk.live.last{background:transparent;border:1.5px solid var(--live)}.mk.ovr{background:var(--profile);border-radius:1px;transform:rotate(45deg)}.mk.prof{border:1.5px solid var(--profile);border-radius:1px;transform:rotate(45deg)}
   .mk.link{width:.8em;height:.2em;border-radius:1px;background:var(--text);margin-top:.12em}.mk.tmp{background:var(--warn)}
-  .legend .mk.sel{width:.9em;height:.9em;border-radius:.2em;border:2px solid var(--accent);background:var(--tint)}
+  .legend .mk.also{width:.9em;height:.9em;border-radius:.2em;border:2px dashed var(--accent)}.mk.sel{width:.9em;height:.9em;border-radius:.2em;border:2px solid var(--accent);background:var(--tint)}
   .legend .mk.na{width:.9em;height:.9em;border-radius:.2em;border:1px solid var(--line);background:repeating-linear-gradient(135deg,transparent 0 2px,rgba(255,255,255,.25) 2px 4px)}
   .legend .mk.unused{width:.9em;height:.9em;border-radius:.2em;border:1px solid var(--line);opacity:.5}
   .legend{display:flex;flex-wrap:wrap;gap:.3em 1em;font-size:.75em;color:var(--muted)}.legend span{display:inline-flex;align-items:center;gap:.4em}

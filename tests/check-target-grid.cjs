@@ -16,6 +16,7 @@ const {actions}=require('./fixtures/editor-actions.cjs');
     // Opens on what the TV is showing, like the native menu, in Base.
     assert.deepEqual((await editor()).target.inputs,['hdmi4']);assert.deepEqual((await editor()).target.presets,['hdrGame']);
     assert.equal(await a.number('backlight').inputValue(),'100');
+    assert.equal(await q('.legend').getByText('Also changes (linked)').count(),0,'Only shown when linked partners change');
     assert(await q('.tv-card').getByText('HDMI 4 · HDR Game · ALLM').isVisible());
     assert(await q('.tv-card').getByText('Using Dark room · Automatic').isVisible());
     assert.equal(await a.focusKey('edit:standard').getAttribute('aria-pressed'),'true');
@@ -78,6 +79,7 @@ const {actions}=require('./fixtures/editor-actions.cjs');
     await a.open('backlight');await a.cell('hdmi1_pc','game').click();await a.ready();
     for(const input of ['hdmi3','hdmi4'])assert.match(await a.cell(input,'game').getAttribute('class'),/\balso\b/);
     assert(await q('.valuebox').getByText(/also changes 2 linked targets/).isVisible());
+    assert(await q('.legend').getByText('Also changes (linked)',{exact:true}).isVisible(),'The legend explains dashed cells');
     await a.number('backlight').fill('75');
     await button('Review 1 changes').click();
     assert.equal(await q('.sheet .targets li').count(),3,'Shared brightness previews every linked preset');
