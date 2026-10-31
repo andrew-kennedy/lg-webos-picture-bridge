@@ -14,6 +14,9 @@ const catalog=require('../app/bridge/lib/profile-catalog');
     await mount(page,initial,{tvRemote:true});
     const button=name=>page.getByRole('button',{name,exact:true});
     await page.evaluate(async()=>{const e=document.querySelector('lg-profile-editor');e.scope={port:['hdmi3'],format:['sdr'],family:['movie']};e.render();await e.inspect();});
+    assert.equal(await button('Edit Base').getAttribute('aria-pressed'),'true','Base is the default even while Dark is the viewing profile');
+    assert.equal(await page.getByRole('combobox',{name:'Profile to edit',exact:true}).count(),0);
+    await button('Edit profile').click();
     assert.equal(await page.getByRole('combobox',{name:'Profile to edit',exact:true}).inputValue(),'dark');
     assert.equal(await page.getByRole('combobox',{name:'Room variant'}).count(),0);
     await page.locator('[data-focus="profile-management"]').focus();await page.keyboard.press('Enter');
@@ -22,11 +25,12 @@ const catalog=require('../app/bridge/lib/profile-catalog');
     await button('New from base').click();await page.getByText('Saved on the TV.',{exact:false}).waitFor();
     const id=await page.getByRole('combobox',{name:'Profile to edit',exact:true}).inputValue();
     assert.match(id,/^p_/);
+    await page.locator('[data-focus="viewing-profile"]').click();
     assert.equal(await page.getByRole('combobox',{name:'Profile to apply',exact:true}).inputValue(),'automatic','Creating/editing never selects a profile');
     const light=page.getByRole('spinbutton',{name:'OLED pixel brightness · Linked SDR movie values',exact:true});
     await light.waitFor();assert.equal(await light.inputValue(),'3','New profile inherits base movie brightness');
     await light.fill('17');await button('Review 1 changes').click();
-    await button('Save standards').click();await page.getByText('Saved on the TV.',{exact:false}).waitFor();
+    await button('Save Evening overrides').click();await page.getByText('Saved on the TV.',{exact:false}).waitFor();
     const saved=await page.evaluate(()=>window.fixture.document.profiles.at(-1));assert.equal(saved.brightness.movie_sdr,17);
     await page.getByRole('combobox',{name:'Profile to apply',exact:true}).selectOption(id);await button('Apply profile').click();await page.getByText('Saved on the TV.',{exact:false}).waitFor();
     assert.equal(await page.evaluate(()=>window.fixture.selection),id);
@@ -40,12 +44,12 @@ const catalog=require('../app/bridge/lib/profile-catalog');
     await page.getByRole('combobox',{name:'Automatic bright room',exact:true}).selectOption(id);await button('Save automatic bindings').click();await page.getByText('Saved on the TV.',{exact:false}).waitFor();
     assert.equal(await page.evaluate(()=>window.fixture.document.automatic.bright),id);
     await button('Delete selected').click();await button('Delete profile').click();await page.getByText('Saved on the TV.',{exact:false}).waitFor();
-    assert.equal(await page.getByRole('combobox',{name:'Profile to edit',exact:true}).inputValue(),'standard');
+    assert.equal(await button('Edit Base').getAttribute('aria-pressed'),'true');
     assert.equal(await light.isEnabled(),true,'Base movie brightness is editable in named collections');
     // Remote arrows reach and leave the new controls without being trapped or
     // trying to stepUp a text input. Closed details must remain out of the path.
     await page.locator('[data-focus="profile-management"]').click();
-    await page.getByRole('combobox',{name:'Profile to edit',exact:true}).focus();
+    await button('Edit Base').focus();
     const visited=new Set();
     for(let i=0;i<65;i++){visited.add(await page.evaluate(()=>document.querySelector('lg-profile-editor').shadowRoot.activeElement.dataset.focus));await page.keyboard.press('ArrowDown');}
     assert(visited.has('profile-apply'));assert(!visited.has('profile-name'));

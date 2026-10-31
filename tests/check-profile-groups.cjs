@@ -114,7 +114,7 @@ const fixture=require('./fixtures/profile-formats.cjs');
     await button('Back to editing').click();await button('Discard edits').click();
     assert.equal(await page.evaluate(()=>window.fixture.document.banks.find(b=>b.id==='pc_sdr').settings.color),13,'Filtering never removes or rewrites existing standards');
     await page.evaluate(async()=>{window.editorApi=2;await document.querySelector('lg-profile-editor').refresh();});
-    assert(await page.getByText('Update LG Picture Bridge to 0.15.0 or newer to verify which controls apply to each profile.',{exact:true}).isVisible());
+    assert(await page.getByText('Update LG Picture Bridge to verify which controls apply.',{exact:true}).isVisible());
     assert(await button('Restore selected').isDisabled(),'An older bridge must never receive unsupported batch writes');
     await page.evaluate(async()=>{window.offline=true;await document.querySelector('lg-profile-editor').refresh();});
     assert(await page.getByText('TV offline · showing saved backup',{exact:true}).isVisible());assert(await button('Restore selected').isDisabled());
