@@ -102,7 +102,7 @@
     restoreScroll(saved) {if(saved)for(const [k,v] of Object.entries(saved)){const n=this.shadowRoot.querySelector('.'+k);if(n)n.scrollTop=v;}}
     captureFocus() {
       const active=this.shadowRoot.activeElement,controls=this.controls(),index=controls.indexOf(active);
-      return index>=0 ? {key:active.dataset.focus,neighbors:controls.slice(index+1).concat(controls.slice(0,index).reverse()).map(n=>n.dataset.focus)} : null;
+      return index>=0 ? {key:active.dataset.focus,neighbors:controls.slice(index+1).concat(controls.slice(0,index).reverse()).map(n=>n.dataset.focus),kept:true} : null;
     }
     restoreFocus(saved) {
       if(!saved || !this.getClientRects().length)return;
@@ -111,7 +111,11 @@
       if(outer && outer!==this && outer!==document.body)return;
       const controls=this.controls(),target=[saved.key,...saved.neighbors].map(key=>controls.find(n=>n.dataset.focus===key)).find(Boolean)||controls[0];
       if(!target)return;
-      target.focus({preventScroll:true});target.scrollIntoView({block:'nearest',inline:'nearest'});
+      target.focus({preventScroll:true});
+      // Keeping focus across a redraw (arriving data) keeps the restored
+      // scroll position, even if the wheel moved the control out of view.
+      // Explicit focus moves and fallbacks to a neighbour are revealed.
+      if(!saved.kept||target.dataset.focus!==saved.key)target.scrollIntoView({block:'nearest',inline:'nearest'});
       this.editing(this.editingKey===target.dataset.focus ? target : null);
     }
     editing(control) {

@@ -45,7 +45,18 @@ const {actions}=require('./fixtures/editor-actions.cjs');
     assert.equal(landed,3,'Every click during loading takes effect');
     await a.ready();
     assert.equal(await page.evaluate(()=>document.querySelector('lg-profile-editor').deferredRender),null,'Deferred redraws ran after release');
+    // Wheel-scrolling the right pane while new rows load keeps its position:
+    // redraws no longer scroll the still-focused chip back into view.
+    await page.evaluate(()=>{const e=document.querySelector('lg-profile-editor');e.allPresets=false;e.renderPanes();});
+    await a.focusKey('grid:all-presets').click();
+    const detail=await q('.detail').boundingBox();
+    await page.mouse.move(detail.x+detail.width/2,detail.y+detail.height/2);await page.mouse.wheel(0,700);
+    await page.waitForFunction(()=>document.querySelector('lg-profile-editor').shadowRoot.querySelector('.detail').scrollTop>=600);
+    const scrolled=await page.evaluate(()=>document.querySelector('lg-profile-editor').shadowRoot.querySelector('.detail').scrollTop);
+    await a.ready();await page.waitForFunction(()=>document.querySelector('lg-profile-editor').inflight.size===0);
+    assert.equal(await page.evaluate(()=>document.querySelector('lg-profile-editor').shadowRoot.querySelector('.detail').scrollTop),scrolled,'Loading never scrolls the right pane back up');
+    assert.equal((await a.focused()).key,'grid:all-presets','Focus is kept without being scrolled into view');
     assert.deepEqual(errors,[]);
-    console.log('TV app header without On TV now, last-picture default and clicks during loading passed.');
+    console.log('TV app header without On TV now, last-picture default, clicks during loading and scroll position during loading passed.');
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exit(1);});
