@@ -46,6 +46,69 @@
     uhdDeepColor:'Enables the HDMI port’s higher-bandwidth 4K signal modes. The source and cable must support the chosen format.',
     pictureMode:'Chooses which LG picture preset is recalled for the selected input and signal format, including its ALLM state. Each preset has its own saved picture values.'
   };
+  // Reviewer recommendations for the G6, kept as notes: nothing here changes
+  // the TV. Values a reviewer measured on their own unit (white balance and
+  // color calibration) are left out. See docs/reviewer-settings.md.
+  const reviewers = {
+    sources:{
+      rtings:{name:'RTINGS',title:'LG G6 OLED calibration settings',date:'Checked 2026-10-31',url:'https://www.rtings.com/tv/reviews/lg/g6-oled/settings',
+        basis:'Tested on a 65-inch G6 and valid for the 55, 77 and 83-inch models. A starting point for a moderately lit room, not meant to be copied 1:1.'},
+      hdtvtest:{name:'HDTVTest',title:'LG G6 OLED Review: New Firmware Changes Everything',date:'2026-05-15',url:'https://www.youtube.com/watch?v=VfD9sOYhDiQ',
+        basis:'Vincent Teoh’s 65-inch G6 on firmware 43.10.69, compared against a Sony BVM-HX3110 mastering monitor.'},
+      hdtvtestC6h:{name:'HDTVTest',title:'LG C6H OLED Review — The 3000-Nit Problem',date:'2026-08-31',url:'https://www.youtube.com/watch?v=5zI1VBpUkTc',
+        basis:'A 77-inch C6H: the same Alpha 11 Gen3 processor and four-stack panel type as the G6, on firmware 43.21.60.'},
+      hdtvtestPs5:{name:'HDTVTest',title:'This TV Setting Is Ruining Your PS5 HDR Calibration',date:'2026-07-31',url:'https://www.youtube.com/watch?v=6h92l5teghw',
+        basis:'Setting up the PS5’s Adjust HDR screens, shown on an LG OLED.'}},
+    sections:[
+      ['SDR movies',[
+        ['rtings','Picture mode FILMMAKER. Contrast 95, Black level 50, Gamma 2.2, Color temperature Warm 40. Other picture settings stay at their defaults.'],
+        ['rtings','Dark room, most accurate: OLED pixel brightness 3 (about 100 nits) or 17 (about 200 nits), with Peak brightness Off.'],
+        ['rtings','For a brighter image: Peak brightness High and OLED pixel brightness 100, adjusted to taste.'],
+        ['hdtvtest','With Energy Saving off, the default OLED pixel brightness of 80 is far too bright: over 500 nits on a 10% window. In a dimly lit room, use somewhere in the mid-20s.']]],
+      ['HDR movies',[
+        ['rtings','Picture mode FILMMAKER, Contrast 100.'],
+        ['rtings','Dark room, most accurate: OLED pixel brightness 100, Peak brightness High, Dynamic Tone Mapping Off, Expression Enhancer Off.'],
+        ['rtings','For a brighter image: Dynamic Tone Mapping On and Expression Enhancer Brightness. This boosts highlights brighter than they should be.'],
+        ['hdtvtest','Keep Dynamic Tone Mapping off to preserve the creator’s intent. It overbrightens HDR10 most of the time.'],
+        ['hdtvtest','Near black detail −1 brought shadow detail closer to the mastering monitor on his sample, on firmware 43.10.69. Later firmware may differ.'],
+        ['hdtvtestC6h','Keep Creator Original Picture Mode (Prime Video) off and use Filmmaker Mode. It shifted the color temperature slightly toward blue, oversaturated colors and greys out most settings.']]],
+      ['Motion',[
+        ['rtings','Real Cinema On removes judder. Quick Media Switching causes judder in 24p content sent from a 60p source, such as a cable box or older streaming stick.'],
+        ['rtings','TruMotion Cinematic Movement reduces stutter in 24 fps content; it outputs the equivalent of 30 fps. Motion settings are a matter of taste.'],
+        ['hdtvtest','Real Cinema, on by default in Filmmaker Mode, gives proper 5:5 pulldown for 24p films.'],
+        ['hdtvtest','He prefers TruMotion Off for the most film-accurate picture. TruMotion smooths 24p stutter if it bothers you, though even Cinematic Movement can occasionally add soap opera effect.'],
+        ['hdtvtestC6h','Cinematic Movement is the most accomplished interpolation on the market for smoothing 24p stutter without obvious soap opera effect.'],
+        ['hdtvtestC6h','OLED Motion (black frame insertion) Off: it dims the picture and flickers badly with 50 Hz material.']]],
+      ['Processing',[
+        ['hdtvtest','Smooth gradation helps with banding in low-bitrate content, but go no higher than Low. Stronger settings scrub away fine detail.'],
+        ['hdtvtest','In Filmmaker Mode, Smooth gradation is never fully off even when set to Off, and LG’s edge enhancement stays active. Only Game Optimizer turns both off.']]],
+      ['Gaming',[
+        ['rtings','Use the Game Optimizer picture mode for the lowest input lag; no other picture changes are needed. ALLM and VRR are in the Game Bar. With ALLM on, the TV switches to Game Optimizer by itself.'],
+        ['hdtvtest','Turn off Dolby Vision for gaming: Dolby Vision Game Optimizer tracks noticeably brighter than the PQ reference. Play in HDR10 with HGiG instead.'],
+        ['hdtvtest','Leave 165 Hz mode (Refresh rate boost) off unless you need it. It showed worse 10-bit gradation, some black crush and slightly lower chroma resolution; up to 120 Hz keeps the better gradation.'],
+        ['hdtvtest','Prevent input delay Boost cut 60 fps input lag from 13 ms to 9.2 ms. At 120 fps it measured 4.8 ms.'],
+        ['hdtvtest','On firmware 43.10.69, HDR Game Optimizer tracked brighter than reference on his unit. He lowered Tone Mapping Gain and maxed the three luminance metadata sliders to keep a hard HGiG-style clip. LG said a firmware fix was coming for the HGiG and P3 red problems he found at 4K 120 Hz and above.'],
+        ['hdtvtestPs5','PS5 Adjust HDR: with HGiG on, press up on the first two screens until the sun first disappears, then stop. Set the third screen to its minimum. Don’t calibrate with Dynamic Tone Mapping on: it moves the clipping point.']]]],
+    omitted:'Left out: RTINGS’ SDR white balance and color calibration and its HDR 2-point white balance. They were measured on RTINGS’ own unit and vary from TV to TV.',
+    settings:{
+      pictureMode:[['rtings','FILMMAKER for SDR and HDR movies; Game Optimizer for games.'],['hdtvtestC6h','Filmmaker Mode; keep Creator Original Picture Mode off.']],
+      backlight:[['rtings','SDR in a dark room: 3 (about 100 nits) or 17 (about 200 nits). Brighter: 100, adjusted to taste. HDR: 100.'],['hdtvtest','SDR in a dim room: mid-20s. The default of 80 exceeds 500 nits.']],
+      contrast:[['rtings','SDR Filmmaker 95 · HDR Filmmaker 100.']],
+      brightness:[['rtings','SDR Filmmaker 50.']],
+      gamma:[['rtings','SDR Filmmaker 2.2 (mediumHavingLevel on this TV).']],
+      colorTemperature:[['rtings','SDR Filmmaker Warm 40 (−40).']],
+      peakBrightness:[['rtings','SDR: Off in a dark room, High for a brighter image. HDR: High.']],
+      hdrDynamicToneMapping:[['rtings','HDR movies: Off for accuracy, On for a brighter image.'],['hdtvtest','Off for movies: it overbrightens HDR10. HGiG for games.']],
+      expressionEnhancer:[['rtings','HDR: Off for accuracy; Brightness (highlight) for a brighter image.']],
+      nearBlackDetail:[['hdtvtest','−1 matched the mastering monitor on his sample, on firmware 43.10.69.']],
+      smoothGradation:[['hdtvtest','No higher than Low. Filmmaker Mode never turns it fully off.']],
+      realCinema:[['rtings','On, to remove judder.'],['hdtvtest','On (the Filmmaker default): 5:5 pulldown for 24p.']],
+      truMotionMode:[['rtings','Cinematic Movement (cinemaClear) reduces 24p stutter.'],['hdtvtest','Off for the most film-accurate picture. If 24p stutter bothers you, Cinematic Movement, which can occasionally add soap opera effect.']],
+      motionPro:[['hdtvtestC6h','Off: it dims the picture and flickers with 50 Hz material.']],
+      enable144HzBooster:[['hdtvtest','Off unless you need 165 Hz: gradation and chroma are better at up to 120 Hz.']],
+      inputOptimization:[['hdtvtest','Boost (on): 9.2 ms instead of 13 ms at 60 fps.']],
+      enableALLM:[['rtings','With ALLM on, the TV switches to Game Optimizer when a game starts.']],
+      qmsVrr:[['rtings','Causes judder in 24p content sent from a 60p source.']]}};
   // Settings list order by section. Unknown native keys follow alphabetically.
   const order = {
     picture:['backlight','contrast','brightness','color','tint','sharpness','colorTemperature','gamma','gammaLevel','peakBrightness','hdrDynamicToneMapping','expressionEnhancer','dynamicContrast','dynamicColor','colorGamut','superResolution','noiseReduction','mpegNoiseReduction','smoothGradation','nearBlackDetail','dolbyPrecisionDetail','blackLevel'],
@@ -604,8 +667,8 @@
       if(changed){this.renderPanes();this.inspect();}else this.renderPanes();
       if(this.narrow())this.showPane('detail');
     }
-    openView(view) {this.view=view;this.review=null;this.render({key:'view-back',neighbors:[]},false);if(view==='tv')this.inspect();}
-    closeView() {const view=this.view;this.view='edit';this.render({key:view==='tv'?'open-tv':'open-profiles',neighbors:[]},false);this.inspect();}
+    openView(view,returnFocus) {this.view=view;this.viewReturn=returnFocus||null;this.review=null;this.render({key:'view-back',neighbors:[]},false);if(view==='tv')this.inspect();}
+    closeView() {const view=this.view,key=this.viewReturn||({tv:'open-tv',reviews:'open-reviews'}[view]||'open-profiles');this.view='edit';this.viewReturn=null;this.render({key,neighbors:[]},false);this.inspect();}
     render(focus=this.captureFocus(),keepScroll=true) {
       if(this.deferWhileHeld('full'))return;
       const root=this.shadowRoot,previous=this.scrolls();this.memo=new Map();
@@ -618,6 +681,7 @@
       // The TV's own app covers the HDMI picture, so it has no "On TV now"
       // card: the profile in use and its view move into the header.
       if(this.state.document&&this.adapter.tvApp)actions.append(el('span',this.usingText(),'using tv-using'),this.button('TV profile & automation',()=>this.openView('tv'),'ghost small','open-tv'));
+      if(this.state.document)actions.append(this.button('Reviewer settings',()=>this.openView('reviews'),'ghost small','open-reviews'));
       actions.append(this.button('Refresh',()=>this.refresh(true),'small'));
       if(!this.state.document&&this.adapter.fileTransfer!==false)actions.append(...this.backupButtons());
       top.append(actions);frame.append(top);
@@ -628,7 +692,7 @@
       this.listHost=this.detailHost=this.gridHost=null;
       if(this.review||this.view!=='edit') {
         body.classList.add('single');const sheet=el('section',undefined,'sheet');body.append(sheet);
-        if(this.review)this.renderReview(sheet);else if(this.view==='profiles')this.renderManage(sheet);else this.renderTv(sheet);
+        if(this.review)this.renderReview(sheet);else if(this.view==='profiles')this.renderManage(sheet);else if(this.view==='reviews')this.renderReviewers(sheet);else this.renderTv(sheet);
       } else {
         body.dataset.pane=this.pane;
         this.listHost=el('nav',undefined,'list');this.listHost.setAttribute('aria-label','Settings');
@@ -750,6 +814,7 @@
       const head=el('div',undefined,'detail-head');
       head.append(this.button('‹ All settings',()=>this.showPane('list'),'ghost pane-back','pane-back'),el('h3',pretty(alias),'setting-title'));
       if(descriptions[alias]){const help=el('p',descriptions[alias],'help');help.id='help-'+alias;head.append(help);}
+      if(reviewers.settings[alias])head.append(this.reviewerNotes(alias));
       const main=el('div',undefined,'detail-main'),side=el('div',undefined,'extras');host.append(head,main);
       this.gridHost=el('section',undefined,'where');this.gridHost.setAttribute('aria-label','Where this value applies');
       main.append(this.valueBox(alias),this.gridHost,side);this.renderGrid();
@@ -1001,6 +1066,39 @@
       const file=el('input');file.type='file';file.accept='.json,application/json';file.hidden=true;
       file.onchange=async()=>{try{const selected=file.files[0];if(!selected||selected.size>1000000)throw new Error('Choose a JSON profile or backup smaller than 1 MB');const data=JSON.parse(await selected.text());if(!window.confirm('Replace saved standards with this file?'))return;await this.mutate(data.format==='lg-picture-bridge-backup'?{action:'restore_backup',backup:data,revision:this.state.revision}:{action:this.state.document?'import':'initialize',document:data,revision:this.state.revision,enabled:true,room:this.state.room});}catch(e){this.error(e.message);}};
       const importButton=this.button('Import',()=>file.click(),'small');importButton.disabled=!!this.status.offline;return [download,importButton,file];
+    }
+    // One reviewer note. With the TV remote each note is a focus stop, so
+    // the arrows can scroll a page that has no buttons.
+    reviewNote(source,text,id) {
+      const note=el('li',undefined,'review-note');note.append(el('span',reviewers.sources[source].name,'review-source'),document.createTextNode(text));
+      if(this.adapter&&this.adapter.tvRemote){note.tabIndex=0;note.dataset.focus=id;}
+      return note;
+    }
+    reviewerNotes(alias) {
+      const box=el('div',undefined,'reviewer'),list=el('ul',undefined,'reviews');list.setAttribute('aria-label','Reviewer notes');
+      reviewers.settings[alias].forEach(([source,text],i)=>list.append(this.reviewNote(source,text,'review:'+alias+':'+i)));
+      box.append(list,this.button('All reviewer settings',()=>this.openView('reviews','open-reviews:'+alias),'ghost small','open-reviews:'+alias));
+      return box;
+    }
+    renderReviewers(sheet) {
+      this.sheetHead(sheet,'Reviewer settings','Notes to return to. Nothing here changes the TV.');
+      sheet.append(el('p',reviewers.omitted,'note'));
+      reviewers.sections.forEach(([title,notes],s)=>{
+        const section=el('div',undefined,'section'),list=el('ul',undefined,'reviews');
+        notes.forEach(([source,text],i)=>list.append(this.reviewNote(source,text,'reviews:'+s+':'+i)));
+        section.append(el('h4',title),list);sheet.append(section);
+      });
+      const sources=el('div',undefined,'section'),list=el('ul',undefined,'reviews');
+      Object.entries(reviewers.sources).forEach(([id,source])=>{
+        const item=this.reviewNote(id,'','reviews:source:'+id),tv=this.adapter&&this.adapter.tvApp;
+        // The TV app cannot open web pages, so it shows the address instead.
+        const name=el(tv?'span':'a',source.title);
+        if(!tv){name.href=source.url;name.target='_blank';name.rel='noopener noreferrer';}
+        item.append(name,' · '+source.date+'. '+source.basis);
+        if(tv)item.append(el('span',source.url,'review-url'));
+        list.append(item);
+      });
+      sources.append(el('h4','Sources'),list);sheet.append(sources);
     }
     sheetHead(sheet,title,note) {
       const head=el('div',undefined,'sheet-head');head.append(this.button('‹ Back to editing',()=>this.closeView(),'ghost','view-back'),el('h3',title));sheet.append(head);
@@ -1277,6 +1375,11 @@
   .legend .mk.na{width:.9em;height:.9em;border-radius:.2em;border:1px solid var(--line);background:repeating-linear-gradient(135deg,transparent 0 2px,rgba(255,255,255,.25) 2px 4px)}
   .legend .mk.unused{width:.9em;height:.9em;border-radius:.2em;border:1px solid var(--line);opacity:.5}
   .legend{display:flex;flex-wrap:wrap;gap:.3em 1em;font-size:.75em;color:var(--muted)}.legend span{display:inline-flex;align-items:center;gap:.4em}
+  .reviews{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.35em;font-size:.9em;max-width:60em}
+  .review-note{padding:.2em .4em;border-radius:.4em;overflow-wrap:anywhere}.review-note:focus{background:var(--raised)}
+  .review-source{font-weight:700;color:var(--accent);margin-right:.45em}.review-url{display:block;font-size:.85em;color:var(--muted)}.review-note a{color:var(--live)}
+  .reviewer{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.35em 1em;width:100%;max-width:60em;border-left:3px solid var(--line);padding-left:.6em}
+  .reviewer .reviews{flex:1 1 26em;gap:.15em;font-size:.85em}.reviewer .review-note{padding:.1em .3em}
   details summary{cursor:pointer;font-size:.85em;color:var(--muted);padding:.3em 0}
   .targets{padding:0;list-style:none;margin:.3em 0;font-size:.82em;color:var(--muted)}.targets li{border-top:1px solid var(--line);padding:.3em 0;overflow-wrap:anywhere}
   .links .diff{grid-template-columns:1fr auto}
