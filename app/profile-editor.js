@@ -1,9 +1,6 @@
 /* Shared by the TV app and the Home Assistant panel. No dependencies or polling. */
 (function () {
   'use strict';
-  const titles = {backlight:'OLED pixel brightness',contrast:'Contrast',brightness:'Black level',color:'Color depth',sharpness:'Sharpness',blackLevel:'HDMI RGB range',colorTemperature:'Color temperature',gameColorDepth:'Game color depth',gameSharpness:'Game sharpness',gameAdjustContrast:'Game contrast',gameBlackLevel:'Game black level',lowLevelAdjustment:'Fine tune dark areas',blackStabilizer:'Black stabilizer',whiteStabilizer:'White stabilizer',hdrDynamicToneMapping:'HDR tone mapping',pictureMode:'Picture mode',realCinema:'Real Cinema',truMotionMode:'TruMotion',enableALLM:'Auto low latency mode',enableQFT:'Quick frame transport'};
-  titles.enable144HzBooster='Refresh rate boost';
-  Object.assign(titles,{dolbyPrecisionDetail:'Dolby Precision Detail',expressionEnhancer:'Expression Enhancer',gammaLevel:'Gamma fine adjustment',dynamicContrast:'Auto Dynamic Contrast',dynamicColor:'Dynamic color',mpegNoiseReduction:'MPEG noise reduction',gameOptimization:'VRR & G-Sync',inputOptimization:'Prevent input delay',uhdDeepColor:'HDMI Deep Color',freesync:'AMD FreeSync',truMotionJudder:'TruMotion de-judder',truMotionBlur:'TruMotion de-blur',motionPro:'OLED Motion',motionProOLED:'OLED Motion Pro'});
   // Plain-language help, checked against the G6's own Settings/Game Optimizer
   // help and value labels. See docs/setting-help.md for sources and caveats.
   // Keep this local: rendering help requires no TV reads or persistent writes.
@@ -59,7 +56,7 @@
   const sections = {picture:'Picture',motion:'Motion',game:'Game Optimizer',port:'HDMI connection',selection:'Preset selection'};
   const formatNames = {sdr:'SDR',hdr:'HDR',dolbyHdr:'Dolby Vision'};
   const genres = ['Standard','FPS','RPG','RTS','Sports','USER'];
-  const pretty = key => titles[key] || key.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase());
+  const pretty = key => window.LGProfileView.title(key);
   const display = value => typeof value === 'object' && value !== null ? [...new Set(Object.values(value))].join(' / ') : String(value === undefined || value === null ? '—' : value);
   const el = (tag,text,cls) => {const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
   const model = window.LGProfileView;

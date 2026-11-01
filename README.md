@@ -2,6 +2,8 @@
 
 LG Picture Bridge connects a **rooted 2026 LG G6 (webOS 11)** to Home Assistant. It reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision through MQTT discovery, and applies picture profiles without notification dialogs.
 
+Version **0.22.2**, with Home Assistant companion **0.13.1**, tidies the MQTT setting entities. Names now match the editor and LG's menus (for example **OLED Motion**, **TruMotion**, **AI HDR remastering**, **SIMPLINK (HDMI-CEC)**, **Auto Power Sync**), with entity IDs unchanged. Controls no longer write a recorder row, or re-send their discovery config, on every input, preset or signal change. A write is checked against the input and preset Home Assistant showed. TruMotion de-judder and de-blur need TruMotion User Selection, as in the editor. The unexplained **Film Maker Mode** switch is retired, and the **Settings command** sensor is off by default. See [Settings controls](docs/mqtt.md#settings-controls-0222).
+
 Version **0.22.1** follows a live Home Screen audit: for TV apps in Filmmaker Mode, the editor now shows Gamma, Gamma Level, Black Level, Color Gamut, both Noise Reduction controls, Smooth Gradation and Ambient Light Compensation as unavailable, as LG's own menu does. See [Home Screen audit](docs/setting-availability.md#home-screen-audit-0221).
 
 Version **0.22.0**, with Home Assistant companion **0.13.0**, adds **TV apps** (LG's `default` input: the Home Screen and webOS apps) as an editor column after the HDMI ports. Profiles, brightness links and preset selection now cover what you see outside HDMI too, so the Home Screen can follow the Apple TV's Filmmaker standards and room brightness. See [TV apps](docs/setting-availability.md#tv-apps-0220).

@@ -105,6 +105,31 @@ publish that command topic and consume the device's state/discovery. Other broke
 be allowed to impersonate either endpoint. MQTT permissions replace the HTTP bearer token for this
 path. Anyone able to publish authorized commands can change picture settings; keep the broker private.
 
+### Settings controls (0.22.2)
+
+Each reviewed TV setting LG describes is a `number` or `select` entity in the `config`
+category. A control changes whatever input and preset is on screen. Its `dimension` attribute
+shows that scope, for example `{"input": "hdmi3", "pictureMode": "filmMaker"}`; TV-wide
+settings have `{}`. LG Picture Profiles treats such a change as a temporary adjustment and
+restores the saved standard at standby. A control is unavailable while LG greys it out. TruMotion
+de-judder and de-blur also need TruMotion User Selection, as in the editor.
+
+Entity names use the editor's titles (`profile-view.js`), so Home Assistant, the editor and LG's
+menu agree. Entity IDs are unchanged. The per-control state carries only the control's own fields:
+`value`, `available`, `category`, `key`, `dimension` and `backend`. Before 0.22.2 it also carried
+the bridge's `context_id` and `observed_at`, which changed on every input, preset or signal change.
+That wrote a recorder row for every control each time, and because the context id was also built
+into each command template, it re-sent all retained discovery configs. Now a command sends back
+the scope Home Assistant last showed (`this.attributes.dimension`) as `target`. The bridge refuses a
+write whose control no longer has that scope (`stale_context`), so a change made just as the input
+switches cannot reach the new input. Discovery no longer changes with the context.
+
+The `Settings command` reply sensor is disabled by default; nothing in Home Assistant needs it.
+`picture_filmMakerMode` was retired in 0.22.2: a TV-wide on/off that read `on` in nearly every
+preset, Game and Dolby Vision included, which LG's Settings app never offers as a control (its
+FILMMAKER MODE Auto Start is a different key, `filmMakerAutoChange`). Its retained discovery is
+removed on upgrade.
+
 ## Picture-policy commands
 
 Install [the MQTT request/reply script](../home-assistant/lg_picture_bridge_mqtt_command.example.yaml)

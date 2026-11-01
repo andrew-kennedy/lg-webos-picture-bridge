@@ -90,6 +90,12 @@ function create(service, options) {
       var control = makeControl(entry, group.descriptions[entry.key], group.values[entry.key], options.context(), options.describe);
       if (control) next[entry.id] = control;
     });
+    // As in the editor: LG keeps de-judder/de-blur writable, but they only act
+    // with TruMotion User Selection, so they are unavailable in any other mode.
+    var truMotion = next.picture_truMotionMode;
+    ['picture_truMotionJudder', 'picture_truMotionBlur'].forEach(function (id) {
+      if (next[id] && (!truMotion || truMotion.value !== 'user')) next[id].available = false;
+    });
     controls = next; emit();
     if (streams.length && streams.every(function (stream) { return stream.ready; })) {
       backoff = 5000; lastError = null; finishWaiting();

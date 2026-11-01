@@ -284,7 +284,29 @@
     if(kind==='range')return /ALLM$/.test(row)?'With ALLM':'Without ALLM';
     return 'Port-wide';
   }
+  // Display names for TV setting keys, shared by the editor and MQTT discovery.
+  // Sentence case; LG's own feature names (OLED, TruMotion, FILMMAKER MODE,
+  // SIMPLINK, Auto Power Sync) keep LG's spelling from the G6 Settings app.
+  const titles={backlight:'OLED pixel brightness',contrast:'Contrast',brightness:'Black level',color:'Color depth',tint:'Tint',sharpness:'Sharpness',
+    blackLevel:'HDMI RGB range',colorTemperature:'Color temperature',colorGamut:'Color gamut',gamma:'Gamma',gammaLevel:'Gamma fine adjustment',
+    peakBrightness:'Peak brightness',hdrDynamicToneMapping:'HDR tone mapping',expressionEnhancer:'Expression Enhancer',dynamicContrast:'Auto Dynamic Contrast',
+    dynamicColor:'Dynamic color',superResolution:'Super resolution',noiseReduction:'Noise reduction',mpegNoiseReduction:'MPEG noise reduction',
+    smoothGradation:'Smooth gradation',nearBlackDetail:'Near black detail',realCinema:'Real Cinema',pictureMode:'Picture mode',
+    truMotionMode:'TruMotion',truMotionJudder:'TruMotion de-judder',truMotionBlur:'TruMotion de-blur',motionPro:'OLED Motion',motionProOLED:'OLED Motion Pro',
+    dolbyPrecisionDetail:'Dolby Precision Detail',aiPicture:'AI picture',aiHdrRemastering:'AI HDR remastering',filmmakerAmbientLight:'FILMMAKER MODE ambient light',
+    skinColor:'Skin color',grassColor:'Grass color',skyColor:'Sky color',aspectRatio:'Aspect ratio',justScan:'Just scan',logoLuminanceAdjust:'Adjust logo brightness',
+    gameColorDepth:'Game color depth',gameSharpness:'Game sharpness',gameAdjustContrast:'Game contrast',gameBlackLevel:'Game black level',
+    lowLevelAdjustment:'Fine tune dark areas',blackStabilizer:'Black stabilizer',whiteStabilizer:'White stabilizer',gameGenre:'Game genre',darkMode:'Dark mode',
+    enableALLM:'Auto low latency mode',enableQFT:'Quick frame transport',enable144HzBooster:'Refresh rate boost',enableMotionBooster:'Motion booster',
+    gameOptimization:'VRR & G-Sync',freesync:'AMD FreeSync',qmsVrr:'Quick Media Switching',inputOptimization:'Prevent input delay',uhdDeepColor:'HDMI Deep Color',
+    enableDolbyVisionPC:'Dolby Vision for PC',crosshair:'Crosshair',fpsCounter:'FPS counter',gameUIColor:'Game dashboard color',
+    gameScreenRatio:'Game screen ratio',gameScreenSize:'Game screen size',gameScreenPosition:'Game screen position',
+    simplinkEnable:'SIMPLINK (HDMI-CEC)',simplinkAutoPowerOn:'Auto Power Sync',
+    autoVolume:'Auto volume',volumeControl:'Volume control',soundOutputDigital:'Digital sound output',
+    inputAudioFormatHDMI1:'HDMI 1 input audio format',inputAudioFormatHDMI2:'HDMI 2 input audio format',
+    inputAudioFormatHDMI3:'HDMI 3 input audio format',inputAudioFormatHDMI4:'HDMI 4 input audio format'};
+  const title=key=>titles[key] || key.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase());
   const rowFormat=(kind,row)=>kind==='preset'?presetFormat(row):kind==='range'?rangeFormat(row):null;
   return {values,brightness,profileOptions,preferenceValue,isInherited,control,same,inputName,brightnessRole,setBrightnessLink,scopeSelection,modes,families,presetsFor,presetFamily,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition,
-    ranges,coordinates,inColumn,targeted,rangesFor,presetUsage,shortPreset,rowLabel,rowFormat,physical};
+    ranges,coordinates,inColumn,targeted,rangesFor,presetUsage,shortPreset,rowLabel,rowFormat,physical,titles,title};
 });

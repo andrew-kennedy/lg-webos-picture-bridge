@@ -19,8 +19,15 @@ module.exports = function () {
   function profileObservations(){return sent.filter(function(s){return s.topic==='lg/test/settings/observations';});}
   var profileCount=profileObservations().length;
   assert.ok(profileCount>0);
-  state.observed_at+=10000; changed(state); controller.publish();
-  assert.strictEqual(observations().length,count,'Polling unchanged values must not churn HA recorder attributes');
+  var discoveries=sent.filter(function(s){return s.topic.endsWith('/config')&&s.payload;}).length;
+  state.observed_at+=10000; state.context_id='b'.repeat(24); changed(state); controller.publish();
+  assert.strictEqual(observations().length,count,'Polling or a new context id must not churn HA recorder attributes');
+  assert.strictEqual(sent.filter(function(s){return s.topic.endsWith('/config')&&s.payload;}).length,discoveries,'A new context id does not republish discovery');
+  var latest=JSON.parse(observations().at(-1).payload);
+  assert.ok(!('context_id' in latest)&&!('observed_at' in latest),'Control state carries only fields of the control itself');
+  assert.deepStrictEqual(latest.dimension,{input:'hdmi3',pictureMode:'filmMaker'},'Commands send this dimension back as their target');
+  var status=sent.find(function(s){return s.topic==='homeassistant/sensor/test_settings_command/config';});
+  assert.strictEqual(JSON.parse(status.payload).enabled_by_default,false,'The settings command reply sensor is plumbing, off by default');
   assert.strictEqual(profileObservations().length,profileCount,'Unchanged profile observations are not heartbeats');
   state.observations[0].value='4';changed(state);
   assert.strictEqual(profileObservations().length,profileCount+1);
@@ -43,7 +50,7 @@ module.exports = function () {
     });
   });
   ['picture_eyeComfortMode','picture_screenShift','other_blueLight',
-    'picture_energySaving','picture_energySavingAutoMin','picture_motionEyeCare'].forEach(function (id) {
+    'picture_energySaving','picture_energySavingAutoMin','picture_motionEyeCare','picture_filmMakerMode'].forEach(function (id) {
     ['number','select'].forEach(function (kind) {
       assert.ok(sent.some(function(s) { return s.topic==='homeassistant/'+kind+'/test_setting_'+id+'/config' &&
         s.payload==='' && s.retain; }), 'Upgrade removes retained discovery for '+id);

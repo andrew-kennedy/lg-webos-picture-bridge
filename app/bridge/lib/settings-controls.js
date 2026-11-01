@@ -6,6 +6,18 @@ var executor = require('./luna-executor');
 var URI = 'luna://com.webos.settingsservice/';
 function failure(code, message) { var e = new Error(message); e.code = code; return e; }
 function signature(context) { return JSON.stringify(context || null); }
+// Same scope regardless of key order (HA may reorder the attribute object).
+function sameTarget(a, b) {
+  var ka = Object.keys(a || {}).sort(), kb = Object.keys(b || {}).sort();
+  return ka.length === kb.length && ka.every(function (k, i) { return k === kb[i] && String(a[k]) === String(b[k]); });
+}
+function validTarget(target) {
+  if (!target || typeof target !== 'object' || Array.isArray(target)) return false;
+  var keys = Object.keys(target);
+  return keys.length <= 6 && keys.every(function (k) {
+    return /^[A-Za-z]{1,32}$/.test(k) && typeof target[k] === 'string' && /^[A-Za-z0-9_.:-]{0,40}$/.test(target[k]);
+  });
+}
 function call(service, method, params, callback) {
   var done = false, request;
   var timer = setTimeout(function () {
@@ -56,13 +68,12 @@ function describe(entry, description, value) {
 }
 function normalize(command) {
   if (!command || typeof command !== 'object' || Array.isArray(command) ||
-      Object.keys(command).some(function (key) { return ['setting', 'value', 'context_id'].indexOf(key) === -1; }) ||
-      !catalog.entries.some(function (e) { return e.id === command.setting; }) ||
-      typeof command.context_id !== 'string' || !/^[a-f0-9]{24}$/.test(command.context_id) ||
+      Object.keys(command).some(function (key) { return ['setting', 'value', 'target'].indexOf(key) === -1; }) ||
+      !catalog.entries.some(function (e) { return e.id === command.setting; }) || !validTarget(command.target) ||
       ['string', 'number', 'boolean'].indexOf(typeof command.value) === -1 || String(command.value).length > 100) {
-    throw failure('invalid_setting', 'Select a discovered TV setting and its current context');
+    throw failure('invalid_setting', 'Select a discovered TV setting and the input and preset it showed');
   }
-  return {setting: command.setting, value: command.value, context_id: command.context_id};
+  return {setting: command.setting, value: command.value, target: command.target};
 }
 function encode(control, value) {
   if (control.component === 'number') {
@@ -85,7 +96,10 @@ function create(service, options) {
     var control, description, value, epoch = monitor.generation(), captured = signature(options.context());
     function check() {
       if (guard) guard();
-      if (!monitor.current() || command.context_id !== monitor.snapshot().context_id ||
+      // The write must target the scope HA showed. A missing control is
+      // reported as unavailable by the caller, not as a stale scope.
+      var shown = monitor.current() ? monitor.snapshot().controls[command.setting] : null;
+      if (!monitor.current() || (shown && !sameTarget(command.target, shown.dimension)) ||
           epoch !== monitor.generation() || captured !== signature(options.context())) {
         throw failure('stale_context', 'TV settings changed context; wait for refreshed controls');
       }

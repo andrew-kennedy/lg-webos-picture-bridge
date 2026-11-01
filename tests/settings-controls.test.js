@@ -21,20 +21,23 @@ module.exports = async function () {
   var value = '3', writes = [], failWrite = false, ignoreWrite = false, delayed = null, reportedInput = null;
   var desc = {key: 'backlight', category: 'picture', dataType: 'string', vtype: 'Range', dbtype: 'G',
     ui: {visible: true, active: true}, values: {range: {min: 0, max: 100, interval: 1}}, dimension: ['input', 'pictureMode']};
+  var motionValue = 'off';
+  var judder = {key: 'truMotionJudder', category: 'picture', dataType: 'string', vtype: 'Range', dbtype: 'G',
+    ui: {visible: true, active: true}, values: {range: {min: 0, max: 10, interval: 1}}, dimension: ['input', 'pictureMode']};
   var motion = {key: 'truMotionMode', category: 'picture', dataType: '', vtype: 'ArrayExt', dbtype: 'M',
     ui: {visible: true, active: true}, values: {arrayExt: [{value:'off',visible:true,active:true},{value:'user',visible:true,active:true},
       {value:'hidden',visible:false,active:true}]}, dimension: ['input', 'pictureMode']};
   function responseFor(uri, params) {
     var response = {returnValue: true};
-    if (uri.endsWith('getSystemSettingDesc')) response = {returnValue: false, results: params.category === 'picture' ? [desc, motion] : []};
+    if (uri.endsWith('getSystemSettingDesc')) response = {returnValue: false, results: params.category === 'picture' ? [desc, motion, judder] : []};
     else if (uri.endsWith('setSystemSettings')) {
       writes.push(params);
       if (failWrite) response = {returnValue: false, errorText: 'denied'};
       else if (!ignoreWrite && params.settings.backlight !== undefined) value = params.settings.backlight;
     } else if (params.category === 'picture') {
       response = {returnValue: true, dimension: {input: reportedInput || context.input, pictureMode: context.mode}, settings: {}};
-      if (params.current_app || params.app_id) { response.app_id = 'com.webos.app.hdmi3'; response.settings.truMotionMode = 'off'; }
-      else response.settings.backlight = value;
+      if (params.current_app || params.app_id) { response.app_id = 'com.webos.app.hdmi3'; response.settings.truMotionMode = motionValue; }
+      else { response.settings.backlight = value; response.settings.truMotionJudder = '0'; }
     }
     return response;
   }
@@ -53,13 +56,20 @@ module.exports = async function () {
   }};
   var monitor = controls.create(service, {context: function () { return context; }, changed: function () {}});
   function refresh() { return new Promise(function (resolve,reject) { monitor.refresh(function(e) { if(e)reject(e);else resolve(); }); }); }
-  function write(v, id) { return new Promise(function(resolve,reject) {
-    monitor.write({setting:'picture_backlight',value:v,context_id:id||monitor.snapshot().context_id}, function(e,r) {if(e)reject(e);else resolve(r);}, function(){});
+  // HA sends back the dimension it last showed for the control (this.attributes.dimension).
+  function shown() { return monitor.snapshot().controls.picture_backlight.dimension; }
+  function write(v, target) { return new Promise(function(resolve,reject) {
+    monitor.write({setting:'picture_backlight',value:v,target:target||shown()}, function(e,r) {if(e)reject(e);else resolve(r);}, function(){});
   }); }
   try {
     await refresh();
     assert.strictEqual(monitor.snapshot().controls.picture_backlight.value,3);
     assert.deepStrictEqual(monitor.snapshot().controls.picture_truMotionMode.options,['off','user']);
+    assert.strictEqual(monitor.snapshot().controls.picture_truMotionJudder.available,false,'De-judder needs TruMotion User Selection');
+    motionValue = 'user'; monitor.contextChanged(); await refresh();
+    assert.strictEqual(monitor.snapshot().controls.picture_truMotionJudder.available,true);
+    motionValue = 'off'; monitor.contextChanged(); await refresh();
+    assert.strictEqual(monitor.snapshot().controls.picture_truMotionJudder.available,false);
     var changed = await write(4);
     assert.strictEqual(changed.value,'4');
     assert.strictEqual(changed.previous_value,'3');
@@ -67,6 +77,14 @@ module.exports = async function () {
     assert.deepStrictEqual(changed.target,{category:'picture',dimension:{input:'hdmi3',pictureMode:'filmMaker'}});
     assert.strictEqual(writes[0].settings.backlight,'4','Preserve the TV string type');
     assert.deepStrictEqual(writes[0].dimension,{input:'hdmi3',pictureMode:'filmMaker'});
+    assert.strictEqual((await write(5,{pictureMode:'filmMaker',input:'hdmi3'})).value,'5','Attribute key order does not matter');
+    var before = writes.length;
+    await assert.rejects(write(6,{input:'hdmi4',pictureMode:'filmMaker'}),/context/,'A write for a scope HA no longer shows is stale');
+    assert.strictEqual(writes.length,before,'A stale scope never reaches the TV');
+    [undefined,null,[],'hdmi3',{input:3},{input:{nested:'x'}},{input:'a b'},{a:'1',b:'2',c:'3',d:'4',e:'5',f:'6',g:'7'}].forEach(function (target) {
+      assert.throws(function(){controls.normalize({setting:'picture_backlight',value:'4',target:target});},/discovered TV setting/,JSON.stringify(target));
+    });
+    assert.throws(function(){controls.normalize({setting:'picture_backlight',value:'4',target:{},context_id:'a'.repeat(24)});},/discovered TV setting/,'Old context-id commands are refused');
     await assert.rejects(write(101),/outside/);
     await assert.rejects(write(3.5),/outside/);
     await assert.rejects(write(true),/number/);
@@ -81,8 +99,8 @@ module.exports = async function () {
     desc.values.range.max = 10;
     await assert.rejects(write(20),/outside/, 'Preflight must enforce a changed native range');
     desc.values.range.max = 100;
-    assert.throws(function(){controls.normalize({setting:'option_password_ipcontrol',value:'x',context_id:'a'.repeat(24)});});
-    var old = monitor.snapshot().context_id;
+    assert.throws(function(){controls.normalize({setting:'option_password_ipcontrol',value:'x',target:{}});});
+    var old = shown();
     context = {input:'hdmi1_pc',mode:'game',range:'sdrALLM',ready:true};
     await assert.rejects(write(20,old),/context/,'Route changes must reject commands before the next refresh');
     monitor.contextChanged(); await refresh();
@@ -94,16 +112,19 @@ module.exports = async function () {
     context.ready = true; monitor.contextChanged(); await refresh();
     var config = {device_name:'G6',mqtt:{topic_prefix:'lg',discovery_prefix:'homeassistant'}};
     var discovered = mqtt.discovery(config,'test','session',monitor.snapshot());
-    assert.strictEqual(discovered.length,2);
+    assert.strictEqual(discovered.length,3);
     assert.strictEqual(discovered[0].payload.optimistic,false);
     assert.strictEqual(discovered[0].payload.retain,false);
-    assert.ok(discovered[0].payload.command_template.includes(monitor.snapshot().context_id));
+    assert.ok(!discovered[0].payload.command_template.includes(monitor.snapshot().context_id),'Discovery carries no context id');
+    assert.ok(discovered[0].payload.command_template.includes("'target': (this.attributes.dimension if this.attributes.dimension is mapping else {})"));
+    monitor.contextChanged(); await refresh();
+    assert.deepStrictEqual(mqtt.discovery(config,'test','session',monitor.snapshot()),discovered,'A context change does not republish discovery');
     assert.ok(discovered[0].payload.availability.length === 2);
     assert.ok(!catalog.entries.some(function(e) {return /whiteBalance|colorManagement|Reset|password|update|factory/i.test(e.key);}));
     assert.ok(!catalog.entries.some(function(e) {return ['option','general'].includes(e.category);}));
     assert.ok(mqtt.tombstones(config,'test').includes('homeassistant/select/test_setting_option_pointerSize/config'));
     catalog.retiredIds.forEach(function (id) {
-      assert.throws(function () { controls.normalize({setting:id,value:'on',context_id:monitor.snapshot().context_id}); },
+      assert.throws(function () { controls.normalize({setting:id,value:'on',target:{}}); },
         /discovered TV setting/, 'A removed control cannot be changed by an old MQTT command: ' + id);
     });
     // A response from a previous input must not become the new control snapshot.

@@ -4,6 +4,9 @@ var commands = require('./mqtt-commands');
 var settings = require('./settings-controls');
 var catalog = require('./settings-catalog');
 var profiles = require('./profile-banks');
+// The command sends back the scope (dimension) HA last showed for this control,
+// via the entity's own attributes (`this`), so discovery stays fixed while the
+// input, preset or signal changes. The bridge rejects a write whose scope moved.
 function discovery(config, id, session, snapshot) {
   var base = config.mqtt.topic_prefix + '/' + id;
   return Object.keys(snapshot.controls).sort().map(function (key) {
@@ -23,7 +26,7 @@ function discovery(config, id, session, snapshot) {
       command_template: "{{ {'protocol': 1, 'session_id': '" + (session || '') +
         "', 'request_id': 'ha-setting-' ~ ((as_timestamp(now()) * 1000000) | int) ~ '-' ~ (range(100000) | random), " +
         "'expires_at': as_timestamp(now()) + 30, 'policy': {'setting': '" + key +
-        "', 'context_id': '" + (snapshot.context_id || '') + "', 'value': value}} | to_json }}"};
+        "', 'target': (this.attributes.dimension if this.attributes.dimension is mapping else {}), 'value': value}} | to_json }}"};
     if (component === 'number') {
       payload.min = control.min; payload.max = control.max; payload.step = control.step; payload.mode = 'slider';
     } else payload.options = control.options;
@@ -35,10 +38,11 @@ function create(options) {
   var online = false, announced = {}, published = {}, known = {}, latest = {controls: {}, context_id: null};
   var channel, monitor, observed = {};
   function publish(topic, value, retain) { return online && options.publish(topic, JSON.stringify(value), Boolean(retain)); }
-  function observation(topic, value, force, observedAt) {
+  // Only fields that change with the control itself, so HA records nothing new
+  // when an unrelated context change re-reads an unchanged setting.
+  function observation(topic, value, force) {
     var serialized = JSON.stringify(value);
     if (!force && published[topic] === serialized) return true;
-    value.observed_at = observedAt || latest.observed_at ? new Date(observedAt || latest.observed_at).toISOString() : null;
     if (!publish(topic, value, false)) return false;
     published[topic] = serialized;
     return true;
@@ -65,8 +69,7 @@ function create(options) {
     Object.keys(latest.controls).forEach(function (id) {
       var c = latest.controls[id]; known[id] = c;
       if (!observation(base + '/settings/' + id, {value: c.value, available: c.available && channel.status().ready && Boolean(latest.observed_at),
-        category: c.category, key: c.key, dimension: c.dimension, backend: 'root_luna',
-        context_id: latest.context_id}, force, c.observed_at)) ok = false;
+        category: c.category, key: c.key, dimension: c.dimension, backend: 'root_luna'}, force)) ok = false;
     });
     Object.keys(known).forEach(function (id) {
       if (!latest.controls[id]) observation(base + '/settings/' + id, {value: known[id].value, available: false}, force);
@@ -76,7 +79,7 @@ function create(options) {
       default_entity_id: 'sensor.lg_tv_settings_command', device: {identifiers: [options.id], name: options.config.device_name},
       state_topic: base + '/settings/status', json_attributes_topic: base + '/settings/status',
       value_template: '{{ value_json.state }}', availability_topic: base + '/availability',
-      expire_after: 90, entity_category: 'diagnostic'};
+      expire_after: 90, entity_category: 'diagnostic', enabled_by_default: false};
     if (force || !announced[statusTopic]) {
       if (publish(statusTopic, statusPayload, true)) announced[statusTopic] = true;
       else ok = false;
