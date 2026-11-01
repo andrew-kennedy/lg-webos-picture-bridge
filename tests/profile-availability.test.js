@@ -14,6 +14,11 @@ module.exports = async function () {
   assert.equal(index.resolve('gamma',target).ui.active,false,'A different board cannot enable an HDR gamma control');
   assert.equal(index.resolve('gamma',{...target,dimension:{input:'hdmi3',pictureMode:'filmMaker'}}).ui.active,true);
   assert.equal(index.resolve('gamma',{...target,app_id:'com.webos.app.hdmi3'}),null,'Factory metadata must match app ownership');
+  // TV apps (LG's "default" input) use their own overrides; other inputs' are ignored.
+  index.accept({key:'gamma@picture$default.filmMaker.x',ui:{active:false}},true);
+  index.accept({key:'gamma@picture$browser.filmMaker.x',ui:{active:false}},true);
+  assert.equal(index.resolve('gamma',{category:'picture',dimension:{input:'default',pictureMode:'filmMaker'}}).ui.active,false,'TV apps overrides apply');
+  assert.equal(index.resolve('gamma',{category:'picture',dimension:{input:'browser',pictureMode:'filmMaker'}}).ui.active,true,'Unmanaged inputs keep only base metadata');
   const source=JSON.stringify([base,{key:'escaped',text:'a } " \\ end',nested:{a:[1,{b:true}]}}]),parsed=[];
   await native.readArray('unused',v=>parsed.push(v),Readable.from(Array.from(source)));
   assert.deepEqual(parsed,JSON.parse(source),'Streaming handles every possible chunk boundary, nested records and escaped delimiters');

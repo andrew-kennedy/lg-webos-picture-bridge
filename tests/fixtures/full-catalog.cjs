@@ -50,6 +50,24 @@ function build() {
   }
   return {state,catalog:list,native};
 }
+// TV apps (LG's "default" input: Home Screen and webOS apps). Picture and
+// preset-selection banks only: no app-scoped motion, port or game banks.
+function addTvApps(data) {
+  const mapping={sdr:'filmMaker',hdr:'hdrFilmMaker',dolbyHdr:'dolbyHdrCinema'};
+  for(const [range,mode] of Object.entries(mapping)) {
+    const target={category:'picture',dimension:{input:'default',dynamicRange:range}},id='native_tv_apps_'+range;
+    data.catalog.push({id,name:'TV apps '+range+' preset selection',devices:[],target,settings:{pictureMode:null}});
+    data.native[id]={target,settings:{pictureMode:mode}};
+  }
+  for(const mode of Object.values(presets).flat()) {
+    const target={category:'picture',dimension:{input:'default',pictureMode:mode}},id='native_tv_apps_'+mode;
+    const settings=Object.fromEntries(banks.PICTURE.filter(k=>!omitted.has(k)).map(k=>[k,pictureValue(k,mode,'default')]));
+    if(mode==='filmMaker')Object.assign(settings,{backlight:80,sharpness:10});
+    data.catalog.push({id,name:'TV apps '+mode,devices:[],target,settings:Object.fromEntries(Object.keys(settings).map(k=>[k,null]))});
+    data.native[id]={target,settings};
+  }
+  return data;
+}
 // Evaluated in the page after editor-host's setup(): adds catalog discovery,
 // native reads and native-only saves around the managed fixture transport.
 function install(data) {
@@ -140,4 +158,4 @@ async function mountFull(page,options={},mutate) {
   await page.evaluate(options=>{const {deferred,...rest}=options;document.querySelector('lg-profile-editor').configure({...rest,request:window.requestProfile});},options);
   return data;
 }
-module.exports={build,install,mountFull,presets,genres};
+module.exports={addTvApps,build,install,mountFull,presets,genres};

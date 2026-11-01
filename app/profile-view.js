@@ -54,7 +54,7 @@
     return !Object.hasOwn((bank.variants||{})[variant]||{},key);
   }
   function inputName(bank) {
-    return String(typeof bank==='string'?bank:input(bank)||'').replace(/^hdmi([1-4])(_pc)?$/,(_,n,pc)=>'HDMI '+n+(pc?' (PC)':''));
+    return String(typeof bank==='string'?bank:input(bank)||'').replace(/^hdmi([1-4])(_pc)?$/,(_,n,pc)=>'HDMI '+n+(pc?' (PC)':'')).replace(/^default$/,'TV apps');
   }
   function brightnessRole(bank) {
     if(bank.target.category!=='picture'||bank.target.app_id||!Object.hasOwn(bank.settings,'backlight'))return null;
@@ -128,7 +128,7 @@
         const preference=key==='backlight'&&bank.brightness_role?(doc.schema===2?variant+'/'+bank.brightness_role:bank.brightness_role==='game_sdr'?'game_sdr':variant==='standard'?null:'movie_'+variant):null;
         result.push({id:bank.id+':'+key,bank,key,alias:gameKeys[key]||key,category,port,format:family,preset,
           managed:!bank.managed_keys||bank.managed_keys.includes(key),
-          input_type:d.input?(/_pc$/.test(d.input)?'pc':'video'):null,
+          input_type:d.input&&d.input!=='default'?(/_pc$/.test(d.input)?'pc':'video'):null,
           family:d.gameGenre?'game':preset?presetFamily(preset):d.dynamicRange?presetFamily(values(bank,state,variant).pictureMode):null,
           genre:d.gameGenre||null,signals:signals.length?signals:['off','on'],devices:deviceIds,
           preference,brightnessRole:key==='backlight'?bank.brightness_role:null,
@@ -141,7 +141,7 @@
   }
   function options(all) {
     const unique=(key,order)=>[...new Set(all.map(r=>r[key]).filter(Boolean))].sort((a,b)=>order?order.indexOf(a)-order.indexOf(b):a.localeCompare(b));
-    return {port:unique('port'),input_type:unique('input_type',['video','pc']),format:unique('format',['sdr','hdr','dolbyHdr']),family:unique('family',Object.keys(families)),
+    return {port:unique('port').sort((a,b)=>(a==='default')-(b==='default')),input_type:unique('input_type',['video','pc']),format:unique('format',['sdr','hdr','dolbyHdr']),family:unique('family',Object.keys(families)),
       preset:unique('preset'),genre:unique('genre'),allm:['off','on']};
   }
   function matches(record,scope={}) {

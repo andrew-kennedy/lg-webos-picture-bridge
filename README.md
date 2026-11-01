@@ -2,6 +2,8 @@
 
 LG Picture Bridge connects a **rooted 2026 LG G6 (webOS 11)** to Home Assistant. It reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision through MQTT discovery, and applies picture profiles without notification dialogs.
 
+Version **0.22.0**, with Home Assistant companion **0.13.0**, adds **TV apps** (LG's `default` input: the Home Screen and webOS apps) as an editor column after the HDMI ports. Profiles, brightness links and preset selection now cover what you see outside HDMI too, so the Home Screen can follow the Apple TV's Filmmaker standards and room brightness. See [TV apps](docs/setting-availability.md#tv-apps-0220).
+
 Version **0.21.9** restores saved values (for example **Restore standard** for one port) and promotes adjustments against one shared catalog view, like 0.21.8's reads and saves. A port restore no longer takes several seconds on the TV, so Home Assistant can restore a port before switching to it.
 
 Version **0.21.8**, with Home Assistant companion **0.12.7**, edits the G6's real **OLED Motion** control (LG's on/off `motionPro`; the editor previously offered a leveled variant that this model hides). The grid fills and saves much faster: the bridge no longer rebuilds its whole 548-bank catalog view for every bank it reads or checks. Rows and inputs where LG uses a setting nowhere, such as TruMotion in Game presets, no longer take grid space, and a chip shows them again. See [OLED Motion](docs/setting-availability.md#oled-motion-0218).

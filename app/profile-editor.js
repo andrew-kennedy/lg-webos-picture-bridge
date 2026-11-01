@@ -64,7 +64,7 @@
   const el = (tag,text,cls) => {const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
   const model = window.LGProfileView;
   const presetRank = mode => ['sdr','hdr','dolbyHdr'].indexOf(model.rowFormat('preset',mode))*100+Object.keys(model.modes).indexOf(mode);
-  const inputRank = id => {const m=/^hdmi(\d)(_pc)?$/.exec(id);return m?Number(m[1])*2+(m[2]?1:0):99;};
+  const inputRank = id => {const m=/^hdmi(\d)(_pc)?$/.exec(id);return m?Number(m[1])*2+(m[2]?1:0):id==='default'?20:99;};
   const optionText = (key,value) => key==='pictureMode'?(model.modes[value]||value):key==='truMotionMode'&&value==='user'?'User Selection':display(value);
   const cellText = (key,value) => key==='pictureMode'&&model.modes[value]?model.shortPreset(value):key==='truMotionMode'&&value==='user'?'User':display(value);
   // One label for a set of values: the value, a numeric span, or Mixed.
@@ -285,6 +285,9 @@
         const all=this.aliasRecords(alias),kind=all.length?model.coordinates(all[0]).kind:'preset',records=all.filter(r=>model.coordinates(r).kind===kind);
         const inputs=this.inputs();let columns=kind==='port'?[...new Set(inputs.map(model.physical))].map(port=>({id:port,inputs:inputs.filter(i=>model.physical(i)===port),label:model.inputName(port)})):
           inputs.map(id=>({id,inputs:[id],label:model.inputName(id)}));
+        // An input that never stores this setting (TruMotion or port settings
+        // for TV apps, for example) gets no column.
+        columns=columns.filter(c=>records.some(r=>c.inputs.some(i=>model.inColumn(r,i))));
         for(const column of columns)column.devices=this.devicesFor(column.inputs);
         const shown=records.filter(r=>columns.some(c=>c.inputs.some(i=>model.inColumn(r,i))));
         let rows=kind==='port'?['port']:[...new Set(shown.map(r=>model.coordinates(r).row))].sort(kind==='preset'?(a,b)=>presetRank(a)-presetRank(b):(a,b)=>model.ranges.indexOf(a)-model.ranges.indexOf(b));
@@ -889,7 +892,7 @@
       for(const column of spec.columns) {
         const on=column.inputs.every(i=>this.target.inputs.includes(i)),b=this.button('',()=>this.toggleColumn(column),'colh','col:'+column.id);
         b.append(el('span',column.label.replace(/ \(PC\)$/,''),'colname'));
-        b.append(el('small',/_pc$/.test(column.id)?'PC input':column.devices.length?column.devices.join(', '):spec.kind==='port'?'':'Video input'));
+        b.append(el('small',/_pc$/.test(column.id)?'PC input':column.id==='default'?'Home & apps':column.devices.length?column.devices.join(', '):spec.kind==='port'?'':'Video input'));
         if(this.isLive(column,null,'port')&&!this.status.offline)b.append(el('span','',this.picture().live?'dot':'dot last'));
         b.setAttribute('aria-pressed',String(on));b.setAttribute('aria-label',column.label+(column.devices.length?' ('+column.devices.join(', ')+')':'')+(on?' · selected':''));
         grid.append(b);

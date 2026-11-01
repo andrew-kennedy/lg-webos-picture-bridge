@@ -30,8 +30,11 @@ function target(source) {
       !plain(source.dimension)) throw fail('A category and explicit dimensions are required');
   var d = source.dimension, names = Object.keys(d).sort().join(), allowed;
   if (source.category === 'picture') {
-    if (!/^hdmi[1-4](_pc)?$/.test(d.input || '')) throw fail('Invalid picture input');
+    // "default" is LG's input for the Home Screen and webOS apps. Its motion
+    // setting is stored per app, so only its picture and preset banks qualify.
+    if (!/^(hdmi[1-4](_pc)?|default)$/.test(d.input || '')) throw fail('Invalid picture input');
     if (names === 'input,pictureMode' && PRESETS.includes(d.pictureMode)) {
+      if (source.app_id && d.input === 'default') throw fail('TV apps have no HDMI app binding');
       allowed = source.app_id ? ['truMotionMode'] : PICTURE;
       if (source.app_id && source.app_id !== 'com.webos.app.' + d.input.replace(/_pc$/, '')) throw fail('Wrong app binding');
     } else if (names === 'dynamicRange,input' && RANGES.includes(d.dynamicRange) && !source.app_id) allowed = ['pictureMode'];

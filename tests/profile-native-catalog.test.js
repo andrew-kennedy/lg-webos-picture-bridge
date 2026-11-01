@@ -33,7 +33,14 @@ module.exports=async()=>{
   const virtual={...e.snapshot(),document:{...e.snapshot().document,banks:result.catalog}};
   const all=view.records(virtual),opts=view.options(all);
   for(const preset of ['expert1','expert2','normal','hdrCinemaBright','dolbyHdrGame'])assert(opts.preset.includes(preset));
-  assert(!opts.preset.includes('hdrCinema'));assert.deepEqual(opts.port,['hdmi1','hdmi2','hdmi3','hdmi4']);assert(opts.genre.includes('FPS'));
+  assert(!opts.preset.includes('hdrCinema'));assert.deepEqual(opts.port,['hdmi1','hdmi2','hdmi3','hdmi4','default'],'TV apps (LG default input) follow the HDMI ports')
+  // TV apps: picture and preset-selection banks only. LG stores their TruMotion
+  // per app, and they have no Game Optimizer or HDMI port banks.
+  const apps=result.catalog.filter(b=>(b.target.dimension.input||b.target.dimension.gameInput)==='default');
+  assert(apps.some(b=>b.target.dimension.pictureMode&&!b.target.app_id)&&apps.some(b=>b.target.dimension.dynamicRange),'TV apps have picture and preset banks');
+  assert(apps.every(b=>b.target.category==='picture'&&!b.target.app_id),'No app-scoped motion or port banks for TV apps');
+  assert.equal(view.inputName('default'),'TV apps');
+  assert.throws(()=>require('../app/bridge/lib/profile-banks').target({category:'picture',dimension:{input:'default',pictureMode:'filmMaker'},app_id:'com.webos.app.default'}),/no HDMI app binding/);;assert(opts.genre.includes('FPS'));
   const target=result.catalog.find(b=>b.target.dimension.pictureMode==='expert1'&&b.target.dimension.input==='hdmi1'&&!b.target.app_id);
   await e.command({action:'inspect',bank_id:target.id});
   assert.equal(f.writes.length,writes,'Inspecting unused presets never writes persistent storage');

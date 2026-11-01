@@ -18,8 +18,9 @@ const variants=new Set(['motionPro','motionProOLED']);
 const offered=(index,key,target)=>!variants.has(key)||visible(index.resolve(key,target));
 
 function plan(document,index,inputs,all=false) {
-  inputs=inputs||[1,2,3,4].flatMap(n=>['hdmi'+n,'hdmi'+n+'_pc']);
-  if(!Array.isArray(inputs)||!inputs.length||inputs.length>8||new Set(inputs).size!==inputs.length||inputs.some(v=>!/^hdmi[1-4](_pc)?$/.test(v)))throw new Error('Choose valid native HDMI input identities');
+  // "default" is LG's input for the Home Screen and webOS apps (TV apps).
+  inputs=inputs||[1,2,3,4].flatMap(n=>['hdmi'+n,'hdmi'+n+'_pc']).concat('default');
+  if(!Array.isArray(inputs)||!inputs.length||inputs.length>9||new Set(inputs).size!==inputs.length||inputs.some(v=>!/^(hdmi[1-4](_pc)?|default)$/.test(v)))throw new Error('Choose valid native HDMI or TV app input identities');
   const result=[],seen=new Set();
   function add(target,keys,name) {
     const identity=canonical(target);if(seen.has(identity))return;seen.add(identity);
@@ -35,19 +36,21 @@ function plan(document,index,inputs,all=false) {
     result.push({bank,keys:missing,existing:!!existing});
   }
   for(const input of inputs) {
-    const port=input.replace(/_pc$/,''),modes=new Set();
+    const port=input.replace(/_pc$/,''),modes=new Set(),apps=input==='default',label=apps?'TV apps':input;
     for(const dynamicRange of banks.RANGES) {
       const target={category:'picture',dimension:{input,dynamicRange}};
       const offered=choices(index.resolve('pictureMode',target)).filter(v=>view.presetsFor(dynamicRange).includes(v));
       if(!offered.length)continue;
       offered.forEach(v=>modes.add(v));
-      add(target,['pictureMode'],input+' '+dynamicRange+' preset selection');
+      add(target,['pictureMode'],label+' '+dynamicRange+' preset selection');
     }
     for(const pictureMode of modes) {
       const target={category:'picture',dimension:{input,pictureMode}};
-      add(target,banks.PICTURE.filter(k=>!omitted.has(k)&&offered(index,k,target)),input+' '+view.modes[pictureMode]);
-      add({...target,app_id:'com.webos.app.'+port},['truMotionMode'],input+' '+view.modes[pictureMode]+' motion');
+      add(target,banks.PICTURE.filter(k=>!omitted.has(k)&&offered(index,k,target)),label+' '+view.modes[pictureMode]);
+      // TV apps store TruMotion per app, and have no Game Optimizer or HDMI port banks.
+      if(!apps)add({...target,app_id:'com.webos.app.'+port},['truMotionMode'],input+' '+view.modes[pictureMode]+' motion');
     }
+    if(apps)continue;
     const target={category:'other',dimension:{gameInput:port}};
     add(target,banks.PORT,port+' connection');
     const genres=choices(index.resolve('gameGenre',target)).filter(v=>['Standard','FPS','RPG','RTS','Sports','USER'].includes(v));

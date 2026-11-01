@@ -60,7 +60,7 @@ function create(environment, allowed) {
     if (!allowed.has(key)) return;
     if (record.country && record.country !== 'none') return;
     if (record.app_id && record.app_id !== 'default') return;
-    if (isOverride && !/@(?:picture|other)\$hdmi[1-4](?:_pc)?\./.test(record.key)) return;
+    if (isOverride && !/@(?:picture|other)\$(?:hdmi[1-4](?:_pc)?|default)\./.test(record.key)) return;
     if (!isOverride && !['picture','other'].includes(record.category)) return;
     const conditions=Object.entries(record.condition || {});
     if (conditions.some(([k,v])=>environment[k] !== v)) return;
