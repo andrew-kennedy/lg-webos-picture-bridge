@@ -62,7 +62,10 @@ function create(options) {
         remember(b.target,value.settings);readCache.set('native:'+b.id,value.settings);
       }
     }
-    return chosen.map(b=>browser().banks.find(v=>v.id===b.id));
+    // Build the merged view once: it covers the whole catalog, so rebuilding
+    // it per bank made large reads cost ~40 ms per bank on the TV.
+    const merged=new Map(browser().banks.map(v=>[v.id,v]));
+    return chosen.map(b=>merged.get(b.id));
   }
   async function capture(check=()=>{}) {
     await load();const all=metadata();

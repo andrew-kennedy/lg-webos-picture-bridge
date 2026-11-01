@@ -335,13 +335,22 @@ function create(options) {
         return value;
       }};
   }
-  async function inspect(bank, variant = 'standard', readCache) {
+  // Each merged catalog view costs ~40 ms on the TV. A command that checks
+  // many targets against one unchanged candidate shares one view per variant.
+  function sharedEditorOptions(candidate = saved) {
+    const views = new Map();
+    return (variant = 'standard') => {
+      if (!views.has(variant)) views.set(variant,editorOptions(variant,candidate));
+      return views.get(variant);
+    };
+  }
+  async function inspect(bank, variant = 'standard', readCache, prepared) {
     guard();
     if (options.inspect) return options.inspect(bank);
     return new Promise((resolve,reject) => {
       const epoch = powerEpoch;
       const check = () => { guard(); if (epoch !== powerEpoch) throw new Error('TV power session changed'); };
-      const run = done => banks.inspect(options.service,bank,check,() => context,{...editorOptions(variant),readCache}).then(v => done(null,v),done);
+      const run = done => banks.inspect(options.service,bank,check,() => context,{...(prepared || editorOptions(variant)),readCache}).then(v => done(null,v),done);
       if (options.enqueue) options.enqueue(run,(e,v) => e ? reject(e) : resolve(v)); else run((e,v) => e ? reject(e) : resolve(v));
     });
   }
@@ -368,22 +377,23 @@ function create(options) {
     if(conflicts.length)throw new Error('Native values changed after review; newer values were preserved. Refresh and review again: '+conflicts.join(', '));
   }
   async function validateSharedBrightness(candidate, patch, inspected, check) {
+    const current=sharedEditorOptions(), checked=sharedEditorOptions(candidate);
     if(candidate.document.schema===2) {
       for(const bank of candidate.document.banks.filter(b=>b.brightness_role))for(const variant of ['standard',...catalog.ids(candidate.document)]) {
         const value=resolved(bank,variant,candidate).backlight;
         if(model.same(value,resolved(bankById(bank.id),variant).backlight))continue;
-        if(!inspected.has(bank.id))inspected.set(bank.id,await inspect(bankById(bank.id)));
-        check();availability.assertEditable('backlight',value,bank,inspected.get(bank.id),editorOptions(variant,candidate));
+        if(!inspected.has(bank.id))inspected.set(bank.id,await inspect(bankById(bank.id),'standard',undefined,current()));
+        check();availability.assertEditable('backlight',value,bank,inspected.get(bank.id),checked(variant));
       }
       return;
     }
     for (const bank of candidate.document.banks.filter(b=>b.brightness_role)) {
       const roles = bank.brightness_role === 'game_sdr' ? ['game_sdr'] : ['movie_bright','movie_dark'];
       for (const role of roles.filter(r=>Object.hasOwn(patch,r))) {
-        if (!inspected.has(bank.id)) inspected.set(bank.id,await inspect(bankById(bank.id)));
+        if (!inspected.has(bank.id)) inspected.set(bank.id,await inspect(bankById(bank.id),'standard',undefined,current()));
         check();
-        availability.assertEditable('backlight',candidate.preferences[role],bank,inspected.get(bank.id),
-          editorOptions(role === 'game_sdr' ? 'standard' : role.slice(6),candidate));
+        const variant = role === 'game_sdr' ? 'standard' : role.slice(6);
+        availability.assertEditable('backlight',candidate.preferences[role],bank,inspected.get(bank.id),checked(variant));
       }
     }
   }
@@ -519,8 +529,11 @@ function create(options) {
         if(!Array.isArray(ids)||!ids.length||ids.length>32||new Set(ids).size!==ids.length)throw new Error('Inspect 1–32 unique native banks');
         const results=[],readCache=new Map(),captured=model.canonical(context),epoch=powerEpoch;
         const chosen=catalogueReady?await browser.prepare(ids,readCache):ids.map(bankById);
+        // One merged document serves the whole batch. Its dependency values
+        // (preset mappings, motion modes) were read by prepare above.
+        const prepared=sharedEditorOptions()(input.variant||'standard');
         for(const bank of chosen) {
-          const result=await inspect(bank,input.variant||'standard',readCache);
+          const result=await inspect(bank,input.variant||'standard',readCache,prepared);
           browser.remember(bank.target,result.settings);
           externalGuard();guard();if(epoch!==powerEpoch||captured!==model.canonical(context))throw new Error('TV signal changed while checking availability');
           for(const key of ['descriptions','factory_descriptions','active_values','preset_description','genre_description'])delete result[key];
@@ -664,20 +677,28 @@ function create(options) {
           const variant=key==='game_sdr'?'standard':candidate.document.automatic[key.slice(6)],role=key==='game_sdr'?'game_sdr':'movie_sdr';
           prefValues[variant+'/'+role]=value;
         } else Object.assign(prefValues,prefPatch);
-        for (const edit of edits) {
-          if (!edit || typeof edit !== 'object' || Array.isArray(edit)) throw new Error('Invalid bank edit');
-          if(!originals.has(edit.bank_id)) {
-            if(catalogueReady||!document().banks.some(b=>b.id===edit.bank_id)) {
-              const info=await inspectNative(edit.bank_id,'standard',readCache);catalogueReady=true;
-              originals.set(edit.bank_id,info.bank);inspected.set(edit.bank_id,info.result);
-            } else originals.set(edit.bank_id,bankById(edit.bank_id));
+        if (edits.some(edit => !edit || typeof edit !== 'object' || Array.isArray(edit))) throw new Error('Invalid bank edit');
+        // Read every catalogue target and its preset/motion dependencies in one
+        // pass, then inspect them against one shared view. Once a batch needs
+        // the catalogue, later targets are read through it too.
+        let viaCatalogue=catalogueReady;
+        const nativeIds=[...new Set(edits.map(edit=>edit.bank_id))].filter(id=>viaCatalogue=viaCatalogue||!document().banks.some(b=>b.id===id));
+        const current=sharedEditorOptions();
+        if(nativeIds.length) {
+          const prepared=await browser.prepare(nativeIds,readCache);catalogueReady=true;
+          for(const bank of prepared) {
+            const result=await inspect(bank,'standard',readCache,current());
+            browser.remember(bank.target,result.settings);originals.set(bank.id,bank);inspected.set(bank.id,result);check();
           }
+        }
+        for (const edit of edits) {
+          if(!originals.has(edit.bank_id))originals.set(edit.bank_id,bankById(edit.bank_id));
           const original=originals.get(edit.bank_id),bank=original,variant=edit.variant||'standard',patch=edit.settings===undefined?{}:edit.settings,inherit=edit.inherit===undefined?[]:edit.inherit;
           if (!catalog.valid(candidate.document,variant) || !patch || typeof patch !== 'object' || Array.isArray(patch) ||
               !Array.isArray(inherit) || inherit.length>40 || new Set(inherit).size!==inherit.length ||
               (!Object.keys(patch).length&&!inherit.length) || [...Object.keys(patch),...inherit].some(k=>typeof k!=='string'||!Object.hasOwn(bank.settings,k))) throw new Error('Invalid bank edit');
           if(inherit.length&&(candidate.document.schema!==2||variant==='standard'))throw new Error('Only named profiles can inherit from Base');
-          if (!inspected.has(bank.id)) inspected.set(bank.id,await inspect(original));
+          if (!inspected.has(bank.id)) inspected.set(bank.id,await inspect(original,'standard',undefined,current()));
           check();
           const live = inspected.get(bank.id);
           for (const [key,value] of Object.entries(patch)) {
@@ -750,12 +771,12 @@ function create(options) {
         // Validate the completed candidate, so dependency edits in the same
         // transaction are independent of their order. Nothing is persisted or
         // applied until every target passes its own applicability check.
-        const validation={...candidate,document:browser.browser(candidate.document)};
+        const validation={...candidate,document:browser.browser(candidate.document)},validate=sharedEditorOptions(validation);
         for(const entry of direct.values())Object.assign(validation.document.banks.find(b=>b.id===entry.id).settings,entry.settings);
         for (const edit of edits) {
           const bank = validation.document.banks.find(b=>b.id===edit.bank_id), live = inspected.get(bank.id);
           for (const [key,value] of Object.entries(edit.settings||{}))
-            availability.assertEditable(key,value,bank,live,editorOptions(edit.variant || 'standard',validation));
+            availability.assertEditable(key,value,bank,live,validate(edit.variant || 'standard'));
           // Removing an override can also clean up a dormant/unused setting.
           // Validate Base's storage scope and range without treating cleanup
           // as permission to introduce a new processing value in that mode.

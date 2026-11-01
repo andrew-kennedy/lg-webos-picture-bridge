@@ -18,7 +18,7 @@ const unknown = reason => ({state:'unverified',editable:false,reason});
 const groups = {
   brightnessActive:new Set(['backlight','contrast','brightness','gamma','gammaLevel','peakBrightness','hdrDynamicToneMapping','expressionEnhancer','dynamicContrast','nearBlackDetail']),
   colorActive:new Set(['color','tint','colorTemperature','colorGamut','dynamicColor']),
-  clarityActive:new Set(['sharpness','superResolution','noiseReduction','mpegNoiseReduction','smoothGradation','realCinema','truMotionMode','truMotionJudder','truMotionBlur','motionProOLED','dolbyPrecisionDetail'])
+  clarityActive:new Set(['sharpness','superResolution','noiseReduction','mpegNoiseReduction','smoothGradation','realCinema','truMotionMode','truMotionJudder','truMotionBlur','motionProOLED','motionPro','dolbyPrecisionDetail'])
 };
 
 // These policies were traced in this controller, not inferred from a firmware

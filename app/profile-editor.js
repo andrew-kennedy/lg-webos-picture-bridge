@@ -3,7 +3,7 @@
   'use strict';
   const titles = {backlight:'OLED pixel brightness',contrast:'Contrast',brightness:'Black level',color:'Color depth',sharpness:'Sharpness',blackLevel:'HDMI RGB range',colorTemperature:'Color temperature',gameColorDepth:'Game color depth',gameSharpness:'Game sharpness',gameAdjustContrast:'Game contrast',gameBlackLevel:'Game black level',lowLevelAdjustment:'Fine tune dark areas',blackStabilizer:'Black stabilizer',whiteStabilizer:'White stabilizer',hdrDynamicToneMapping:'HDR tone mapping',pictureMode:'Picture mode',realCinema:'Real Cinema',truMotionMode:'TruMotion',enableALLM:'Auto low latency mode',enableQFT:'Quick frame transport'};
   titles.enable144HzBooster='Refresh rate boost';
-  Object.assign(titles,{dolbyPrecisionDetail:'Dolby Precision Detail',expressionEnhancer:'Expression Enhancer',gammaLevel:'Gamma fine adjustment',dynamicContrast:'Auto Dynamic Contrast',dynamicColor:'Dynamic color',mpegNoiseReduction:'MPEG noise reduction',gameOptimization:'VRR & G-Sync',inputOptimization:'Prevent input delay',uhdDeepColor:'HDMI Deep Color',freesync:'AMD FreeSync',truMotionJudder:'TruMotion de-judder',truMotionBlur:'TruMotion de-blur',motionProOLED:'OLED Motion'});
+  Object.assign(titles,{dolbyPrecisionDetail:'Dolby Precision Detail',expressionEnhancer:'Expression Enhancer',gammaLevel:'Gamma fine adjustment',dynamicContrast:'Auto Dynamic Contrast',dynamicColor:'Dynamic color',mpegNoiseReduction:'MPEG noise reduction',gameOptimization:'VRR & G-Sync',inputOptimization:'Prevent input delay',uhdDeepColor:'HDMI Deep Color',freesync:'AMD FreeSync',truMotionJudder:'TruMotion de-judder',truMotionBlur:'TruMotion de-blur',motionPro:'OLED Motion',motionProOLED:'OLED Motion Pro'});
   // Plain-language help, checked against the G6's own Settings/Game Optimizer
   // help and value labels. See docs/setting-help.md for sources and caveats.
   // Keep this local: rendering help requires no TV reads or persistent writes.
@@ -34,7 +34,8 @@
     truMotionMode:'Smooths movement using motion processing. Stronger smoothing can make films look like live video. Save User Selection to edit de-judder and de-blur for this preset, including while its source is inactive.',
     truMotionJudder:'Adjusts smoothing for the stepping motion visible in low-frame-rate content. Used with TruMotion’s User Selection mode.',
     truMotionBlur:'Adjusts TruMotion’s reduction of motion blur. Used with TruMotion’s User Selection mode.',
-    motionProOLED:'Uses dark intervals between displayed frames to improve motion clarity. This can dim the picture and make flicker visible.',
+    motionPro:'Uses dark intervals between displayed frames to improve motion clarity. This can dim the picture and make flicker visible.',
+    motionProOLED:'The leveled OLED Motion Pro variant used by some LG models. The G6 uses the on/off OLED Motion control instead.',
     lowLevelAdjustment:'Fine-tunes dark game areas when variable refresh rate is enabled. It adjusts shadow visibility separately from the normal black-level control.',
     blackStabilizer:'Adjusts visibility in dark game scenes, helping objects stand out in shadows. Changes can also alter the intended contrast.',
     whiteStabilizer:'Adjusts visibility in bright game scenes, helping objects stand out in highlights. It is separate from the panel’s Peak brightness setting.',
@@ -79,7 +80,7 @@
     constructor() {
       super();this.attachShadow({mode:'open'});
       this.variant='standard';this.draft={};this.epoch=0;this.editingKey=null;this.live={};this.liveVersion=0;this.expanded=new Set();
-      this.setting=null;this.target=null;this.allPresets=false;this.allInputs=false;this.pane='list';this.view='edit';this.memo=new Map();this.liveEpoch=0;this.inflight=new Set();
+      this.setting=null;this.target=null;this.allPresets=false;this.allInputs=false;this.showNa=false;this.pane='list';this.view='edit';this.memo=new Map();this.liveEpoch=0;this.inflight=new Set();
       // ShadowRoot has no onkeydown event-handler property. Keep one listener
       // across renders, including the empty/offline editor.
       this.shadowRoot.addEventListener('keydown',event=>{this.focusValue=false;this.remoteKey(event);});
@@ -194,7 +195,7 @@
     }
     records() { return this.recordsFor(this.variant); }
     cached(key,build) {
-      const stamp=[this.records(),this.liveVersion,this.allPresets,this.allInputs,JSON.stringify(this.target),this.onlyOverrides,this.view];
+      const stamp=[this.records(),this.liveVersion,this.allPresets,this.allInputs,this.showNa,JSON.stringify(this.target),this.onlyOverrides,this.view];
       const hit=this.memo.get(key);
       if(hit&&hit.stamp.every((v,i)=>v===stamp[i]))return hit.value;
       const value=build();this.memo.set(key,{stamp,value});return value;
@@ -277,19 +278,41 @@
     }
     // The visible grid for one setting: columns are inputs (or physical
     // ports for port-wide settings); rows are presets, signal ranges or one
-    // port-wide row. Rows the setting never stores are omitted.
+    // port-wide row. Rows the setting never stores are omitted, and so are
+    // rows and columns where LG uses it nowhere (unless asked to show them).
     gridSpec(alias) {
       return this.cached('grid:'+alias,()=>{
         const all=this.aliasRecords(alias),kind=all.length?model.coordinates(all[0]).kind:'preset',records=all.filter(r=>model.coordinates(r).kind===kind);
-        const inputs=this.inputs(),columns=kind==='port'?[...new Set(inputs.map(model.physical))].map(port=>({id:port,inputs:inputs.filter(i=>model.physical(i)===port),label:model.inputName(port)})):
+        const inputs=this.inputs();let columns=kind==='port'?[...new Set(inputs.map(model.physical))].map(port=>({id:port,inputs:inputs.filter(i=>model.physical(i)===port),label:model.inputName(port)})):
           inputs.map(id=>({id,inputs:[id],label:model.inputName(id)}));
         for(const column of columns)column.devices=this.devicesFor(column.inputs);
         const shown=records.filter(r=>columns.some(c=>c.inputs.some(i=>model.inColumn(r,i))));
         let rows=kind==='port'?['port']:[...new Set(shown.map(r=>model.coordinates(r).row))].sort(kind==='preset'?(a,b)=>presetRank(a)-presetRank(b):(a,b)=>model.ranges.indexOf(a)-model.ranges.indexOf(b));
         let hidden=0;
         if(kind==='preset'&&!this.allPresets){const used=this.usedPresets(),narrowed=rows.filter(r=>used.has(r));if(narrowed.length){hidden=rows.length-narrowed.length;rows=narrowed;}}
-        return {kind,records,columns,rows,hidden,game:records.some(r=>r.bank.target.dimension.gameGenre)};
+        // Judge n/a lines on the rows actually shown: folded presets are never read.
+        let na=this.status.offline?{rows:[],columns:[]}:this.unusedLines(records,columns,rows);
+        // Never hide the whole grid: its n/a cells then explain the setting.
+        if(na.rows.length===rows.length||na.columns.length===columns.length)na={rows:[],columns:[]};
+        else if(!this.showNa){rows=rows.filter(r=>!na.rows.includes(r));columns=columns.filter(c=>!na.columns.includes(c));}
+        return {kind,records,columns,rows,hidden,na,game:records.some(r=>r.bank.target.dimension.gameGenre)};
       });
+    }
+    // A row or column is n/a once LG has described every stored target in it
+    // and uses the setting in none of them (TruMotion in Game presets and PC
+    // inputs, for example), even if selected: the value box then explains it.
+    // Targets still loading keep it shown; the room lock on shared brightness
+    // is not LG's n/a.
+    unusedLines(records,columns,rows) {
+      const cells=new Map(),key=(row,column)=>row+'\n'+column.id;
+      for(const r of records) {
+        if(!this.filtered(r))continue;
+        const row=model.coordinates(r).row;
+        for(const c of columns)if(c.inputs.some(i=>model.inColumn(r,i))){const k=key(row,c);if(!cells.has(k))cells.set(k,[]);cells.get(k).push(r);}
+      }
+      const na=r=>{const s=this.lgStatus(r);return !s.editable&&s.state!=='pending';};
+      const unused=list=>{const stored=list.filter(Boolean);return stored.length>0&&stored.every(l=>l.every(na));};
+      return {rows:rows.filter(row=>unused(columns.map(c=>cells.get(key(row,c))))),columns:columns.filter(c=>unused(rows.map(row=>cells.get(key(row,c)))))};
     }
     filtered(record) {
       const d=record.bank.target.dimension;if(!d.gameGenre)return true;
@@ -544,9 +567,12 @@
       field.append(list);return field;
     }
     targetPhrase(spec) {
-      const t=this.target,columns=spec.columns.filter(c=>c.inputs.some(i=>t.inputs.includes(i)));
-      if(!columns.length)return 'No inputs selected';
-      const inputs=columns.length===spec.columns.length&&columns.length>1?(spec.kind==='port'?'All ports':'All inputs'):columns.map(c=>c.label).join(', ');
+      // Selected targets on hidden n/a lines are still named, marked n/a.
+      const t=this.target,columns=spec.columns.filter(c=>c.inputs.some(i=>t.inputs.includes(i))),hiddenNa=this.showNa?{rows:[],columns:[]}:spec.na;
+      const naColumns=hiddenNa.columns.filter(c=>c.inputs.some(i=>t.inputs.includes(i)));
+      if(!columns.length&&!naColumns.length)return 'No inputs selected';
+      const inputs=[columns.length?columns.length===spec.columns.length&&columns.length>1?(spec.kind==='port'?'All ports':'All inputs'):columns.map(c=>c.label).join(', '):'',
+        ...naColumns.map(c=>c.label+' (n/a)')].filter(Boolean).join(', ');
       if(spec.kind==='port')return inputs;
       const selected=this.rowList(spec.kind),parts=[];
       for(const format of ['sdr','hdr','dolbyHdr']) {
@@ -556,6 +582,8 @@
         else if(chosen.length===rows.length&&rows.length>1)parts.push('all '+formatNames[format]+(spec.hidden?' presets in use':' presets'));
         else parts.push(...chosen.map(r=>model.modes[r]||r));
       }
+      for(const r of hiddenNa.rows.filter(r=>selected.includes(r)))
+        parts.push((spec.kind==='range'?formatNames[model.rowFormat('range',r)]+' '+model.rowLabel('range',r).toLowerCase():model.modes[r]||r)+' (n/a)');
       return inputs+' · '+(parts.length?parts.join(', '):'no '+(spec.kind==='range'?'signals':'presets')+' selected');
     }
     isLive(column,row,kind) {
@@ -837,6 +865,14 @@
       head.append(quick);host.append(head);
       const views=el('div',undefined,'chips views');
       if(spec.kind==='preset'&&(spec.hidden||this.allPresets))views.append(this.toggle(this.allPresets?'Showing all presets':'Show '+spec.hidden+' more presets',this.allPresets,()=>{this.allPresets=!this.allPresets;this.renderPanes();this.inspect();},'grid:all-presets','chip quiet'));
+      const naRows=spec.na.rows.length,naColumns=spec.na.columns.length;
+      if(naRows||naColumns) {
+        const rowName=n=>spec.kind==='range'?(n===1?'signal':'signals'):spec.kind==='port'?'row':(n===1?'preset':'presets');
+        const columnName=n=>spec.kind==='port'?(n===1?'port':'ports'):(n===1?'input':'inputs');
+        const counted=[naRows?naRows+' '+rowName(naRows):'',naColumns?naColumns+' '+columnName(naColumns):''].filter(Boolean).join(' and ');
+        const named=[naRows?rowName(2):'',naColumns?columnName(2):''].filter(Boolean).join(' and ')||'rows';
+        views.append(this.toggle(this.showNa?'Showing n/a '+named:'Show '+counted+' LG doesn’t use',this.showNa,()=>{this.showNa=!this.showNa;this.renderPanes();this.inspect();},'grid:show-na','chip quiet'));
+      }
       if(spec.kind!=='port'&&this.hasInputTypes())views.append(this.toggle(this.allInputs?'Showing PC and video inputs':'Show PC and video inputs separately',this.allInputs,()=>{this.allInputs=!this.allInputs;this.renderPanes();this.inspect();},'grid:all-inputs','chip quiet'));
       if(views.childElementCount)host.append(views);
       if(spec.game) {

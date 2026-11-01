@@ -74,6 +74,16 @@ module.exports=async()=>{
   assert.equal(f.operations.length,nativeOps,'Compaction does not change native values');
   await assert.rejects(e.command({action:'inspect_many',bank_ids:Array(33).fill('movie')}),/1–32/);
   assert.throws(()=>native.plan(doc,index,['hdmi5']),/valid native HDMI/);
+  // LG enables one OLED Motion control per model. The G6's factory table
+  // enables on/off motionPro and hides the leveled motionProOLED twin.
+  for(const [model,shown,hidden] of [['oled_motion','motionPro','motionProOLED'],['oled_motion_pro','motionProOLED','motionPro']]) {
+    const motion={size:()=>1,resolve(key,target){
+      if(['motionPro','motionProOLED'].includes(key)&&target.dimension.pictureMode&&!target.app_id){const r=description(key,target,['off','on']);r.ui.visible=r.ui.active=key===shown;return r;}
+      return index.resolve(key,target);
+    }};
+    const planned=native.plan({...doc,banks:[]},motion,['hdmi3'],true).filter(p=>p.bank.target.dimension.pictureMode&&!p.bank.target.app_id);
+    assert(planned.length&&planned.every(p=>p.keys.includes(shown)&&!p.keys.includes(hidden)),model+' lists only '+shown);
+  }
   const hidden={id:'hidden',target:{category:'picture',dimension:{input:'hdmi3',pictureMode:'hdrCinema'}},settings:{backlight:50}};
   const d=description('backlight',hidden.target),preset=index.resolve('pictureMode',{category:'picture',dimension:{input:'hdmi3',dynamicRange:'hdr'}});
   assert.equal(availability.describe('backlight',hidden,{factory:d,value:50,preset},{reviewed:true,values:b=>b.settings}).editable,false);
@@ -95,4 +105,21 @@ module.exports=async()=>{
   assert.deepEqual(m.snapshot().document.banks.find(b=>b.id===target.id).settings,{backlight:51},'Overlay baselines survive while their copied siblings are removed');
   m.stop();
   e.stop();
+};
+// Reading a batch builds the merged catalog view once, not once per bank:
+// on the TV each rebuild of a 548-bank view costs ~40 ms.
+const nativeState=require('../app/bridge/lib/profile-native-state');
+const batchCheck=module.exports;
+module.exports=async()=>{
+  await batchCheck();
+  const definitions=Array.from({length:40},(_,i)=>({id:'n'+i,name:'n'+i,devices:[],target:{category:'picture',dimension:{input:'hdmi3',pictureMode:'p'+i}},settings:{backlight:null}}));
+  let reads=0;
+  const s=nativeState.create({document:()=>{reads++;return {...doc,banks:[]};},now:()=>1,index:{size:()=>1,resolve:()=>null},
+    read:async c=>({banks:c.banks.map(b=>({id:b.id,settings:{backlight:40}}))})});
+  const discover=native.discover;native.discover=async()=>definitions;
+  try {await s.load();} finally {native.discover=discover;}
+  reads=0;
+  const prepared=await s.prepare(definitions.slice(0,32).map(b=>b.id));
+  assert.equal(prepared.length,32);assert.equal(prepared[5].settings.backlight,40);
+  assert(reads<=4,'prepare rebuilt the merged view '+reads+' times for one batch');
 };

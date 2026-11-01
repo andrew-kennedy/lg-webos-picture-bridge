@@ -10,6 +10,12 @@ const canonical=value=>JSON.stringify(Object.keys(value).sort().reduce((r,k)=>(r
 const visible=d=>d&&d.ui&&d.ui.visible===true&&d.ui.active===true;
 const choices=d=>visible(d)?(d.values&&d.values.arrayExt||[]).filter(v=>v.visible===true&&v.active===true).map(v=>v.value):[];
 const omitted=new Set(['motionEyeCare','aiHdrRemastering','ambientLightCompensation']);
+// LG ships two OLED Motion controls and enables one per model through the
+// motionProMode condition: the G6 (oled_motion) uses on/off motionPro, while
+// oled_motion_pro models use the leveled motionProOLED. List only the one this
+// TV's factory table enables, so the editor never shows a permanently hidden twin.
+const variants=new Set(['motionPro','motionProOLED']);
+const offered=(index,key,target)=>!variants.has(key)||visible(index.resolve(key,target));
 
 function plan(document,index,inputs,all=false) {
   inputs=inputs||[1,2,3,4].flatMap(n=>['hdmi'+n,'hdmi'+n+'_pc']);
@@ -39,7 +45,7 @@ function plan(document,index,inputs,all=false) {
     }
     for(const pictureMode of modes) {
       const target={category:'picture',dimension:{input,pictureMode}};
-      add(target,banks.PICTURE.filter(k=>!omitted.has(k)),input+' '+view.modes[pictureMode]);
+      add(target,banks.PICTURE.filter(k=>!omitted.has(k)&&offered(index,k,target)),input+' '+view.modes[pictureMode]);
       add({...target,app_id:'com.webos.app.'+port},['truMotionMode'],input+' '+view.modes[pictureMode]+' motion');
     }
     const target={category:'other',dimension:{gameInput:port}};

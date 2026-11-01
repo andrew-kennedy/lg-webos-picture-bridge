@@ -11,7 +11,7 @@ var PRESETS = Object.keys(view.modes);
 var RANGES = ['sdr', 'sdrALLM', 'hdr', 'hdrALLM', 'dolbyHdr', 'dolbyHdrALLM'];
 var PICTURE = ('backlight contrast brightness color tint sharpness colorTemperature colorGamut gamma gammaLevel ' +
   'peakBrightness hdrDynamicToneMapping expressionEnhancer dynamicContrast dynamicColor superResolution ' +
-  'noiseReduction mpegNoiseReduction smoothGradation realCinema truMotionJudder truMotionBlur motionEyeCare motionProOLED ' +
+  'noiseReduction mpegNoiseReduction smoothGradation realCinema truMotionJudder truMotionBlur motionEyeCare motionProOLED motionPro ' +
   'aiHdrRemastering ambientLightCompensation filmmakerAmbientLight dolbyPrecisionDetail nearBlackDetail blackLevel').split(' ');
 var GAME = ['gameAdjustContrast', 'gameBlackLevel', 'gameColorDepth', 'gameSharpness',
   'blackStabilizer', 'whiteStabilizer', 'lowLevelAdjustment'];

@@ -24,8 +24,14 @@ for(const [mode,settings] of [['expert1',{color:40,gamma:'high2'}],['expert2',{c
   // PC and video identities of one port are separate columns.
   await a.open('gamma');
   for(const row of ['expert1','expert2'])assert(await a.focusKey('row:'+row).isVisible());
-  assert.equal(await a.focusKey('row:hdrCinemaBright').count(),1,'Gamma rows include HDR presets so their exclusion is visible');
+  // HDR rows LG never uses for Gamma take no space until asked for; then
+  // their exclusion is visible.
+  assert.equal(await a.focusKey('row:hdrCinemaBright').count(),0,'n/a HDR Gamma rows are hidden');
+  assert.match(await a.focusKey('grid:show-na').textContent(),/^Show \d+ presets? LG doesn’t use$/);
+  await a.focusKey('grid:show-na').click();
+  assert.equal(await a.focusKey('row:hdrCinemaBright').count(),1,'Shown on request so their exclusion is visible');
   assert.match(await a.cell('hdmi3','hdrCinemaBright').getAttribute('aria-label'),/not used — Gamma does not apply to HDR/);
+  await a.focusKey('grid:show-na').click();
   assert(await a.focusKey('col:hdmi3_pc').getByText('PC input').isVisible());assert(await a.focusKey('col:hdmi3').isVisible());
   assert.equal(await a.choice('gamma').inputValue(),'high2');
   assert(await q('.valuebox').getByText('4 selected values are skipped',{exact:false}).isVisible());

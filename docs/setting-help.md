@@ -25,6 +25,7 @@ Public references corroborate the picture-processing descriptions: [LG's brightn
 | `inputOptimization` | **Prevent Input Delay (Input Lag)**: `auto` = Standard; `on` = Boost. LG limits Boost to the Game Optimizer picture mode. |
 | `lowLevelAdjustment` | Fine Tune Dark Areas, associated with VRR/FreeSync. Separate from ordinary Black Level and Near Black Detail. |
 | `enableQFT` | Quick Frame Transport requires source support. LG explicitly notes possible restrictions on resolution and Dolby Vision. |
+| `motionPro` | **OLED Motion** on the G6, an On/Off switch (`tv.model.motionProMode` = `OLED Motion`). `motionProOLED` is the leveled OLED Motion Pro variant used by other models and is hidden on this TV. |
 | `enable144HzBooster` | The native key retains its old name; the G6 supports a 165 Hz mode. The source must support the corresponding rate. |
 
 The descriptions deliberately make no unverified claims about exact input-lag savings, measured brightness, Dolby processing algorithms or which numeric near-black adjustment is optimal. Native keys, option values, profile targets and write behavior remain unchanged.

@@ -8,7 +8,8 @@ const catalog=require('../../app/bridge/lib/profile-catalog');
 const banks=require('../../app/bridge/lib/profile-banks');
 const presets={sdr:['personalized','vivid','normal','eco','cinema','game','filmMaker','expert1','expert2'],hdr:['hdrPersonalized','hdrVivid','hdrStandard','hdrEco','hdrCinemaBright','hdrGame','hdrFilmMaker'],dolbyHdr:['dolbyHdrPersonalized','dolbyHdrVivid','dolbyHdrStandard','dolbyHdrCinemaBright','dolbyHdrCinema','dolbyHdrGame']};
 const genres=['Standard','FPS','RPG','RTS','Sports','USER'];
-const omitted=new Set(['motionEyeCare','aiHdrRemastering','ambientLightCompensation']);
+// The G6 enables on/off OLED Motion (motionPro); its leveled twin is not listed.
+const omitted=new Set(['motionEyeCare','aiHdrRemastering','ambientLightCompensation','motionProOLED']);
 const defaultMapping={sdr:'normal',sdrALLM:'game',hdr:'hdrStandard',hdrALLM:'hdrGame',dolbyHdr:'dolbyHdrStandard',dolbyHdrALLM:'dolbyHdrGame'};
 const canonical=target=>JSON.stringify(target,Object.keys(target).concat(Object.keys(target.dimension)).sort());
 const formatOf=mode=>mode.startsWith('dolbyHdr')?'dolbyHdr':mode.startsWith('hdr')?'hdr':'sdr';
@@ -17,7 +18,7 @@ function pictureValue(key,mode,input) {
   const values={backlight:f==='sdr'?(movie?40:80):100,contrast:f==='sdr'?85:100,brightness:50,color:/vivid/i.test(mode)?60:/^expert/.test(mode)?45:50,tint:0,sharpness:game||movie?0:10,
     colorTemperature:movie||/^expert/.test(mode)?-40:0,colorGamut:'auto',gamma:f==='sdr'?(movie?'bt1886':'high2'):'medium',gammaLevel:0,peakBrightness:'off',hdrDynamicToneMapping:game?'HGIG':'on',
     expressionEnhancer:'off',dynamicContrast:movie?'off':'low',dynamicColor:'off',superResolution:'off',noiseReduction:'off',mpegNoiseReduction:'off',smoothGradation:'low',realCinema:'on',
-    truMotionJudder:0,truMotionBlur:10,motionProOLED:'off',filmmakerAmbientLight:'off',dolbyPrecisionDetail:'off',nearBlackDetail:0,blackLevel:{hdmi:'auto'}};
+    truMotionJudder:0,truMotionBlur:10,motionPro:'off',filmmakerAmbientLight:'off',dolbyPrecisionDetail:'off',nearBlackDetail:0,blackLevel:{hdmi:'auto'}};
   if(key==='color'&&input==='hdmi2'&&mode==='normal')return 55;
   return values[key];
 }
@@ -56,7 +57,7 @@ function install(data) {
     truMotionJudder:[0,10],truMotionBlur:[0,10],gameAdjustContrast:[0,100],gameBlackLevel:[0,100],gameColorDepth:[0,100],gameSharpness:[0,50],blackStabilizer:[0,20],whiteStabilizer:[0,20],lowLevelAdjustment:[0,20]};
   const choices={colorGamut:['auto','extended','wide'],gamma:['high2','mediumHavingLevel','bt1886'],peakBrightness:['off','low','medium','high'],hdrDynamicToneMapping:['on','HGIG','off'],expressionEnhancer:['off','detail','highlight'],
     dynamicContrast:['off','low','medium','high'],dynamicColor:['off','low','medium','high'],superResolution:['off','low','medium','high'],noiseReduction:['off','low','medium','high','auto'],mpegNoiseReduction:['off','low','medium','high','auto'],
-    smoothGradation:['off','low','medium','high'],realCinema:['off','on'],truMotionMode:['off','cinemaClear','natural','smooth','user'],motionProOLED:['off','on'],filmmakerAmbientLight:['off','on'],dolbyPrecisionDetail:['off','on'],blackLevel:['auto','high','low'],
+    smoothGradation:['off','low','medium','high'],realCinema:['off','on'],truMotionMode:['off','cinemaClear','natural','smooth','user'],motionPro:['on','off'],filmmakerAmbientLight:['off','on'],dolbyPrecisionDetail:['off','on'],blackLevel:['auto','high','low'],
     gameGenre:['Standard','FPS','RPG','RTS','Sports','USER'],inputOptimization:['auto','on'],gameOptimization:['off','on'],enableALLM:['off','on'],enableQFT:['off','on'],enable144HzBooster:['off','on'],uhdDeepColor:['off','on'],freesync:['off','on']};
   const mapping={sdr:['personalized','vivid','normal','eco','cinema','game','filmMaker','expert1','expert2'],hdr:['hdrPersonalized','hdrVivid','hdrStandard','hdrEco','hdrCinemaBright','hdrGame','hdrFilmMaker'],dolbyHdr:['dolbyHdrPersonalized','dolbyHdrVivid','dolbyHdrStandard','dolbyHdrCinemaBright','dolbyHdrCinema','dolbyHdrGame']};
   window.native=data.native;window.editorApi=9;if(data.lastContext)window.lastContext=data.lastContext;
@@ -64,6 +65,8 @@ function install(data) {
   const values=id=>({...window.native[id].settings,...(managed(id)||{settings:{}}).settings});
   function reason(target,key,settings) {
     const d=target.dimension,mode=d.pictureMode||'',f=mode.startsWith('dolbyHdr')?'dolbyHdr':mode.startsWith('hdr')?'hdr':'sdr',game=/game$/i.test(mode);
+    // Tests can mark further targets n/a (window.extraReason(target, key)).
+    const extra=window.extraReason&&window.extraReason(target,key);if(extra)return extra;
     if(!mode)return null;
     if(key==='dolbyPrecisionDetail')return 'This G6’s model configuration disables Dolby Precision Detail.';
     if(['gamma','gammaLevel'].includes(key)&&f!=='sdr')return 'Gamma applies to SDR only.';
