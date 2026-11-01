@@ -8,6 +8,10 @@ const games = new Set(['hdmi1_pc/game','hdmi1_pc/hdrGame','hdmi3/game','hdmi3/hd
 const movies = new Set(['hdmi3/filmMaker','hdmi3/hdrFilmMaker','hdmi3/dolbyHdrCinema','hdmi3/dolbyHdrCinemaBright']);
 const ports = new Set(['hdmi1','hdmi3','hdmi4']);
 const processing = new Set(['peakBrightness','dynamicContrast','noiseReduction','mpegNoiseReduction','smoothGradation']);
+// docs/g6-tv-apps-home-audit.json: LG greys these out on the Home Screen in TV
+// apps' SDR Filmmaker. The bridge's live context is HDMI-only, so without this
+// rule TV apps would fall back to factory tables that offer them.
+const homeScreen = new Set(['gamma','gammaLevel','blackLevel','colorGamut','noiseReduction','mpegNoiseReduction','smoothGradation','filmmakerAmbientLight']);
 const blocked = reason => ({editable:false,reason});
 const select = (options, condition) => ({editable:true,control:{component:'select',options,choices:options,data_type:'string'},...(condition?{condition}:{})});
 const number = (min,max) => ({editable:true,control:{component:'number',min,max,step:1,data_type:'int'}});
@@ -23,6 +27,8 @@ function resolve(key,target) {
   }
   if(target.category!=='picture' || dimensions!=='input,pictureMode')return null;
   const identity=d.input+'/'+d.pictureMode,isGame=games.has(identity),isMovie=movies.has(identity);
+  if(identity==='default/filmMaker'&&!target.app_id&&homeScreen.has(key))
+    return blocked('LG disables this on the Home Screen in Filmmaker Mode.');
   if(!isGame&&!isMovie)return null;
   if(target.app_id) {
     if(target.app_id!=='com.webos.app.'+d.input.replace(/_pc$/,''))return null;

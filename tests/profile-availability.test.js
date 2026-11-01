@@ -39,6 +39,20 @@ module.exports = async function () {
   assert.equal(check('gammaLevel','filmMaker',0,{settings:{gamma:'mediumHavingLevel'}}).source,'audited','Verified inactive SDR Gamma fine adjustment remains editable');
   assert.equal(check('gammaLevel','filmMaker','medium',{settings:{gamma:'high2'}}).editable,false);
   assert.equal(check('gamma','filmMaker','medium',{options:{reviewed:false}}).state,'unverified');
+  // Home Screen audit: LG greys these out for TV apps in SDR Filmmaker, while the
+  // factory tables (all the HDMI-only live context can use there) offer them.
+  const tvApps=(mode,settings)=>({id:'apps',target:{category:'picture',dimension:{input:'default',pictureMode:mode}},settings});
+  const appsInfo=(key,bank)=>({factory:{...base,key,values:{arrayExt:['off','low','medium','high','mediumHavingLevel'].map(value=>({value,visible:true,active:true}))}},value:bank.settings[key]});
+  const appsOptions=bank=>({reviewed:true,document:{banks:[bank]},values:b=>b.settings,context:{ready:true,input:'hdmi3',mode:'filmMaker',range:'sdr'}});
+  const home=tvApps('filmMaker',{gamma:'mediumHavingLevel',gammaLevel:0,noiseReduction:'off',sharpness:'medium'});
+  for (const key of ['gamma','gammaLevel','blackLevel','colorGamut','noiseReduction','mpegNoiseReduction','smoothGradation','filmmakerAmbientLight']) {
+    const result=availability.describe(key,home,appsInfo(key,home),appsOptions(home));
+    assert.deepEqual([result.state,result.source,result.reason],['unavailable','audited','LG disables this on the Home Screen in Filmmaker Mode.'],key);
+  }
+  assert.equal(availability.describe('sharpness',home,appsInfo('sharpness',home),appsOptions(home)).editable,true,'Controls LG keeps on the Home Screen stay editable for TV apps');
+  assert.equal(check('noiseReduction','filmMaker','medium').editable,true,'The Home Screen audit does not reach HDMI inputs');
+  const appsHdr=tvApps('hdrFilmMaker',{noiseReduction:'off'});
+  assert.equal(availability.describe('noiseReduction',appsHdr,appsInfo('noiseReduction',appsHdr),appsOptions(appsHdr)).source,'native_rules','Only the audited TV apps preset uses the Home Screen rule');
   for (const key of ['contrast','brightness','sharpness','color']) assert.equal(check(key,'hdrGame','medium').state,'unavailable');
   assert.equal(check('realCinema','game','medium').editable,false);
   assert.equal(check('peakBrightness','game','medium').editable,false);

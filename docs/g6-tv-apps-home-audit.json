@@ -1,0 +1,286 @@
+{
+  "date": "2026-10-31",
+  "model": "OLED77G6WUA",
+  "firmware": "43.21.69",
+  "bridge_version": "0.22.0",
+  "input": "default",
+  "source": "webOS Home Screen (com.webos.app.home), SDR, Filmmaker Mode",
+  "method": "With the Home Screen in front, getSystemSettingDesc for every TV apps picture key (current context only), compared with the bridge editor availability for the TV apps SDR Filmmaker bank. Read-only; nothing was written.",
+  "context": {
+    "dynamicRange": "sdr",
+    "input": "default"
+  },
+  "groups": {
+    "pictureMode": "filmMaker",
+    "isfMode": {
+      "expert2": "none",
+      "expert1": "none"
+    },
+    "colorActive": true,
+    "brightnessActive": true,
+    "clarityActive": true
+  },
+  "controls": {
+    "backlight": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "blackLevel": {
+      "live_visible": true,
+      "live_active": false,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unavailable (audited)"
+    },
+    "brightness": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "color": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "colorGamut": {
+      "live_visible": true,
+      "live_active": false,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unavailable (audited)"
+    },
+    "colorTemperature": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "contrast": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "dolbyPrecisionDetail": {
+      "live_visible": false,
+      "live_active": false,
+      "bridge_0_22_0": {
+        "state": "unavailable",
+        "reason": "LG disables Dolby Precision Detail in this TV model configuration, for every preset."
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "dynamicColor": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "dynamicContrast": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "expressionEnhancer": {
+      "live_visible": false,
+      "live_active": false,
+      "bridge_0_22_0": {
+        "state": "unavailable",
+        "reason": "Expression Enhancer requires an HDR signal."
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "filmmakerAmbientLight": {
+      "live_visible": true,
+      "live_active": false,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unavailable (audited)"
+    },
+    "gamma": {
+      "live_visible": true,
+      "live_active": false,
+      "bridge_0_22_0": {
+        "state": "unverified",
+        "reason": "Gamma choices have not been audited for this input and preset."
+      },
+      "bridge_0_22_1": "unavailable (audited)"
+    },
+    "gammaLevel": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "unavailable",
+        "reason": "Requires the adjustable 2.2 Gamma option."
+      },
+      "bridge_0_22_1": "unavailable (audited)"
+    },
+    "hdrDynamicToneMapping": {
+      "live_visible": false,
+      "live_active": false,
+      "bridge_0_22_0": {
+        "state": "unavailable",
+        "reason": "HDR tone mapping applies to HDR10/HLG, not SDR or Dolby Vision."
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "motionPro": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "mpegNoiseReduction": {
+      "live_visible": true,
+      "live_active": false,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unavailable (audited)"
+    },
+    "nearBlackDetail": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "noiseReduction": {
+      "live_visible": true,
+      "live_active": false,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unavailable (audited)"
+    },
+    "peakBrightness": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "realCinema": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "sharpness": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "smoothGradation": {
+      "live_visible": true,
+      "live_active": false,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unavailable (audited)"
+    },
+    "superResolution": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "tint": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "editable",
+        "source": "native_rules"
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "truMotionBlur": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "unavailable",
+        "reason": "Requires TruMotion User Selection in this preset."
+      },
+      "bridge_0_22_1": "unchanged"
+    },
+    "truMotionJudder": {
+      "live_visible": true,
+      "live_active": true,
+      "bridge_0_22_0": {
+        "state": "unavailable",
+        "reason": "Requires TruMotion User Selection in this preset."
+      },
+      "bridge_0_22_1": "unchanged"
+    }
+  },
+  "result": {
+    "audited_unavailable": [
+      "gamma",
+      "gammaLevel",
+      "blackLevel",
+      "colorGamut",
+      "noiseReduction",
+      "mpegNoiseReduction",
+      "smoothGradation",
+      "filmmakerAmbientLight"
+    ],
+    "reason": "LG shows these controls but greys them out (ui.active false) on the Home Screen, while the factory tables the bridge used for TV apps offered them. Gamma Level reads active, but it is only reachable through the adjustable 2.2 Gamma option, which is greyed out."
+  },
+  "notes": [
+    "No webOS video app was audited: YouTube and other streaming apps are not installed on this TV, so a launch attempt left the Home Screen in front. Video apps share these TV apps banks and may enable some of these controls; re-audit if one is installed.",
+    "TruMotion Judder/Blur appear in the live description, but TV apps have no app-scoped TruMotion bank (LG stores TruMotion per app), so the bridge does not manage them.",
+    "Saved values for the blocked keys stay in the bank. Restore skips unavailable keys and lists them as excluded."
+  ]
+}
