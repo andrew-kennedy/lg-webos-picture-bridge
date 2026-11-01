@@ -2,6 +2,12 @@
 
 LG Picture Bridge connects a **rooted 2026 LG G6 (webOS 11)** to Home Assistant. It reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision through MQTT discovery, and applies picture profiles without notification dialogs.
 
+Version **0.24.0**, with Home Assistant companion **0.15.0**, refines the editor:
+
+- **Locked presets.** A preset an input never selects is locked. It still shows its faded value, but you can't select it, and edits across a whole row leave it out. To edit one, change the input's Preset selection first. See [Presets an input never selects](docs/setting-availability.md#presets-an-input-never-selects-0240).
+- **Game Optimizer values.** Contrast, Black level, Color depth and Sharpness now say that Game presets use Game Optimizer's own value for each game genre, and that their Game rows edit it.
+- **More reviewer notes.** A Dolby Vision section is added, and the settings RTINGS leaves at their defaults (such as Color depth, Tint and Sharpness) now say so.
+
 Version **0.23.0**, with Home Assistant companion **0.14.0**, adds reviewer notes to the editor. Settings that RTINGS or HDTVTest (Vincent Teoh) make a recommendation for show it under their description, for example Contrast: `RTINGS SDR Filmmaker 95 · HDR Filmmaker 100`. **Reviewer settings** lists everything both recommend for SDR and HDR movies, motion, processing and gaming, with dates, firmware and sources. The notes are text only and change nothing on the TV. RTINGS' white balance and color calibration, which they measured on their own unit, are left out. See [Reviewer settings notes](docs/reviewer-settings.md).
 
 Version **0.22.3** stops publishing one Home Assistant entity per TV setting unless you ask for it. The TV editor and the LG Picture Profiles panel already edit every setting, nothing used the 66 `number`/`select` entities, and they wrote thousands of recorder rows a day. On upgrade the bridge removes them from Home Assistant. The status entities (input, HDMI signal, signal state, dynamic range, picture mode, screensaver and CEC filter), picture-policy commands and LG Picture Profiles are unchanged. Set `mqtt.settings_entities_enabled: true` to bring the controls back. See [Settings controls](docs/mqtt.md#settings-controls-opt-in-0223).

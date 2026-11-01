@@ -118,8 +118,12 @@ const fixture=require('./fixtures/profile-formats.cjs');
     });
     await a.ready();
     assert.equal(await a.number('color').inputValue(),'53','An unused ordinary value cannot make valid Game Optimizer controls look mixed');
-    const excluded=a.focusKey('excluded-settings');assert(await excluded.isVisible());
-    await excluded.click();assert(await page.getByText('Game Optimizer uses its own Color Depth control.',{exact:false}).isVisible());
+    // That replaced control is not a skip: the value box names the Game
+    // Optimizer value it edits instead.
+    assert.equal(await a.focusKey('excluded-settings').count(),0,'The ordinary control Game Optimizer replaces is not listed as skipped');
+    assert.match(await q('.valuebox .game-note').textContent(),/^Edits Game Optimizer’s own Color depth for Game presets/);
+    assert.equal(await q('[data-focus="setting:color"] .meta').textContent(),'Game Optimizer value');
+    assert.equal(await q('[data-focus="row:game"] small').textContent(),'Game Optimizer');
     await a.number('color').fill('54');await button('Review 2 changes').click();
     assert.deepEqual(await reviewed(),['pc_sdr_game','pc_sdrALLM_game'],'A combined value only targets verified applicable banks');
     await button('Back to editing').click();await button('Discard edits').click();

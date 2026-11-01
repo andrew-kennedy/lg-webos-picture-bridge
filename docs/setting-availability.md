@@ -123,6 +123,33 @@ Live flags are used only when the input, preset/range, game genre and HDMI appli
 
 Unknown controller revisions remain read-only until their policies are reviewed. The firmware fingerprint is checked once per service lifetime; existing MQTT live controls retain their own native validation path.
 
+## Presets an input never selects (0.24.0)
+
+The grid fades a preset that an input's saved Preset selection (Base and every profile) never
+picks, and from 0.24.0 locks it. The cell keeps its stored value but can't be selected, and an edit
+that spans it, such as a whole row across all inputs, leaves it out and lists it as skipped. Before
+0.24.0 these cells were editable, which looked like a bug: the value only took effect after picking
+that preset by hand, and LG Picture Profiles put the saved selection back at standby.
+
+To edit one, change the input's Preset selection first. A drafted selection unlocks the preset at
+once, and the picture on screen is always editable. LG's own n/a still takes precedence. Linked SDR
+brightness stays editable because it is one value shared with presets in use.
+
+## Game Optimizer picture values (0.24.0)
+
+In Game presets LG ignores the ordinary Contrast, Black Level, Color Depth and Sharpness and uses
+Game Optimizer's own value for each game genre (`gameAdjustContrast`, `gameBlackLevel`,
+`gameColorDepth`, `gameSharpness`). The editor shows those inside the ordinary setting, so one
+Contrast covers every preset. From 0.24.0 that is spelled out:
+
+- The four descriptions say so.
+- The settings list marks the value **Game Optimizer value** when the selection is a Game preset.
+- The grid labels those Game rows **Game Optimizer**.
+- The value box names the genres it edits.
+
+The replaced ordinary control is no longer listed as a skipped value, because the Game rows
+already edit the value LG uses there.
+
 ## Editing and recovery
 
 Both single-bank and combined edits validate applicability before committing standards. Combined edits validate the completed candidate and every target before the first persistent write. A failed later target cannot partially commit earlier edits. Shared brightness preferences validate their full affected set. Keeping temporary adjustments also checks applicability before promoting them.

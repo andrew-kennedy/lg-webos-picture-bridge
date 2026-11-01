@@ -32,27 +32,30 @@ const {actions}=require('./fixtures/editor-actions.cjs');
     await a.focusKey('grid:all-presets').click();await a.focusKey('row:expert1').waitFor();
     await a.focusKey('grid:all-presets').click();assert.equal(await a.focusKey('row:expert1').count(),0);
 
-    // Story 1: one Black level for SDR Filmmaker on every HDMI input.
+    // Story 1: Black level for SDR Filmmaker on every HDMI input. Only HDMI 3
+    // selects Filmmaker; the others are locked and left out.
     await a.open('brightness');
     await a.cell('hdmi3','filmMaker').click();await a.focusKey('cols:all').click();await a.ready();
     assert.match(await q('.valuebox .for').textContent(),/All inputs · SDR Filmmaker/);
+    for(const input of ['hdmi1_pc','hdmi2','hdmi4'])assert(await a.cell(input,'filmMaker').isDisabled(),input+' never selects Filmmaker');
+    assert(await q('.valuebox').getByText('3 selected values are skipped: their inputs never select those presets').isVisible());
     await a.number('brightness').fill('52');
     let draft=(await editor()).draft;
-    assert.deepEqual(draft.map(d=>[d.target.dimension.input,d.target.dimension.pictureMode,d.key]).sort(),[['hdmi1_pc','filmMaker','brightness'],['hdmi2','filmMaker','brightness'],['hdmi3','filmMaker','brightness'],['hdmi4','filmMaker','brightness']]);
-    for(const input of ['hdmi1_pc','hdmi2','hdmi3','hdmi4'])assert.match(await a.cell(input,'filmMaker').getAttribute('class'),/drafted/);
-    assert(await q('.footer').getByText('4 staged changes → Base').isVisible());
-    await button('Review 4 changes').click();
+    assert.deepEqual(draft.map(d=>[d.target.dimension.input,d.target.dimension.pictureMode,d.key]).sort(),[['hdmi3','filmMaker','brightness']]);
+    assert.match(await a.cell('hdmi3','filmMaker').getAttribute('class'),/drafted/);
+    await button('Review 1 changes').click();
     assert(await page.getByRole('heading',{name:'Review Base changes'}).isVisible());
-    assert.equal(await q('.sheet .diff').count(),4);
+    assert.equal(await q('.sheet .diff').count(),1);
     await button('Save Base').click();await a.saved();
     const saved=(await a.calls('edit_many')).at(-1);
-    assert.equal(saved.edits.length,4);assert(saved.edits.every(e=>e.variant==='standard'&&e.settings.brightness===52));
+    assert.equal(saved.edits.length,1);assert(saved.edits.every(e=>e.variant==='standard'&&e.settings.brightness===52));
     assert(saved.edits.filter(e=>e.bank_id.startsWith('native_')).every(e=>e.expected&&e.expected.brightness===50),'Native-only edits carry the reviewed value');
 
     // Story 2: Color depth for all Dolby Vision presets on all inputs. Game
-    // presets use Game Optimizer's own value; the ordinary one is skipped.
+    // presets use Game Optimizer's own value instead of the ordinary one, and
+    // presets an input never selects are locked.
     await a.open('color');
-    await a.cell('hdmi4','dolbyHdrCinema').click();await a.focusKey('group:dolbyHdr').click();await a.focusKey('cols:all').click();await a.ready();
+    await a.cell('hdmi3','dolbyHdrCinema').click();await a.focusKey('group:dolbyHdr').click();await a.focusKey('cols:all').click();await a.ready();
     assert.equal(await a.focusKey('group:dolbyHdr').getAttribute('aria-pressed'),'true');
     assert.match(await q('.valuebox .for').textContent(),/All inputs · all Dolby Vision presets in use/);
     assert.equal(await a.number('color').inputValue(),'','Different genre values show Mixed');
@@ -63,7 +66,8 @@ const {actions}=require('./fixtures/editor-actions.cjs');
     assert(draft.every(d=>d.key!=='color'||!/game$/i.test(d.target.dimension.pictureMode)),'Disabled ordinary color in DV Game is never staged');
     await button('Review '+draft.length+' changes').click();
     assert(await page.getByRole('heading',{name:'Excluded from these edits'}).isVisible());
-    assert(await page.getByText('Game Optimizer replaces this control in Game presets.',{exact:false}).first().isVisible());
+    assert(await page.getByText('never selects',{exact:false}).first().isVisible(),'Locked presets are listed with why');
+    assert.equal(await page.getByText('Game Optimizer replaces this control in Game presets.',{exact:false}).count(),0,'The control Game Optimizer replaces is not a skip');
     await button('Back to editing').click();
     // Story 3: narrow the same edit to HDMI 3 and HDMI 4.
     await a.focusKey('col:hdmi1_pc').click();await a.focusKey('col:hdmi2').click();await a.ready();
@@ -93,15 +97,15 @@ const {actions}=require('./fixtures/editor-actions.cjs');
 
     // Remote: 2D movement inside the grid; OK selects a target.
     await a.open('contrast');
-    await a.cell('hdmi3','filmMaker').focus();
-    await page.keyboard.press('ArrowRight');assert.equal((await a.focused()).key,'cell:hdmi4:filmMaker');
-    await page.keyboard.press('ArrowUp');assert.match((await a.focused()).key,/^cell:hdmi4:/);
+    await a.cell('hdmi2','game').focus();
+    await page.keyboard.press('ArrowRight');assert.equal((await a.focused()).key,'cell:hdmi3:game');
+    await page.keyboard.press('ArrowDown');assert.match((await a.focused()).key,/^cell:hdmi3:/);
     await page.keyboard.press('Enter');
     const picked=(await a.focused()).key.split(':')[2];assert.deepEqual((await editor()).target.presets,[picked]);
     await a.reach('row:'+picked);await page.keyboard.press('ArrowLeft');assert.match((await a.focused()).key,/^setting:/,'Left from the grid returns to the settings list');
     await a.reach('value:contrast:number');await page.keyboard.press('Enter');await page.keyboard.press('ArrowUp');await page.keyboard.press('Escape');
     const remoteDraft=(await editor()).draft;
-    assert(remoteDraft.length>=1&&remoteDraft.every(d=>(d.target.dimension.input||d.target.dimension.gameInput)==='hdmi4'),'Remote adjusts the selected target only');
+    assert(remoteDraft.length>=1&&remoteDraft.every(d=>(d.target.dimension.input||d.target.dimension.gameInput)==='hdmi3'),'Remote adjusts the selected target only');
     assert.equal(remoteDraft.length,await page.evaluate(()=>{const e=document.querySelector('lg-profile-editor');return new Set(e.targetsFor('contrast').editable.map(r=>e.entryId(r))).size;}));
     await a.reach('review');await page.keyboard.press('Enter');await a.reach('review-confirm');await page.keyboard.press('Enter');await a.saved();
 

@@ -6,6 +6,10 @@ const {actions}=require('./fixtures/editor-actions.cjs');
 const state=structuredClone(require('./fixtures/profile-formats.cjs'));
 for(const [mode,settings] of [['expert1',{color:40,gamma:'high2'}],['expert2',{color:45,gamma:'high2'}],['hdrCinemaBright',{color:55,gamma:'high2'}],['dolbyHdrGame',{color:50,gamma:'high2'}]])
   for(const input of ['hdmi3','hdmi3_pc'])state.document.banks.push({id:input+'_'+mode,name:mode,devices:[],target:{category:'picture',dimension:{input,pictureMode:mode}},settings});
+// HDMI 3's profiles select these presets, so they are editable rather than
+// locked (a preset an input never selects is locked).
+Object.assign(state.document.banks.find(b=>b.id==='movie_sdr_mapping'),{variants:{bright:{pictureMode:'expert1'},dark:{pictureMode:'expert2'}}});
+Object.assign(state.document.banks.find(b=>b.id==='movie_hdr_mapping'),{variants:{bright:{pictureMode:'hdrCinemaBright'}}});
 (async()=>{
  const browser=await chromium.launch({headless:true});
  try {
@@ -38,8 +42,9 @@ for(const [mode,settings] of [['expert1',{color:40,gamma:'high2'}],['expert2',{c
   await a.open('color');
   assert.equal(await a.number('color').inputValue(),'');await a.number('color').fill('51');
   await button('Review 6 changes').click();
-  assert(await page.getByRole('heading',{name:'Excluded from these edits',exact:true}).isVisible());
-  assert(await page.getByText('HDMI 3 · Dolby Vision Game · Picture — Game Optimizer uses its separate Color Depth',{exact:true}).isVisible());
+  // Dolby Vision Game's ordinary Color depth is replaced by Game Optimizer's
+  // value, so it is left out without being listed as a skip.
+  assert.equal(await page.getByRole('heading',{name:'Excluded from these edits',exact:true}).count(),0);
   await button('Save standards').click();await a.saved();
   const edits=(await a.calls('edit_many')).at(-1).edits;
   assert(edits.every(e=>!e.bank_id.includes('dolbyHdrGame')),'Disabled targets cannot enter a combined save');assert.equal(edits.length,6);

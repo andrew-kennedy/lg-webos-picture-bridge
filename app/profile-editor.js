@@ -4,13 +4,17 @@
   // Plain-language help, checked against the G6's own Settings/Game Optimizer
   // help and value labels. See docs/setting-help.md for sources and caveats.
   // Keep this local: rendering help requires no TV reads or persistent writes.
+  // Game presets ignore these four and use Game Optimizer's own value for
+  // each game genre. The editor shows that value in the same setting.
+  const gameNote = name => ' In Game presets, LG uses Game Optimizer’s own '+name+', saved for each game genre. The Game rows here edit it; the genre chips choose which genres.';
+  const gameAliases = new Set(['contrast','brightness','color','sharpness']);
   const descriptions = {
     backlight:'Sets how much light the OLED panel emits. SDR profiles can share brightness or keep independent values using SDR brightness links. HDR and Dolby Vision have their own saved values.',
-    contrast:'Adjusts the difference between light and dark areas. Raising it can make bright shades harder to distinguish.',
-    brightness:'Adjusts how dark the picture’s black and shadow areas appear. Too high can make black look gray; too low can hide shadow detail.',
-    color:'Adjusts color intensity. Higher values make colors more saturated; this does not change the HDMI signal’s bit depth.',
+    contrast:'Adjusts the difference between light and dark areas. Raising it can make bright shades harder to distinguish.'+gameNote('Contrast'),
+    brightness:'Adjusts how dark the picture’s black and shadow areas appear. Too high can make black look gray; too low can hide shadow detail.'+gameNote('Black Level'),
+    color:'Adjusts color intensity. Higher values make colors more saturated; this does not change the HDMI signal’s bit depth.'+gameNote('Color Depth'),
     tint:'Shifts the balance between red and green. Zero leaves this balance centered.',
-    sharpness:'Emphasizes outlines to make edges look crisper. Higher values can add halos; they cannot recover missing source detail.',
+    sharpness:'Emphasizes outlines to make edges look crisper. Higher values can add halos; they cannot recover missing source detail.'+gameNote('Sharpness'),
     colorTemperature:'Shifts whites toward warm/red or cool/blue. Negative values are warmer (−40 means Warm 40); positive values are cooler.',
     colorGamut:'Chooses the range of colors the TV uses. Auto follows the content; forcing a wider gamut can make ordinary colors look oversaturated.',
     gamma:'Controls the brightness of SDR midtones. Lower gamma makes them lighter; higher gamma makes them darker. HDR uses a different brightness curve.',
@@ -49,6 +53,9 @@
   // Reviewer recommendations for the G6, kept as notes: nothing here changes
   // the TV. Values a reviewer measured on their own unit (white balance and
   // color calibration) are left out. See docs/reviewer-settings.md.
+  // RTINGS leaves every picture setting it doesn't list at the preset default.
+  // LG's defaults vary by country and panel, so no number is given.
+  const defaulted='Left at the FILMMAKER default in SDR and HDR, like every picture setting RTINGS doesn’t list.';
   const reviewers = {
     sources:{
       rtings:{name:'RTINGS',title:'LG G6 OLED calibration settings',date:'Checked 2026-10-31',url:'https://www.rtings.com/tv/reviews/lg/g6-oled/settings',
@@ -72,6 +79,11 @@
         ['hdtvtest','Keep Dynamic Tone Mapping off to preserve the creator’s intent. It overbrightens HDR10 most of the time.'],
         ['hdtvtest','Near black detail −1 brought shadow detail closer to the mastering monitor on his sample, on firmware 43.10.69. Later firmware may differ.'],
         ['hdtvtestC6h','Keep Creator Original Picture Mode (Prime Video) off and use Filmmaker Mode. It shifted the color temperature slightly toward blue, oversaturated colors and greys out most settings.']]],
+      ['Dolby Vision',[
+        [null,'Neither RTINGS nor HDTVTest publishes Dolby Vision picture values for the G6. RTINGS’ HDR settings are for HDR10.'],
+        ['hdtvtest','Firmware 43.10.69 fixed most of Dolby Vision’s launch problems with near-black banding and color overshoot. Gradation is still slightly worse than HDR10, faint diagonal lines can show in very dark scenes, and blacks glow very faintly, as on most Dolby Vision TVs.'],
+        ['hdtvtestC6h','Firmware 43.21.60 added a switch to turn off Dolby Vision support. It applies only to external HDMI sources, not the TV’s own apps.'],
+        ['hdtvtest','For games, turn off Dolby Vision for gaming and play in HDR10 with HGiG: Dolby Vision Game Optimizer tracks noticeably brighter than the PQ reference.']]],
       ['Motion',[
         ['rtings','Real Cinema On removes judder. Quick Media Switching causes judder in 24p content sent from a 60p source, such as a cable box or older streaming stick.'],
         ['rtings','TruMotion Cinematic Movement reduces stutter in 24 fps content; it outputs the equivalent of 30 fps. Motion settings are a matter of taste.'],
@@ -95,13 +107,17 @@
       backlight:[['rtings','SDR in a dark room: 3 (about 100 nits) or 17 (about 200 nits). Brighter: 100, adjusted to taste. HDR: 100.'],['hdtvtest','SDR in a dim room: mid-20s. The default of 80 exceeds 500 nits.']],
       contrast:[['rtings','SDR Filmmaker 95 · HDR Filmmaker 100.']],
       brightness:[['rtings','SDR Filmmaker 50.']],
+      color:[['rtings',defaulted]],tint:[['rtings',defaulted]],sharpness:[['rtings',defaulted]],colorGamut:[['rtings',defaulted]],
+      dynamicContrast:[['rtings',defaulted]],dynamicColor:[['rtings',defaulted]],superResolution:[['rtings',defaulted]],
+      noiseReduction:[['rtings',defaulted]],mpegNoiseReduction:[['rtings',defaulted]],gammaLevel:[['rtings',defaulted]],
+      blackLevel:[['rtings',defaulted]],aiHdrRemastering:[['rtings',defaulted]],filmmakerAmbientLight:[['rtings',defaulted]],
       gamma:[['rtings','SDR Filmmaker 2.2 (mediumHavingLevel on this TV).']],
       colorTemperature:[['rtings','SDR Filmmaker Warm 40 (−40).']],
       peakBrightness:[['rtings','SDR: Off in a dark room, High for a brighter image. HDR: High.']],
       hdrDynamicToneMapping:[['rtings','HDR movies: Off for accuracy, On for a brighter image.'],['hdtvtest','Off for movies: it overbrightens HDR10. HGiG for games.']],
       expressionEnhancer:[['rtings','HDR: Off for accuracy; Brightness (highlight) for a brighter image.']],
-      nearBlackDetail:[['hdtvtest','−1 matched the mastering monitor on his sample, on firmware 43.10.69.']],
-      smoothGradation:[['hdtvtest','No higher than Low. Filmmaker Mode never turns it fully off.']],
+      nearBlackDetail:[['rtings',defaulted],['hdtvtest','−1 matched the mastering monitor on his sample, on firmware 43.10.69.']],
+      smoothGradation:[['rtings',defaulted],['hdtvtest','No higher than Low. Filmmaker Mode never turns it fully off.']],
       realCinema:[['rtings','On, to remove judder.'],['hdtvtest','On (the Filmmaker default): 5:5 pulldown for 24p.']],
       truMotionMode:[['rtings','Cinematic Movement (cinemaClear) reduces 24p stutter.'],['hdtvtest','Off for the most film-accurate picture. If 24p stutter bothers you, Cinematic Movement, which can occasionally add soap opera effect.']],
       motionPro:[['hdtvtestC6h','Off: it dims the picture and flickers with 50 Hz material.']],
@@ -283,7 +299,10 @@
     statusMap() {
       return this.cached('status',()=>{
         const {visible,excluded}=model.partition(this.records(),this.live),map=new Map();
-        for(const r of visible.concat(excluded))map.set(r.id,r.locked?{state:'unavailable',editable:false,reason:'Choose Bright room or Dark room to edit shared SDR movie brightness.',lg:r.availability}:r.availability);
+        for(const r of visible.concat(excluded))map.set(r.id,r.locked?{state:'unavailable',editable:false,reason:'Choose Bright room or Dark room to edit shared SDR movie brightness.',lg:r.availability}:
+          // A preset the input never selects is locked. Linked SDR brightness
+          // stays editable: it is one value shared with presets in use.
+          !r.preference&&r.availability&&(r.availability.editable||r.availability.state==='pending')&&this.unusedRecord(r)?{state:'unused',editable:false,reason:model.inputName(r.bank.target.dimension.input)+' never selects '+(model.modes[r.preset]||r.preset)+'. Change its Preset selection to edit this.',lg:r.availability}:r.availability);
         return map;
       });
     }
@@ -325,6 +344,13 @@
       return [...names];
     }
     usage() { return this.cached('usage',()=>model.presetUsage(this.records())); }
+    // Saved selections (Base and every profile), plus drafted ones and the
+    // picture on screen, decide which presets each input can show.
+    unusedRecord(r) {
+      const input=r.bank.target.dimension.input,saved=this.usage().get(input),p=this.picture();
+      if(!r.preset||!saved||saved.has(r.preset)||(p&&p.input===input&&p.mode===r.preset))return false;
+      return !Object.values(this.draft).some(e=>e.key==='pictureMode'&&e.target.dimension.input===input&&e.value===r.preset);
+    }
     usedPresets() {return this.cached('used',()=>this.computeUsedPresets());}
     computeUsedPresets() {
       const inputs=new Set(this.inputs()),used=new Set(),p=this.picture();
@@ -390,7 +416,10 @@
         const shared=new Set(chosen.map(r=>r.preference).filter(Boolean)),ids=new Set(chosen.map(r=>r.id));
         const linked=shared.size?all.filter(r=>r.preference&&shared.has(r.preference)&&!ids.has(r.id)):[];
         const affected=chosen.concat(linked),status=r=>this.statusOf(r);
-        return {chosen,linked,affected,editable:affected.filter(r=>status(r).editable),pending:affected.filter(r=>status(r).state==='pending'),excluded:affected.filter(r=>!status(r).editable&&status(r).state!=='pending')};
+        // In Game presets the ordinary picture control is replaced by Game
+        // Optimizer's value, which this same setting edits: not a skip.
+        const replaced=r=>gameAliases.has(r.key)&&r.key===r.alias&&/game$/i.test(r.preset||'')&&!r.bank.target.dimension.gameGenre&&!status(r).editable;
+        return {chosen,linked,affected,editable:affected.filter(r=>status(r).editable),pending:affected.filter(r=>status(r).state==='pending'),excluded:affected.filter(r=>!status(r).editable&&status(r).state!=='pending'&&!replaced(r)),replaced:affected.filter(replaced)};
       });
     }
     // The HDMI picture the editor centres on: what is on screen, otherwise the
@@ -778,7 +807,8 @@
       else if(t.pending.length&&!t.editable.length)result={text:'…'};
       else if(!t.editable.length)result={text:'n/a',cls:'na',meta:'Not used here'};
       else result=summarize(alias,t.editable.map(r=>this.draftValue(r)));
-      const meta=[];
+      const meta=[],game=t.editable.filter(r=>r.key!==r.alias);
+      if(game.length)meta.push(game.length===t.editable.length?'Game Optimizer value':'Includes Game Optimizer values');
       if(t.affected.some(r=>this.draft[this.entryId(r)]))meta.push((t.affected.some(r=>(this.draft[this.entryId(r)]||{}).inherit)?'Draft: follow Base':'Draft')+' → '+this.profileName(this.variant));
       if(this.profileMode()&&t.affected.some(r=>!r.inherited))meta.push('Override');
       if(t.linked.length||t.chosen.some(r=>r.preference))meta.push('Linked');
@@ -866,7 +896,8 @@
         for(const value of control.options){const option=el('option',optionText(alias,value));option.value=value;input.append(option);}input.value=sum.mixed?'':unique[0];input.disabled=disabled;input.onchange=()=>update(input.value);
       } else if(this.status.offline)input=el('p',summarize(alias,t.affected.map(r=>this.draftValue(r))).full||'—','static');
       else if(!ready)input=el('p','Checking which of these targets use '+title+'…','note');
-      else if(!t.editable.length)input=el('p',t.excluded.every(r=>this.statusOf(r).lg)?this.statusOf(t.excluded[0]).reason:'LG does not use '+title+' for any selected target.','note warn');
+      else if(!t.editable.length)input=el('p',!t.excluded.length&&t.replaced.length?'Game presets use Game Optimizer’s own '+title+'. Choose a game genre with the chips to edit it.':
+        t.excluded.every(r=>this.statusOf(r).lg)?this.statusOf(t.excluded[0]).reason:'LG does not use '+title+' for any selected target.','note warn');
       else input=el('p','These targets have no range or choice in common. Narrow the selection, for example to one format.','note warn');
       if(control&&control.label&&control.label!==title&&input.tagName!=='SELECT')input.prepend(el('span',control.label,'control-label'));
       box.append(input);
@@ -875,6 +906,9 @@
       if(onScreen){meta.append(' · ');meta.append(el('span',c.live?'includes what’s on screen':'includes what you last watched','live-note'));}
       box.append(meta);
       box.append(el('p',this.draftLine(t.editable),'note draft-line'));
+      const game=t.editable.filter(r=>r.key!==r.alias);
+      if(game.length){const genres=[...new Set(game.map(r=>r.bank.target.dimension.gameGenre).filter(Boolean))].map(g=>g==='USER'?'User':g);
+        box.append(el('p',(game.length===t.editable.length?'Edits':'Includes')+' Game Optimizer’s own '+title+' for Game presets'+(genres.length?' · '+genres.join(', ')+(genres.length===1?' genre':' genres'):'')+'. LG uses it instead of the ordinary '+title+' there.','note game-note'));}
       if(t.linked.length||t.chosen.some(r=>r.preference)) {
         const roles=[...new Set(t.affected.filter(r=>r.preference).map(r=>r.brightnessRole))].map(r=>r==='game_sdr'?'gaming':'movie').join(' and ');
         box.append(el('p','Linked SDR '+roles+' brightness is one shared value'+(t.linked.length?'. This edit also changes '+t.linked.length+' linked '+(t.linked.length===1?'target':'targets')+' outside your selection (dashed in the grid).':' for every linked preset.'),'note linked'));
@@ -907,7 +941,8 @@
           if(this.profileMode()&&!r.inherited)item.append(el('span',' · Saved override: '+display(r.value)+' · Base: '+display(model.values(r.bank,this.state,'standard')[r.key])));
           list.append(item);
         }
-        box.append(this.details(t.excluded.length+' selected '+(t.excluded.length===1?'value is':'values are')+' skipped: LG doesn’t use '+title+' there','excluded-settings',list));
+        const unusedOnly=t.excluded.every(r=>this.statusOf(r).state==='unused'),some=t.excluded.some(r=>this.statusOf(r).state==='unused');
+        box.append(this.details(t.excluded.length+' selected '+(t.excluded.length===1?'value is':'values are')+' skipped: '+(unusedOnly?(t.excluded.length===1?'its input never selects that preset':'their inputs never select those presets'):some?'locked or not used by LG':'LG doesn’t use '+title+' there'),'excluded-settings',list));
       }
       box.querySelectorAll('input,select').forEach(node=>node.setAttribute('aria-describedby','edit-context'+(descriptions[alias]?' help-'+alias:'')));
       return box;
@@ -970,6 +1005,7 @@
           if(spec.kind==='port')grid.append(el('span','Port-wide','rowh static'));
           else {
             const on=selectedRows.includes(row),h=this.button(model.rowLabel(spec.kind,row),()=>this.toggleRows(spec,[row]),'rowh','row:'+row);
+            if(spec.kind==='preset'&&gameAliases.has(alias)&&/game$/i.test(row))h.append(el('small','Game Optimizer'));
             h.setAttribute('aria-pressed',String(on));h.setAttribute('aria-label',(spec.kind==='preset'?model.modes[row]||row:formatNames[model.rowFormat('range',row)]+' '+model.rowLabel('range',row).toLowerCase())+(on?' · selected':''));grid.append(h);
           }
           for(const column of spec.columns)grid.append(this.cell(spec,column,row,chosen,linked));
@@ -983,7 +1019,7 @@
       if(spec.records.some(r=>r.preference))mark('link','Linked SDR brightness');
       if(t.linked.length)mark('also','Also changes (linked)');
       if(spec.records.some(r=>Object.hasOwn((this.state.overrides||{})[r.bank.id]||{},r.key)))mark('tmp','Temporary on TV');
-      mark('na','n/a: LG doesn’t use it');if(spec.kind==='preset')mark('unused','Faded: input doesn’t select this preset');
+      mark('na','n/a: LG doesn’t use it');if(spec.kind==='preset')mark('unused','Faded: locked, the input never selects this preset');
       host.append(legend);
       this.fitGrid();
     }
@@ -1004,7 +1040,10 @@
       if(!records.length){node.disabled=true;node.textContent='·';node.classList.add('none');node.setAttribute('aria-label',name+': not stored');return node;}
       const editable=records.filter(r=>this.statusOf(r).editable),pending=records.filter(r=>this.statusOf(r).state==='pending');
       let sum,reason='';
-      if(this.status.offline)sum=summarize(alias,records.map(r=>this.draftValue(r)));
+      // LG's own n/a wins: a lock only matters where LG uses the setting.
+      const unused=spec.kind==='preset'&&records.every(r=>this.unusedRecord(r))&&records.some(r=>{const s=this.lgStatus(r);return s.editable||s.state==='pending';});
+      if(unused){sum=summarize(alias,records.map(r=>this.draftValue(r)));reason=model.inputName(records[0].bank.target.dimension.input)+' never selects this preset · locked';node.disabled=true;node.classList.add('unused');}
+      else if(this.status.offline)sum=summarize(alias,records.map(r=>this.draftValue(r)));
       else if(editable.length)sum=summarize(alias,editable.map(r=>this.draftValue(r)));
       else if(pending.length)sum={text:'…',full:'checking'};
       else {sum={text:'n/a',full:'not used'};reason=this.statusOf(records[0]).reason||'';node.classList.add('excluded');}
@@ -1018,7 +1057,6 @@
       const selected=records.some(r=>chosen.has(r.id)),also=!selected&&records.some(r=>linked.has(r.id));
       const drafted=records.some(r=>this.draft[this.entryId(r)]);
       if(selected)node.classList.add('selected');if(also)node.classList.add('also');if(drafted)node.classList.add('drafted');if(sum.mixed)node.classList.add('mixed');
-      if(spec.kind==='preset'&&!column.inputs.some(i=>(this.usage().get(i)||new Set()).has(row))&&column.inputs.some(i=>this.usage().has(i)))node.classList.add('unused');
       node.append(marks,el('span',sum.text,'cv'));
       node.setAttribute('aria-pressed',String(selected));
       const label=name+': '+(sum.full||sum.text)+(reason?' — '+reason:'')+(flags.length?' · '+flags.join(' · '):'')+(drafted?' · draft':'')+(also?' · also changes (linked)':'')+(records.length>1?' · '+records.length+' stored values':'');
@@ -1070,7 +1108,7 @@
     // One reviewer note. With the TV remote each note is a focus stop, so
     // the arrows can scroll a page that has no buttons.
     reviewNote(source,text,id) {
-      const note=el('li',undefined,'review-note');note.append(el('span',reviewers.sources[source].name,'review-source'),document.createTextNode(text));
+      const note=el('li',undefined,'review-note');if(source)note.append(el('span',reviewers.sources[source].name,'review-source'));note.append(document.createTextNode(text));
       if(this.adapter&&this.adapter.tvRemote){note.tabIndex=0;note.dataset.focus=id;}
       return note;
     }
@@ -1365,7 +1403,7 @@
   .cell.drafted .cv{color:var(--accent);font-weight:700}.cell.drafted::after{content:'';position:absolute;inset:auto 25% 3px;height:2px;background:var(--accent);border-radius:2px}
   .cell.mixed .cv{color:var(--warn)}
   .cell.excluded{color:var(--muted);background:repeating-linear-gradient(135deg,transparent 0 6px,rgba(255,255,255,.05) 6px 12px)}
-  .cell.unused:not(.selected) .cv{opacity:.5}
+  .cell.unused:disabled{opacity:1;cursor:default}.cell.unused .cv{opacity:.45}
   .cell.none{border-style:dotted;color:#475a78;background:transparent}
   .marks{position:absolute;top:3px;left:3px;display:flex;gap:2px}
   .mk{display:inline-block;width:.45em;height:.45em;border-radius:50%;flex:none}
@@ -1378,6 +1416,7 @@
   .reviews{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.35em;font-size:.9em;max-width:60em}
   .review-note{padding:.2em .4em;border-radius:.4em;overflow-wrap:anywhere}.review-note:focus{background:var(--raised)}
   .review-source{font-weight:700;color:var(--accent);margin-right:.45em}.review-url{display:block;font-size:.85em;color:var(--muted)}.review-note a{color:var(--live)}
+  .rowh small{display:block;font-size:.68em;color:var(--muted);font-weight:400}.game-note{color:var(--text)}
   .reviewer{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.35em 1em;width:100%;max-width:60em;border-left:3px solid var(--line);padding-left:.6em}
   .reviewer .reviews{flex:1 1 26em;gap:.15em;font-size:.85em}.reviewer .review-note{padding:.1em .3em}
   details summary{cursor:pointer;font-size:.85em;color:var(--muted);padding:.3em 0}
