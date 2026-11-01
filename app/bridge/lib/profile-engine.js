@@ -633,11 +633,13 @@ function create(options) {
         if(input.scope!==undefined&&!['all','active'].includes(input.scope))throw new Error('Unknown scope');
         const requested=view.scopeSelection(snapshot(),input.filters,input.categories), selection={},excluded=[], epoch=powerEpoch, currentRoom=activeProfile(), currentContext=model.canonical(context);
         const check=()=>{externalGuard();guard();checkRevision(input);if(powerEpoch!==epoch||activeProfile()!==currentRoom||model.canonical(context)!==currentContext)throw new Error('TV session, signal or room changed');};
+        // check() rejects any revision, room or context change, so one view serves every key.
+        const current=sharedEditorOptions();
         for(const [id,keys] of Object.entries(requested)) {
           const bank=bankById(id);if(input.scope==='active'&&!model.active(bank,context))continue;
-          const live=await inspect(bank,currentRoom);check();
+          const live=await inspect(bank,currentRoom,undefined,current(currentRoom));check();
           for(const key of keys) {
-            try {availability.assertEditable(key,resolved(bank,currentRoom)[key],bank,live,editorOptions(currentRoom));}
+            try {availability.assertEditable(key,resolved(bank,currentRoom)[key],bank,live,current(currentRoom));}
             catch(error){if(error.code!=='profile_setting_unavailable')throw error;excluded.push({bank_id:id,key,reason:error.message});continue;}
             (selection[id]||(selection[id]=[])).push(key);
           }
@@ -860,7 +862,7 @@ function create(options) {
           if (!input.expected || !input.expected[id] || !Object.hasOwn(input.expected[id],key) || !model.same(input.expected[id][key],(overrides[id] || {})[key])) throw new Error('Temporary adjustments changed; review them again');
         }
         model.validate(candidate.document); model.preferences(preferences(candidate));
-        const inspected = new Map();
+        const inspected = new Map(), current = sharedEditorOptions(), promoting = sharedEditorOptions(candidate);
         const check = () => {
           externalGuard(); guard(); checkRevision(input);
           if (epoch !== powerEpoch) throw new Error('TV power session changed');
@@ -869,9 +871,9 @@ function create(options) {
         for (const [id,keys] of Object.entries(selection)) {
           const bank = candidate.document.banks.find(b=>b.id===id), adjusted = keys.filter(k=>Object.hasOwn(promoted[id] || {},k));
           if (!adjusted.length) continue;
-          const live = await inspect(bankById(id));
+          const live = await inspect(bankById(id),'standard',undefined,current());
           inspected.set(id,live); check();
-          for (const key of adjusted) availability.assertEditable(key,promoted[id][key],bank,live,editorOptions(activeProfile(),candidate));
+          for (const key of adjusted) availability.assertEditable(key,promoted[id][key],bank,live,promoting(activeProfile()));
         }
         await validateSharedBrightness(candidate,prefValues,inspected,check);
         check();
