@@ -83,7 +83,16 @@
       // ShadowRoot has no onkeydown event-handler property. Keep one listener
       // across renders, including the empty/offline editor.
       this.shadowRoot.addEventListener('keydown',event=>{this.focusValue=false;this.remoteKey(event);});
-      this.shadowRoot.addEventListener('pointerdown',()=>{this.focusValue=false;});
+      // A redraw while the pointer is pressed replaces the button under it and
+      // swallows the click (or ends a slider drag). Redraws caused by
+      // arriving data wait until release; clicks redraw after release anyway.
+      this.shadowRoot.addEventListener('pointerdown',()=>{this.focusValue=false;this.pointerHeld=true;});
+      const release=()=>{
+        if(!this.pointerHeld)return;this.pointerHeld=false;
+        const pending=this.deferredRender;this.deferredRender=null;
+        if(pending)setTimeout(()=>{if(pending==='full')this.render();else this.renderPanes();},0);
+      };
+      for(const type of ['pointerup','pointercancel','blur'])window.addEventListener(type,release,true);
     }
     controls() { return [...this.shadowRoot.querySelectorAll('[data-focus]:not(:disabled)')].filter(n=>{
       const closed=n.closest('details:not([open])');
@@ -566,17 +575,23 @@
     openView(view) {this.view=view;this.review=null;this.render({key:'view-back',neighbors:[]},false);if(view==='tv')this.inspect();}
     closeView() {const view=this.view;this.view='edit';this.render({key:view==='tv'?'open-tv':'open-profiles',neighbors:[]},false);this.inspect();}
     render(focus=this.captureFocus(),keepScroll=true) {
+      if(this.deferWhileHeld('full'))return;
       const root=this.shadowRoot,previous=this.scrolls();this.memo=new Map();
       if('list' in previous)this.editScroll=previous;
       root.innerHTML=`<style>${styles}</style>`;
       const frame=el('div',undefined,'frame');this.frame=frame;
       if(this.state&&this.state.document&&this.variant!=='standard')frame.classList.add('profile');
       const top=el('header',undefined,'top');top.append(el('h2','Picture settings'));
-      const actions=el('div',undefined,'actions');actions.append(this.button('Refresh',()=>this.refresh(true),'small'));
+      const actions=el('div',undefined,'actions');
+      // The TV's own app covers the HDMI picture, so it has no "On TV now"
+      // card: the profile in use and its view move into the header.
+      if(this.state.document&&this.adapter.tvApp)actions.append(el('span',this.usingText(),'using tv-using'),this.button('TV profile & automation',()=>this.openView('tv'),'ghost small','open-tv'));
+      actions.append(this.button('Refresh',()=>this.refresh(true),'small'));
       if(!this.state.document&&this.adapter.fileTransfer!==false)actions.append(...this.backupButtons());
       top.append(actions);frame.append(top);
       if(!this.state.document){this.listHost=this.detailHost=null;frame.append(el('p','Import a profile collection using LG Picture Profiles in Home Assistant.','empty'),el('p',this.status.error||'No collection yet.','message'));root.append(frame);this.lockControls();this.restoreFocus(focus);return;}
-      const context=el('div',undefined,'context');context.append(this.editCard(),this.tvCard());frame.append(context);
+      const context=el('div',undefined,'context');context.append(this.editCard());
+      if(this.adapter.tvApp)context.classList.add('solo');else context.append(this.tvCard());frame.append(context);
       const body=el('main',undefined,'body');body.setAttribute('aria-label','Settings editor');frame.append(body);
       this.listHost=this.detailHost=this.gridHost=null;
       if(this.review||this.view!=='edit') {
@@ -602,8 +617,14 @@
       this.editing(root.activeElement&&this.editingKey===root.activeElement.dataset.focus?root.activeElement:null);
       this.focusPendingValue();
     }
+    deferWhileHeld(kind) {
+      if(!this.pointerHeld)return false;
+      if(this.deferredRender!=='full')this.deferredRender=kind;
+      return true;
+    }
     renderPanes() {
       if(!this.listHost||this.review||this.view!=='edit')return;
+      if(this.deferWhileHeld('panes'))return;
       const focus=this.captureFocus(),scroll=this.scrolls();this.memo=new Map();
       this.fillPanes();this.updateFooter();this.lockControls();this.restoreScroll(scroll);this.restoreFocus(focus);
       this.focusPendingValue();
@@ -626,16 +647,21 @@
       note.id='edit-context';card.append(note);return card;
     }
     tvCard() {
-      const card=el('section',undefined,'card tv-card'),p=this.status.offline?null:this.picture(),temporary=Object.values(this.state.overrides||{}).reduce((n,v)=>n+Object.keys(v).length,0);
+      const card=el('section',undefined,'card tv-card'),p=this.status.offline?null:this.picture();
       // Inside the TV app the HDMI picture is always covered, so the card
       // names the last one watched: where the TV returns when the app closes.
       const line=el('div',undefined,'tv-line');line.append(el('span',p&&!p.live?'Last watched':'On TV now','card-label'));
       const now=el('strong',this.status.offline?'TV offline':p?this.pictureText(p):'No HDMI picture yet','now');
       if(p)now.prepend(el('span','',p.live?'dot':'dot last'));
       line.append(now);card.append(line);
-      const using=this.schema2()?'Using '+this.profileName(this.state.active_profile)+' · '+(this.state.selection==='automatic'?'Automatic':'Manual'):'Room: '+this.state.room;
-      const second=el('div',undefined,'tv-line');second.append(el('span',using+(this.state.enabled?'':' · paused')+(temporary?' · '+temporary+' temporary':''),'using'),this.button('TV profile & automation',()=>this.openView('tv'),'ghost small','open-tv'));card.append(second);
+      const second=el('div',undefined,'tv-line');second.append(el('span',this.usingText(),'using'),this.button('TV profile & automation',()=>this.openView('tv'),'ghost small','open-tv'));card.append(second);
       return card;
+    }
+    // The profile the TV is using, how it was chosen, and its state.
+    usingText() {
+      const temporary=Object.values(this.state.overrides||{}).reduce((n,v)=>n+Object.keys(v).length,0);
+      const using=this.schema2()?'Using '+this.profileName(this.state.active_profile)+' · '+(this.state.selection==='automatic'?'Automatic':'Manual'):'Room: '+this.state.room;
+      return using+(this.state.enabled?'':' · paused')+(temporary?' · '+temporary+' temporary':'');
     }
     aliasGroups() {
       return this.cached('groups',()=>{
@@ -975,7 +1001,7 @@
     renderTv(sheet) {
       const p=this.status.offline?null:this.picture(),choices=model.profileOptions(this.state.document);
       this.sheetHead(sheet,'TV profile & automation','Choosing what the TV uses is separate from editing. Editing Base or a profile never changes this selection.');
-      const now=el('div',undefined,'section');now.append(el('h4',p&&!p.live?'Last watched':'On screen'),el('p',this.status.offline?'TV offline · showing saved backup':p?this.pictureText(p,true)+(p.live?'':this.adapter&&this.adapter.tvRemote?' · the TV returns here when you close this app':' · no HDMI picture on screen now'):'No HDMI picture since the bridge started.'));
+      const now=el('div',undefined,'section');now.append(el('h4',p&&!p.live?'Last watched':'On screen'),el('p',this.status.offline?'TV offline · showing saved backup':p?this.pictureText(p,true)+(p.live?'':this.adapter&&this.adapter.tvApp?' · the TV returns here when you close this app':' · no HDMI picture on screen now'):'No HDMI picture since the bridge started.'));
       sheet.append(now);
       if(this.schema2()) {
         const use=el('div',undefined,'section'),selected=this.applyChoice||this.state.selection||'automatic';
@@ -1141,7 +1167,7 @@
   .small{min-height:2.2em;font-size:.88em;padding:.3em .65em}
   .top{display:flex;align-items:center;justify-content:space-between;gap:.5em;flex-wrap:wrap}
   .top h2{margin:0;font-size:1.4em;font-weight:600}.actions,.row-actions,.chips,.tabs{display:flex;flex-wrap:wrap;gap:.4em;align-items:center}
-  .context{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:.55em}
+  .context{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:.55em}.context.solo{grid-template-columns:minmax(0,1fr)}.top .actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:.4em .7em}.tv-using{font-size:.95em}
   .card{border:1px solid var(--line);border-radius:.75em;padding:.55em .8em;background:var(--surface);display:flex;flex-direction:column;gap:.35em;min-width:0}
   .edit-card{border-color:var(--accent);box-shadow:inset 5px 0 0 var(--accent);padding-left:1.05em}
   .tabs .card-label{margin-right:.4em}.tv-line{display:flex;flex-wrap:wrap;align-items:center;gap:.3em .7em}.tv-line button{margin-left:auto}

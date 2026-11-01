@@ -34,8 +34,9 @@ const appRoot=process.env.PROFILE_TEST_APP_ROOT||path.join(__dirname,'../app');
         const root=document.querySelector('#profile-editor').shadowRoot;
         (root.activeElement||document.activeElement).dispatchEvent(new KeyboardEvent('keydown',{key:'Unidentified',keyCode:code,which:code,bubbles:true,composed:true,cancelable:true}));
       },code);
-      assert.equal((await a.focused()).label,'Refresh');
-      await legacy(40);assert.notEqual((await a.focused()).label,'Refresh','Legacy Down moves spatially');
+      // Inside the TV app the profile in use and its view lead the header.
+      assert.equal((await a.focused()).label,'TV profile & automation');
+      await legacy(40);assert.notEqual((await a.focused()).label,'TV profile & automation','Legacy Down moves spatially');
       // Choose a setting from the list, a target in the grid, then edit.
       await a.reach('setting:color');await legacy(13);
       assert.equal(await a.focusKey('setting:color').getAttribute('aria-current'),'true');
@@ -71,7 +72,7 @@ const appRoot=process.env.PROFILE_TEST_APP_ROOT||path.join(__dirname,'../app');
       await a.number('sharpness').waitFor();
       assert.equal((await a.focused()).label,'Refresh');
       await page.keyboard.press('ArrowUp');assert.equal(await page.evaluate(()=>document.activeElement.id),'profiles-close');
-      await page.keyboard.press('ArrowDown');await page.evaluate(()=>{window.delayGet=true;});
+      await page.keyboard.press('ArrowDown');await a.reach('button:Refresh');await page.evaluate(()=>{window.delayGet=true;});
       await page.keyboard.press('Enter');await legacy(461);await page.waitForTimeout(200);
       assert.equal(await page.locator('#profiles-view').evaluate(n=>n.hidden),true);
       assert.equal(await page.evaluate(()=>document.activeElement.id),'profiles-button','Late response does not steal focus from the closed editor');
