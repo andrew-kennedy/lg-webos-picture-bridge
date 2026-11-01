@@ -24,7 +24,8 @@ Launch parameters can contain this `setup` object:
     "discovery_prefix": "homeassistant",
     "tls": false,
     "commands_enabled": true,
-    "cec_commands_enabled": false
+    "cec_commands_enabled": false,
+    "settings_entities_enabled": false
   }
 }
 ```
@@ -58,6 +59,8 @@ in 0.7. They use `/cec/command` and `/cec/state` and do not require a current HD
 picture. See [generic CEC filtering](cec-filter.md) for capabilities, HA scripts,
 discovery entities, migration from 0.6, and safety limits. Extend broker ACLs for
 those two topics only when enabling that feature.
+One entity per TV setting is a third opt-in, `mqtt.settings_entities_enabled` (0.22.3, needs
+`commands_enabled`). See [Settings controls](#settings-controls-opt-in-0223).
 
 TLS is supported with `tls: true` (default port 8883), certificate verification enabled, and an
 optional PEM `ca` string. The supported G6 runs Node 20. Do not disable certificate verification
@@ -105,7 +108,17 @@ publish that command topic and consume the device's state/discovery. Other broke
 be allowed to impersonate either endpoint. MQTT permissions replace the HTTP bearer token for this
 path. Anyone able to publish authorized commands can change picture settings; keep the broker private.
 
-### Settings controls (0.22.2)
+### Settings controls (opt-in, 0.22.3)
+
+From 0.22.3 these entities exist only with `mqtt.settings_entities_enabled: true` (and
+`commands_enabled`). Editing belongs in the TV editor or the LG Picture Profiles panel, which show
+which settings apply where and save them as profiles. On this G6, nothing referenced the 66
+controls, and they logged 2,400–8,200 state changes a day. With the option off, the bridge doesn't
+subscribe to `/settings/command` or publish `/settings/…` topics. It also sends empty retained
+discovery configs for every control and the `Settings command` sensor, so Home Assistant deletes
+them; their old history ages out with the recorder's normal purge. The status entities, `/command` picture
+policies, CEC and `/profiles/…` are unaffected. Saved launch configurations don't merge, so to opt
+in, add the key when you next run the MQTT configuration script.
 
 Each reviewed TV setting LG describes is a `number` or `select` entity in the `config`
 category. A control changes whatever input and preset is on screen. Its `dimension` attribute

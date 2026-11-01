@@ -19,6 +19,9 @@ sequence:
               commands_enabled: true
               # Separate opt-in for validated generic CEC rules. Off by default.
               cec_commands_enabled: false
+              # One HA entity per TV setting (0.22.3+). Off by default; the TV editor
+              # and the LG Picture Profiles panel cover editing.
+              settings_entities_enabled: false
               host: 10.0.0.4
               port: 1883
               username: !secret lg_picture_bridge_mqtt_username

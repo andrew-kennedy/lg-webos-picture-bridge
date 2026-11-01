@@ -111,7 +111,10 @@ function create(config, onHealth, dependencies) {
       return online && !stopped ? client.publish(base + '/cec/state', JSON.stringify(status), false) : false;
     }
   }) : null;
-  var controls = settings.commands_enabled && deps.service ? mqttSettings.create({
+  // One HA entity per TV setting is opt-in (0.22.3): the TV editor and the LG Picture
+  // Profiles panel cover editing, and the entities only filled the recorder. When off,
+  // announce() publishes their tombstones so HA removes them.
+  var controls = settings.commands_enabled && settings.settings_entities_enabled && deps.service ? mqttSettings.create({
     config: config, id: id, service: deps.service, enqueue: deps.enqueueSetting, monitor:deps.settingsMonitor,
     publish: function (topic, payload, retain) { return online && !stopped && client.publish(topic, payload, retain); },
     context: function () {
