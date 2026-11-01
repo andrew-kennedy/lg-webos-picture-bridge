@@ -188,7 +188,7 @@
   function storedScope(record) {
     const bank=record.bank,d=bank.target.dimension;
     const detail=d.pictureMode?(modes[d.pictureMode]||d.pictureMode)+' · '+(bank.target.app_id?'Motion':'Picture'):
-      d.dynamicRange?(formats[record.format]||record.format)+(d.dynamicRange.endsWith('ALLM')?' + ALLM':' without ALLM')+' · '+(d.gameGenre?'Game Optimizer / '+d.gameGenre:'Preset selection'):'Shared port settings';
+      d.dynamicRange?(formats[record.format]||record.format)+(d.dynamicRange.endsWith('ALLM')?' + ALLM':' without ALLM')+' · '+(d.gameGenre?'Game Optimizer':'Preset selection'):'Shared port settings';
     return inputName(input(bank))+' · '+detail;
   }
   function combinedControl(cell,live) {

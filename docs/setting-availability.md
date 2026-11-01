@@ -138,14 +138,15 @@ brightness stays editable because it is one value shared with presets in use.
 ## Game Optimizer picture values (0.24.0)
 
 In Game presets LG ignores the ordinary Contrast, Black Level, Color Depth and Sharpness and uses
-Game Optimizer's own value for each game genre (`gameAdjustContrast`, `gameBlackLevel`,
+Game Optimizer's own value (`gameAdjustContrast`, `gameBlackLevel`,
 `gameColorDepth`, `gameSharpness`). The editor shows those inside the ordinary setting, so one
 Contrast covers every preset. From 0.24.0 that is spelled out:
 
 - The four descriptions say so.
 - The settings list marks the value **Game Optimizer value** when the selection is a Game preset.
 - The grid labels those Game rows **Game Optimizer**.
-- The value box names the genres it edits.
+
+Since 0.26.0 those rows are the Standard genre only; see [Game genres](#game-genres-0260).
 
 The replaced ordinary control is no longer listed as a skipped value, because the Game rows
 already edit the value LG uses there.
@@ -154,9 +155,28 @@ already edit the value LG uses there.
 
 Some settings LG stores for every preset are switched off for the whole TV model. On the G6 that is Dolby Precision Detail: Config Service reports `tv.model.dolbyVisionPrecisionDetail: false` (see [the verification below](#dolby-vision-precision-detail-verification)). Before 0.25.0 the editor listed it anyway and showed **n/a** for every target.
 
-Since 0.25.0 the bridge reports these settings in the editor status as `unsupported_settings`, each with its reason, and the native catalog no longer lists them. The editor leaves them out of the settings list and grid. When the editor talks to an older bridge, it hides Dolby Precision Detail as soon as an inspected bank reports the model switch. Values a profile already stores (two HDMI 3 Dolby Vision banks hold `off`) are kept. Only an explicit `false` hides a setting: if Config Service doesn't answer, nothing is hidden.
+Since 0.25.0 the native catalog leaves these settings out. Only an explicit `false` counts: if Config Service doesn't answer, nothing is left out. 0.25.0 also reported them to the editor as `unsupported_settings` so it could hide the values saved profiles still held. 0.26.0 removes that report and the hiding: on 2026-11-01 the only two stored values on this TV (HDMI 3 Dolby Vision Filmmaker and Cinema Home, both `off`) were removed from the profiles with `compact_management`, which left every other key as it was. A profile or older backup that still stores Precision Detail shows it again, as **n/a**.
 
 A read-only scan of all 576 catalog groups on 2026-10-31 found no other setting that is never editable. Gamma, Expression Enhancer, TruMotion de-judder and de-blur, and Filmmaker ambient light compensation are each editable for only a few targets, but they depend on the signal or preset, so they stay listed. The motion twin `motionProOLED` and the unaudited `motionEyeCare`, `aiHdrRemastering` and `ambientLightCompensation` were already left out of the catalog.
+
+## Game genres (0.26.0)
+
+Game Optimizer offers six genres on each port: Standard, FPS, RPG, RTS, Sports and User. A genre is not a mode with its own processing in LG's settings. It only chooses which of six saved copies of the same seven Game Optimizer values applies: Game Contrast, Game Black Level, Game Color Depth, Game Sharpness, Black Stabilizer, White Stabilizer and Fine Tune Dark Areas. LG's factory table (`/etc/palm/defaultSettings.json`, categories `other$hdmiN.<genre>.<range>.x`) stores nothing else per genre. The genres differ only in their starting values, for example HDMI 1 SDR:
+
+| Genre | Color Depth | Sharpness | Black Stabilizer | White Stabilizer |
+| --- | --- | --- | --- | --- |
+| Standard | 55 | 10 | 10 | 10 |
+| FPS | 65 | 25 | 15 | 13 |
+| RPG | 65 | 25 | 7 | 5 |
+| RTS | 65 | 25 | 13 | 5 |
+| Sports | 80 | 20 | 14 | 2 |
+| User | 55 | 10 | 10 | 10 |
+
+Game Contrast (85 SDR, 100 HDR), Game Black Level (50) and Fine Tune Dark Areas (0) are the same in every genre. The table shows only what LG stores; firmware could still treat a genre differently internally, but nothing in the settings data shows that.
+
+LG's Game Optimizer app (`com.webos.app.gameoptimizer`) names them Standard, FPS (First Person Shooter), RPG (Role-playing Game), RTS (Real-time Strategy), Sports and User, and adds "(User Settings)" to a genre once one of its values is changed there (`gameSettingModified`). User is an ordinary slot with Standard's starting values. There is no guided setup for it. The Picture Wizard (`com.webos.app.picturewizard`) builds the Personalized picture presets, which are ordinary presets in the editor. On 2026 models a genre applies to picture values only, not the sound mode.
+
+Profiles already choose these values per device and room, so genres only add six places for a value to hide. Since 0.26.0 the editor works in Standard only. The native catalog lists the Standard genre and leaves the genre selector out of the port settings. The editor ignores other genres' banks, even from an older bridge's catalog or an older profile, and never reads or edits them. It has no **Game genre** setting, genre chips or genre wording, and its Game rows edit Standard. The saved port settings for HDMI 1 (PC), HDMI 3 (Switch 2) and HDMI 4 (PS5) hold Standard, so the bridge keeps those ports there. A genre picked from the TV's menu counts as a temporary change and ends at standby. HDMI 2 has no saved genre; it was on Standard on 2026-10-31.
 
 ## Editing and recovery
 

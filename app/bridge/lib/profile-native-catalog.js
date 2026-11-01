@@ -54,8 +54,12 @@ function plan(document,index,inputs,all=false,unsupported=[]) {
     }
     if(apps)continue;
     const target={category:'other',dimension:{gameInput:port}};
-    add(target,banks.PORT,port+' connection');
-    const genres=choices(index.resolve('gameGenre',target)).filter(v=>['Standard','FPS','RPG','RTS','Sports','USER'].includes(v));
+    // LG's game genres (Standard, FPS, RPG, RTS, Sports, User) are six saved
+    // copies of the same seven Game Optimizer values; only their factory
+    // starting values differ. Profiles already choose values per device, so
+    // the catalog lists the Standard genre and leaves the genre selector out.
+    add(target,banks.PORT.filter(k=>k!=='gameGenre'),port+' connection');
+    const genres=choices(index.resolve('gameGenre',target)).filter(v=>v==='Standard');
     for(const dynamicRange of banks.RANGES)for(const gameGenre of genres)
       add({category:'other',dimension:{gameInput:port,dynamicRange,gameGenre}},banks.GAME,port+' '+dynamicRange+' '+gameGenre+' Game Optimizer');
   }

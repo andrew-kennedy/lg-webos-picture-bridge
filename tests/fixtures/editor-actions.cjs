@@ -18,7 +18,7 @@ function actions(page) {
     // Wait until every value the current setting would change has been described.
     ready:()=>page.waitForFunction(()=>{const e=document.querySelector('lg-profile-editor');return e.state&&e.setting&&e.targetsFor(e.setting).pending.length===0;}),
     // Set the target directly for tests that are not about choosing it.
-    async target(target){await page.evaluate(async target=>{const e=document.querySelector('lg-profile-editor');e.target={ranges:null,genres:null,allm:null,...target};e.renderPanes();await e.inspect();},target);await this.ready();},
+    async target(target){await page.evaluate(async target=>{const e=document.querySelector('lg-profile-editor');e.target={ranges:null,allm:null,...target};e.renderPanes();await e.inspect();},target);await this.ready();},
     focused:()=>page.evaluate(()=>{const e=document.querySelector('lg-profile-editor'),n=e.shadowRoot.activeElement;return n?{key:n.dataset.focus,label:n.getAttribute('aria-label')||n.textContent,editing:n.hasAttribute('data-editing')}:null;}),
     // Arrow-only navigation toward a control, using the editor's own spatial
     // rules. Fails if the remote cannot reach it.

@@ -25,15 +25,12 @@ function create(options) {
   let latestObservations = [];
   let recoveryTimer = null, retryDelay = 5000;
   let captureTimer = null, nativeError = null;
-  let catalogueReady=false, modelCapabilities=null;
-  // Config Service answers once per service; tests and other hosts inject it.
+  let catalogueReady=false;
+  // Settings the TV model disables stay out of the native catalog. Config
+  // Service answers once per service; tests and other hosts inject it.
   const capabilities=()=>options.capabilities?options.capabilities():options.service?availability.loadCapabilities(options.service):Promise.resolve({});
-  async function modelSupport() {
-    if(!modelCapabilities)modelCapabilities=await Promise.resolve().then(capabilities).catch(()=>({}));
-    return modelCapabilities;
-  }
   const browser = nativeState.create({document,now:clock,index:options.nativeDescriptions,read:command=>native(command),
-    unsupported:async()=>Object.keys(availability.unsupported(await modelSupport()))});
+    unsupported:()=>Promise.resolve().then(capabilities).then(c=>Object.keys(availability.unsupported(c)),()=>[])});
   const defaults = {movie_bright:100,movie_dark:3,game_sdr:80};
   try {
     saved = store.read('profiles');
@@ -102,7 +99,7 @@ function create(options) {
     return {configured:!!saved,editor_api:9,profile_schema:document()&&document().schema,selection:selection(),active_profile:activeProfile(),owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
       enabled:!!(saved && saved.enabled),room,power,context,last_context:lastContext,temporary_count:Object.values(overrides).reduce((n,v) => n + Object.keys(v).length,0),
       pending_restore:Object.keys(journal.restore).length > 0||!!(journal.native&&journal.native.length),applying,changed_count:changedCount,native_backup_error:nativeError,native_backup_complete:!!browser.captured(),
-      error:loadError || lastError,backup_sequence:latestBackup ? sequence : null,backup_acknowledged:acknowledged,unsupported_settings:availability.unsupported(modelCapabilities),
+      error:loadError || lastError,backup_sequence:latestBackup ? sequence : null,backup_acknowledged:acknowledged,
       active_devices:document() ? [...new Set(document().banks.filter(b =>
         (Object.hasOwn(b.target.dimension,'pictureMode') || Object.hasOwn(b.target.dimension,'dynamicRange')) &&
         model.active(b,context)).flatMap(b => b.devices || []))].map(d => document().devices[d]) : []};
@@ -442,7 +439,6 @@ function create(options) {
       externalGuard();
       if(saved&&document().schema===2&&input.action==='edit')input={action:'edit_many',revision:input.revision,edits:[{bank_id:input.bank_id,variant:input.variant,settings:input.settings,expected:input.expected}]};
       if (input.action === 'get') {
-        if(power==='on')await modelSupport();
         if(saved&&power==='on')try{await browser.load();catalogueReady=true;}catch(error){nativeError=error.message;}
         return {state:snapshot(),status:status(),...(catalogueReady?{catalog:browser.metadata()}: {})};
       }

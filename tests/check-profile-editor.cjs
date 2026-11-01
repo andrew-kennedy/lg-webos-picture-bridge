@@ -26,7 +26,7 @@ const state=require('./fixtures/profile-editor.cjs');
       await a.number('sharpness').fill('4');
       assert.equal((await a.calls('edit_many')).length,0,'Editing is a draft until explicit preview and save');
       await button('Review 1 changes').click();
-      assert(await page.getByText('HDMI 3 · HDR + ALLM · Game Optimizer / Standard',{exact:true}).isVisible());
+      assert(await page.getByText('HDMI 3 · HDR + ALLM · Game Optimizer',{exact:true}).isVisible());
       await button('Save standards').click();await a.saved();
       assert.deepEqual(await a.calls('edit_many'),[{action:'edit_many',edits:[{bank_id:'game',variant:'standard',settings:{gameSharpness:4}}],preferences:{},revision:7}]);
       // Motion settings are listed with their own native targets.

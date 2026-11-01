@@ -22,7 +22,7 @@ const {actions}=require('./fixtures/editor-actions.cjs');
     await a.open('color');
     assert.match(await q('.reviewer').textContent(),/RTINGSLeft at the FILMMAKER default/,'Settings RTINGS leaves at default say so');
     assert(await q('.detail-head .help').getByText('Game Optimizer’s own Color Depth',{exact:false}).isVisible(),'Color depth explains the Game Optimizer value');
-    await a.open('gameGenre');
+    await a.open('whiteStabilizer');
     assert.equal(await q('.reviewer').count(),0,'Settings neither reviewer covers have no box');
     await a.open('hdrDynamicToneMapping');
     await a.focusKey('open-reviews:hdrDynamicToneMapping').focus();await page.keyboard.press('Enter');

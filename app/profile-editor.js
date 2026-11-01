@@ -4,10 +4,15 @@
   // Plain-language help, checked against the G6's own Settings/Game Optimizer
   // help and value labels. See docs/setting-help.md for sources and caveats.
   // Keep this local: rendering help requires no TV reads or persistent writes.
-  // Game presets ignore these four and use Game Optimizer's own value for
-  // each game genre. The editor shows that value in the same setting.
-  const gameNote = name => ' In Game presets, LG uses Game Optimizer’s own '+name+', saved for each game genre. The Game rows here edit it; the genre chips choose which genres.';
+  // Game presets ignore these four and use Game Optimizer's own value. The
+  // editor shows that value in the same setting.
+  const gameNote = name => ' In Game presets, LG uses Game Optimizer’s own '+name+'. The Game rows here edit it.';
   const gameAliases = new Set(['contrast','brightness','color','sharpness']);
+  // LG's six game genres are six saved copies of the same seven Game Optimizer
+  // values; only their factory starting values differ. The editor works in
+  // Standard only: other genres' banks and the port's genre selector are
+  // ignored, and saved port settings keep each managed port on Standard.
+  const standardGenre = r => r.alias!=='gameGenre'&&(!r.bank.target.dimension.gameGenre||r.bank.target.dimension.gameGenre==='Standard');
   const descriptions = {
     backlight:'Sets how much light the OLED panel emits. SDR profiles can share brightness or keep independent values using SDR brightness links. HDR and Dolby Vision have their own saved values.',
     contrast:'Adjusts the difference between light and dark areas. Raising it can make bright shades harder to distinguish.'+gameNote('Contrast'),
@@ -40,7 +45,6 @@
     lowLevelAdjustment:'Fine-tunes dark game areas when variable refresh rate is enabled. It adjusts shadow visibility separately from the normal black-level control.',
     blackStabilizer:'Adjusts visibility in dark game scenes, helping objects stand out in shadows. Changes can also alter the intended contrast.',
     whiteStabilizer:'Adjusts visibility in bright game scenes, helping objects stand out in highlights. It is separate from the panel’s Peak brightness setting.',
-    gameGenre:'Selects LG’s game tuning bank, such as Standard or FPS. Switching genre can recall different saved Game Optimizer adjustments.',
     inputOptimization:'Selects LG’s input-lag treatment: auto means Standard; on means Boost. Boost applies when using the Game Optimizer picture mode.',
     gameOptimization:'Enables variable refresh rate, including NVIDIA G-Sync compatibility, to reduce tearing and stutter from a supported source.',
     freesync:'Enables AMD FreeSync variable refresh rate for compatible sources, reducing tearing and stutter. It is separate from the VRR & G-Sync switch.',
@@ -129,12 +133,11 @@
   const order = {
     picture:['backlight','contrast','brightness','color','tint','sharpness','colorTemperature','gamma','gammaLevel','peakBrightness','hdrDynamicToneMapping','expressionEnhancer','dynamicContrast','dynamicColor','colorGamut','superResolution','noiseReduction','mpegNoiseReduction','smoothGradation','nearBlackDetail','dolbyPrecisionDetail','blackLevel'],
     motion:['realCinema','truMotionMode','truMotionJudder','truMotionBlur','motionProOLED','motionPro'],
-    game:['gameGenre','inputOptimization','lowLevelAdjustment','blackStabilizer','whiteStabilizer'],
+    game:['inputOptimization','lowLevelAdjustment','blackStabilizer','whiteStabilizer'],
     port:['enableALLM','gameOptimization','freesync','enableQFT','enable144HzBooster','uhdDeepColor'],
     selection:['pictureMode']};
   const sections = {picture:'Picture',motion:'Motion',game:'Game Optimizer',port:'HDMI connection',selection:'Preset selection'};
   const formatNames = {sdr:'SDR',hdr:'HDR',dolbyHdr:'Dolby Vision'};
-  const genres = ['Standard','FPS','RPG','RTS','Sports','USER'];
   const pretty = key => window.LGProfileView.title(key);
   const display = value => typeof value === 'object' && value !== null ? [...new Set(Object.values(value))].join(' / ') : String(value === undefined || value === null ? '—' : value);
   const el = (tag,text,cls) => {const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
@@ -266,7 +269,7 @@
     recordsFor(variant=this.variant) {
       if(!this.state||!this.state.document)return [];
       if(!this.recordCache||this.recordCache.state!==this.state)this.recordCache={state:this.state,byVariant:new Map()};
-      if(!this.recordCache.byVariant.has(variant))this.recordCache.byVariant.set(variant,model.records(this.state,variant));
+      if(!this.recordCache.byVariant.has(variant))this.recordCache.byVariant.set(variant,model.records(this.state,variant).filter(standardGenre));
       return this.recordCache.byVariant.get(variant);
     }
     records() { return this.recordsFor(this.variant); }
@@ -309,20 +312,8 @@
     statusOf(record) { return this.statusMap().get(record.id)||{state:'pending',editable:false}; }
     // LG's own availability, ignoring the editor's room lock on shared values.
     lgStatus(record) { const s=this.statusOf(record);return s.lg||s; }
-    // Settings this TV model never uses, for any input or preset. Bridge 0.25.0
-    // reports them; older bridges show Dolby Precision Detail's model switch
-    // in each inspected bank.
-    unsupported() {
-      return this.cached('unsupported',()=>{
-        const map=new Map(Object.entries(this.status.unsupported_settings||{}));
-        if(!map.has('dolbyPrecisionDetail')&&Object.values(this.live||{}).some(v=>v.capabilities&&v.capabilities.dolbyPrecisionDetail===false))
-          map.set('dolbyPrecisionDetail','LG disables Dolby Precision Detail in this TV model configuration, for every preset.');
-        return map;
-      });
-    }
-    // Model-unsupported settings stay stored but are not listed.
     byAlias() {
-      return this.cached('alias',()=>{const map=new Map(),hidden=this.unsupported();for(const r of this.records()){if(hidden.has(r.alias))continue;if(!map.has(r.alias))map.set(r.alias,[]);map.get(r.alias).push(r);}return map;});
+      return this.cached('alias',()=>{const map=new Map();for(const r of this.records()){if(!map.has(r.alias))map.set(r.alias,[]);map.get(r.alias).push(r);}return map;});
     }
     aliasRecords(alias) { return this.byAlias().get(alias)||[]; }
     managedBank(bank) { return !bank.managed_keys||bank.managed_keys.length>0||Object.keys(bank.variants||{}).length>0; }
@@ -416,8 +407,8 @@
       return {rows:rows.filter(row=>unused(columns.map(c=>cells.get(key(row,c))))),columns:columns.filter(c=>unused(rows.map(row=>cells.get(key(row,c)))))};
     }
     filtered(record) {
-      const d=record.bank.target.dimension;if(!d.gameGenre)return true;
-      return (!Array.isArray(this.target.genres)||this.target.genres.includes(d.gameGenre))&&(!Array.isArray(this.target.allm)||record.signals.some(v=>this.target.allm.includes(v)));
+      if(!record.bank.target.dimension.gameGenre)return true;
+      return !Array.isArray(this.target.allm)||record.signals.some(v=>this.target.allm.includes(v));
     }
     cellRecords(spec,column,row) {return spec.records.filter(r=>model.coordinates(r).row===row&&column.inputs.some(i=>model.inColumn(r,i))&&this.filtered(r));}
     // Records an edit to this setting would change: the selected targets
@@ -450,7 +441,7 @@
     onScreenTarget() {
       const p=this.picture();
       if(!p)return null;
-      return {inputs:[p.input],presets:model.modes[p.mode]?[p.mode]:[],ranges:p.range?[p.range]:null,genres:null,allm:null};
+      return {inputs:[p.input],presets:model.modes[p.mode]?[p.mode]:[],ranges:p.range?[p.range]:null,allm:null};
     }
     ensureTarget() {
       if(this.target)return;
@@ -458,7 +449,7 @@
       if(this.target)return;
       // Without a picture on screen, start at the first input's mapped (or
       // managed) preset so the list shows real values rather than nothing.
-      this.target={inputs:[],presets:[],ranges:null,genres:null,allm:null};
+      this.target={inputs:[],presets:[],ranges:null,allm:null};
       const usage=this.usage(),records=this.records();
       for(const input of this.inputs()) {
         const own=records.filter(r=>r.preset&&model.inColumn(r,input));if(!own.length)continue;
@@ -908,7 +899,7 @@
         for(const value of control.options){const option=el('option',optionText(alias,value));option.value=value;input.append(option);}input.value=sum.mixed?'':unique[0];input.disabled=disabled;input.onchange=()=>update(input.value);
       } else if(this.status.offline)input=el('p',summarize(alias,t.affected.map(r=>this.draftValue(r))).full||'—','static');
       else if(!ready)input=el('p','Checking which of these targets use '+title+'…','note');
-      else if(!t.editable.length)input=el('p',!t.excluded.length&&t.replaced.length?'Game presets use Game Optimizer’s own '+title+'. Choose a game genre with the chips to edit it.':
+      else if(!t.editable.length)input=el('p',!t.excluded.length&&t.replaced.length?'Game presets use Game Optimizer’s own '+title+', which isn’t stored for these targets.':
         t.excluded.every(r=>this.statusOf(r).lg)?this.statusOf(t.excluded[0]).reason:'LG does not use '+title+' for any selected target.','note warn');
       else input=el('p','These targets have no range or choice in common. Narrow the selection, for example to one format.','note warn');
       if(control&&control.label&&control.label!==title&&input.tagName!=='SELECT')input.prepend(el('span',control.label,'control-label'));
@@ -919,8 +910,7 @@
       box.append(meta);
       box.append(el('p',this.draftLine(t.editable),'note draft-line'));
       const game=t.editable.filter(r=>r.key!==r.alias);
-      if(game.length){const genres=[...new Set(game.map(r=>r.bank.target.dimension.gameGenre).filter(Boolean))].map(g=>g==='USER'?'User':g);
-        box.append(el('p',(game.length===t.editable.length?'Edits':'Includes')+' Game Optimizer’s own '+title+' for Game presets'+(genres.length?' · '+genres.join(', ')+(genres.length===1?' genre':' genres'):'')+'. LG uses it instead of the ordinary '+title+' there.','note game-note'));}
+      if(game.length)box.append(el('p',(game.length===t.editable.length?'Edits':'Includes')+' Game Optimizer’s own '+title+' for Game presets. LG uses it instead of the ordinary '+title+' there.','note game-note'));
       if(t.linked.length||t.chosen.some(r=>r.preference)) {
         const roles=[...new Set(t.affected.filter(r=>r.preference).map(r=>r.brightnessRole))].map(r=>r==='game_sdr'?'gaming':'movie').join(' and ');
         box.append(el('p','Linked SDR '+roles+' brightness is one shared value'+(t.linked.length?'. This edit also changes '+t.linked.length+' linked '+(t.linked.length===1?'target':'targets')+' outside your selection (dashed in the grid).':' for every linked preset.'),'note linked'));
@@ -989,8 +979,6 @@
       if(views.childElementCount)host.append(views);
       if(spec.game) {
         const filters=el('div',undefined,'filters');
-        const present=genres.filter(g=>spec.records.some(r=>r.bank.target.dimension.gameGenre===g));
-        if(present.length>1)filters.append(this.filterChips('Game Optimizer genres','genres',present,g=>g==='USER'?'User':g));
         filters.append(this.filterChips('Game Optimizer with ALLM','allm',['off','on'],v=>v==='on'?'ALLM on':'ALLM off'));
         host.append(filters);
       }
@@ -1181,7 +1169,7 @@
       if(this.status.editor_api>=8) {
         const native=el('div',undefined,'section');native.append(el('h4','Native settings catalog · '+this.state.document.banks.length+' browsable groups'),
           el('p',this.status.editor_api>=9?'Browsing reads LG’s values without adding them to profile management. In Base, native-only edits save directly to LG. Adding a named override or brightness link saves only the baseline needed to restore that setting. Home Assistant receives a complete native backup.':'Discover every preset and game genre offered by this TV. Existing values become Base without changing the picture.','note'));
-        const discover=this.button(this.status.editor_api>=9?'Refresh native catalog':'Discover native presets and genres',()=>this.mutate({action:'include_native_catalog',revision:this.state.revision}),undefined,'native-catalog');native.append(discover);sheet.append(native);
+        const discover=this.button(this.status.editor_api>=9?'Refresh native catalog':'Discover native presets',()=>this.mutate({action:'include_native_catalog',revision:this.state.revision}),undefined,'native-catalog');native.append(discover);sheet.append(native);
       }
       sheet.querySelectorAll('.section button,.sheet>button').forEach(b=>{b.dataset.profileAction='';});
       if(backup)sheet.append(backup);

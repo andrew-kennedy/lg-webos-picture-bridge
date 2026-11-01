@@ -58,7 +58,7 @@ const {actions}=require('./fixtures/editor-actions.cjs');
     await a.cell('hdmi3','dolbyHdrCinema').click();await a.focusKey('group:dolbyHdr').click();await a.focusKey('cols:all').click();await a.ready();
     assert.equal(await a.focusKey('group:dolbyHdr').getAttribute('aria-pressed'),'true');
     assert.match(await q('.valuebox .for').textContent(),/All inputs · all Dolby Vision presets in use/);
-    assert.equal(await a.number('color').inputValue(),'','Different genre values show Mixed');
+    assert.equal(await a.number('color').inputValue(),'','Different values (Dolby Vision Game Optimizer) show Mixed');
     assert(await q('.valuebox').getByText(/values are skipped/).isVisible());
     await a.number('color').fill('50');
     draft=(await editor()).draft;

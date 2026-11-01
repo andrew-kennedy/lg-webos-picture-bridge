@@ -40,7 +40,8 @@ module.exports=async()=>{
   assert(apps.some(b=>b.target.dimension.pictureMode&&!b.target.app_id)&&apps.some(b=>b.target.dimension.dynamicRange),'TV apps have picture and preset banks');
   assert(apps.every(b=>b.target.category==='picture'&&!b.target.app_id),'No app-scoped motion or port banks for TV apps');
   assert.equal(view.inputName('default'),'TV apps');
-  assert.throws(()=>require('../app/bridge/lib/profile-banks').target({category:'picture',dimension:{input:'default',pictureMode:'filmMaker'},app_id:'com.webos.app.default'}),/no HDMI app binding/);;assert(opts.genre.includes('FPS'));
+  assert.throws(()=>require('../app/bridge/lib/profile-banks').target({category:'picture',dimension:{input:'default',pictureMode:'filmMaker'},app_id:'com.webos.app.default'}),/no HDMI app binding/);
+  assert.deepEqual(opts.genre,['Standard'],'Only the Standard genre is listed, although the TV offers FPS too');
   const target=result.catalog.find(b=>b.target.dimension.pictureMode==='expert1'&&b.target.dimension.input==='hdmi1'&&!b.target.app_id);
   await e.command({action:'inspect',bank_id:target.id});
   assert.equal(f.writes.length,writes,'Inspecting unused presets never writes persistent storage');
@@ -131,7 +132,7 @@ module.exports=async()=>{
   assert(reads<=4,'prepare rebuilt the merged view '+reads+' times for one batch');
 
   // A setting the TV model disables (Dolby Precision Detail on the G6) is not
-  // listed, and the editor learns it from status.
+  // listed in the catalog.
   const reason='LG disables Dolby Precision Detail in this TV model configuration, for every preset.';
   assert.deepEqual(availability.unsupported({dolbyPrecisionDetail:false}),{dolbyPrecisionDetail:reason});
   assert.deepEqual(availability.unsupported({dolbyPrecisionDetail:true}),{});assert.deepEqual(availability.unsupported({}),{},'Unknown is not a denial');
@@ -140,15 +141,21 @@ module.exports=async()=>{
   assert(pictures(native.plan({...doc,banks:[]},precision,['hdmi3'],true)).every(p=>p.keys.includes('dolbyPrecisionDetail')),'Listed when the model allows it');
   const skipped=pictures(native.plan({...doc,banks:[]},precision,['hdmi3'],true,['dolbyPrecisionDetail']));
   assert(skipped.length&&skipped.every(p=>!p.keys.includes('dolbyPrecisionDetail')&&p.keys.includes('backlight')),'Skipped when the model disables it');
-  for(const [capabilities,expected] of [[async()=>({dolbyPrecisionDetail:false}),{dolbyPrecisionDetail:reason}],[async()=>({}),{}],[async()=>{throw new Error('Config Service down');},{}]]) {
+  for(const [capabilities,listed] of [[async()=>({dolbyPrecisionDetail:false}),false],[async()=>({}),true],[async()=>{throw new Error('Config Service down');},true]]) {
     const g=fixture(doc,{nativeDescriptions:precision,capabilities}),m=g.create();m.setPower('on');await m.idle();
-    assert.deepEqual(m.status().unsupported_settings,{},'Nothing is claimed before the model is read');
     await m.command({action:'initialize',document:doc,enabled:true,migration_id:'precision-test'});
     await m.command({action:'upgrade_profiles',revision:m.status().revision});await m.idle();
-    const got=await m.command({action:'get'});
-    assert.deepEqual(got.status.unsupported_settings,expected);
-    const listed=got.catalog.filter(b=>Object.hasOwn(b.settings,'dolbyPrecisionDetail')).length;
-    assert(expected.dolbyPrecisionDetail?listed===0:listed>0,'Catalog lists Precision Detail '+listed+' times');
+    const got=await m.command({action:'get'}),count=got.catalog.filter(b=>Object.hasOwn(b.settings,'dolbyPrecisionDetail')).length;
+    assert.equal(count>0,listed,'Catalog lists Precision Detail '+count+' times');
+    assert(!Object.hasOwn(got.status,'unsupported_settings'),'Status does not report model-disabled settings');
     m.stop();
   }
+
+  // Game genres are six saved copies of the same Game Optimizer values. The
+  // catalog lists the Standard genre only and leaves the genre selector out,
+  // although this test TV offers FPS too.
+  const planned=native.plan({...doc,banks:[]},index,['hdmi3'],true);
+  const game=planned.filter(p=>p.bank.target.dimension.gameGenre),port=planned.find(p=>p.bank.target.dimension.gameInput&&!p.bank.target.dimension.dynamicRange);
+  assert(game.length&&game.every(p=>p.bank.target.dimension.gameGenre==='Standard'),'Only Standard genre banks: '+game.map(p=>p.bank.target.dimension.gameGenre).join(','));
+  assert(!port||!port.keys.includes('gameGenre'),'No genre selector in the port settings');
 };

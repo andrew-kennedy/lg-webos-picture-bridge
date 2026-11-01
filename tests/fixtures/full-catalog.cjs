@@ -1,13 +1,15 @@
 'use strict';
 // A G6-sized native catalog layered over the managed format fixture: eight
 // input identities × 22 presets, preset mappings, port banks and Game
-// Optimizer genres (548 groups, as on the verified TV). Values and
+// Optimizer banks, listed like the bridge: the Standard genre only and no
+// genre selector. Values and
 // availability are deterministic and follow the audited G6 rules closely
 // enough to exercise exclusions; they are not a substitute for the audits.
 const catalog=require('../../app/bridge/lib/profile-catalog');
 const banks=require('../../app/bridge/lib/profile-banks');
 const presets={sdr:['personalized','vivid','normal','eco','cinema','game','filmMaker','expert1','expert2'],hdr:['hdrPersonalized','hdrVivid','hdrStandard','hdrEco','hdrCinemaBright','hdrGame','hdrFilmMaker'],dolbyHdr:['dolbyHdrPersonalized','dolbyHdrVivid','dolbyHdrStandard','dolbyHdrCinemaBright','dolbyHdrCinema','dolbyHdrGame']};
-const genres=['Standard','FPS','RPG','RTS','Sports','USER'];
+// The bridge lists only the Standard genre (see profile-native-catalog.js).
+const genres=['Standard'];
 // The G6 enables on/off OLED Motion (motionPro); its leveled twin is not listed.
 const omitted=new Set(['motionEyeCare','aiHdrRemastering','ambientLightCompensation','motionProOLED']);
 const defaultMapping={sdr:'normal',sdrALLM:'game',hdr:'hdrStandard',hdrALLM:'hdrGame',dolbyHdr:'dolbyHdrStandard',dolbyHdrALLM:'dolbyHdrGame'};
@@ -23,7 +25,7 @@ function pictureValue(key,mode,input) {
   return values[key];
 }
 const portValues={gameGenre:'Standard',inputOptimization:'auto',gameOptimization:'on',enableALLM:'on',enableQFT:'off',enable144HzBooster:'off',uhdDeepColor:'on',freesync:'off'};
-const gameValue=(key,range,genre)=>({gameAdjustContrast:range.startsWith('sdr')?95:100,gameBlackLevel:50,gameColorDepth:genre==='FPS'?55:50,gameSharpness:0,blackStabilizer:genre==='FPS'?13:10,whiteStabilizer:10,lowLevelAdjustment:0})[key];
+const gameValue=(key,range,genre)=>({gameAdjustContrast:range.startsWith('sdr')?95:100,gameBlackLevel:50,gameColorDepth:range.startsWith('dolbyHdr')?55:50,gameSharpness:0,blackStabilizer:genre==='FPS'?13:10,whiteStabilizer:10,lowLevelAdjustment:0})[key];
 // Builds {state, catalog, native}. state.document holds the managed banks only.
 function build() {
   const state=structuredClone(require('./profile-formats.cjs'));
@@ -45,7 +47,8 @@ function build() {
       add({category:'picture',dimension:{input,pictureMode:mode},app_id:'com.webos.app.'+port},{truMotionMode:'off'},input+' '+mode+' motion');
     }
     if(input.endsWith('_pc'))continue;
-    add({category:'other',dimension:{gameInput:port}},{...portValues},port+' connection');
+    const {gameGenre,...connection}=portValues;
+    add({category:'other',dimension:{gameInput:port}},connection,port+' connection');
     for(const range of banks.RANGES)for(const genre of genres)add({category:'other',dimension:{gameInput:port,dynamicRange:range,gameGenre:genre}},Object.fromEntries(banks.GAME.map(k=>[k,gameValue(k,range,genre)])),port+' '+range+' '+genre);
   }
   return {state,catalog:list,native};
@@ -111,14 +114,11 @@ function install(data) {
       else controls[key]={component:'select',options:choices[key]||[String(settings[key])]};
     }
     if(controls.enable144HzBooster)controls.enable144HzBooster.label='165 Hz boost';
-    // data.capabilities: the model switches an older bridge reports per bank.
-    return {id,settings:structuredClone(settings),controls,availability,...(data.capabilities?{capabilities:data.capabilities}:{})};
+    return {id,settings:structuredClone(settings),controls,availability};
   }
   window.requestProfile=async command=>{
     if(command.action==='get') {
       const result=await original(command);result.status.editor_api=window.editorApi;
-      // data.unsupported: the bridge's model-unsupported settings (0.25.0).
-      if(data.unsupported)result.status.unsupported_settings=data.unsupported;
       result.catalog=data.catalog.map(b=>({...b,devices:(managed(b.id)||b).devices||[],settings:{...b.settings,...Object.fromEntries(Object.keys((managed(b.id)||{settings:{}}).settings).map(k=>[k,null]))}}));
       return result;
     }
