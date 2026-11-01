@@ -309,8 +309,20 @@
     statusOf(record) { return this.statusMap().get(record.id)||{state:'pending',editable:false}; }
     // LG's own availability, ignoring the editor's room lock on shared values.
     lgStatus(record) { const s=this.statusOf(record);return s.lg||s; }
+    // Settings this TV model never uses, for any input or preset. Bridge 0.25.0
+    // reports them; older bridges show Dolby Precision Detail's model switch
+    // in each inspected bank.
+    unsupported() {
+      return this.cached('unsupported',()=>{
+        const map=new Map(Object.entries(this.status.unsupported_settings||{}));
+        if(!map.has('dolbyPrecisionDetail')&&Object.values(this.live||{}).some(v=>v.capabilities&&v.capabilities.dolbyPrecisionDetail===false))
+          map.set('dolbyPrecisionDetail','LG disables Dolby Precision Detail in this TV model configuration, for every preset.');
+        return map;
+      });
+    }
+    // Model-unsupported settings stay stored but are not listed.
     byAlias() {
-      return this.cached('alias',()=>{const map=new Map();for(const r of this.records()){if(!map.has(r.alias))map.set(r.alias,[]);map.get(r.alias).push(r);}return map;});
+      return this.cached('alias',()=>{const map=new Map(),hidden=this.unsupported();for(const r of this.records()){if(hidden.has(r.alias))continue;if(!map.has(r.alias))map.set(r.alias,[]);map.get(r.alias).push(r);}return map;});
     }
     aliasRecords(alias) { return this.byAlias().get(alias)||[]; }
     managedBank(bank) { return !bank.managed_keys||bank.managed_keys.length>0||Object.keys(bank.variants||{}).length>0; }

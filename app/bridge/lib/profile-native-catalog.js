@@ -17,7 +17,9 @@ const omitted=new Set(['motionEyeCare','aiHdrRemastering','ambientLightCompensat
 const variants=new Set(['motionPro','motionProOLED']);
 const offered=(index,key,target)=>!variants.has(key)||visible(index.resolve(key,target));
 
-function plan(document,index,inputs,all=false) {
+// unsupported: keys this TV model never uses (see availability.unsupported).
+function plan(document,index,inputs,all=false,unsupported=[]) {
+  const skip=new Set([...omitted,...unsupported]);
   // "default" is LG's input for the Home Screen and webOS apps (TV apps).
   inputs=inputs||[1,2,3,4].flatMap(n=>['hdmi'+n,'hdmi'+n+'_pc']).concat('default');
   if(!Array.isArray(inputs)||!inputs.length||inputs.length>9||new Set(inputs).size!==inputs.length||inputs.some(v=>!/^(hdmi[1-4](_pc)?|default)$/.test(v)))throw new Error('Choose valid native HDMI or TV app input identities');
@@ -46,7 +48,7 @@ function plan(document,index,inputs,all=false) {
     }
     for(const pictureMode of modes) {
       const target={category:'picture',dimension:{input,pictureMode}};
-      add(target,banks.PICTURE.filter(k=>!omitted.has(k)&&offered(index,k,target)),label+' '+view.modes[pictureMode]);
+      add(target,banks.PICTURE.filter(k=>!skip.has(k)&&offered(index,k,target)),label+' '+view.modes[pictureMode]);
       // TV apps store TruMotion per app, and have no Game Optimizer or HDMI port banks.
       if(!apps)add({...target,app_id:'com.webos.app.'+port},['truMotionMode'],input+' '+view.modes[pictureMode]+' motion');
     }
@@ -63,6 +65,6 @@ function plan(document,index,inputs,all=false) {
 async function discover(document,options={}) {
   const index=options.index||await descriptions.load(banks.descriptionKeys);
   if(!index.size())throw new Error('The TV did not supply its native preset catalog');
-  return plan(document,index,options.inputs,true).map(({bank,keys})=>({id:bank.id,name:bank.name,devices:bank.devices||[],target:bank.target,settings:Object.fromEntries(keys.map(k=>[k,null]))}));
+  return plan(document,index,options.inputs,true,options.unsupported).map(({bank,keys})=>({id:bank.id,name:bank.name,devices:bank.devices||[],target:bank.target,settings:Object.fromEntries(keys.map(k=>[k,null]))}));
 }
 module.exports={plan,discover};

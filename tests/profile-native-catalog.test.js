@@ -129,4 +129,26 @@ module.exports=async()=>{
   const prepared=await s.prepare(definitions.slice(0,32).map(b=>b.id));
   assert.equal(prepared.length,32);assert.equal(prepared[5].settings.backlight,40);
   assert(reads<=4,'prepare rebuilt the merged view '+reads+' times for one batch');
+
+  // A setting the TV model disables (Dolby Precision Detail on the G6) is not
+  // listed, and the editor learns it from status.
+  const reason='LG disables Dolby Precision Detail in this TV model configuration, for every preset.';
+  assert.deepEqual(availability.unsupported({dolbyPrecisionDetail:false}),{dolbyPrecisionDetail:reason});
+  assert.deepEqual(availability.unsupported({dolbyPrecisionDetail:true}),{});assert.deepEqual(availability.unsupported({}),{},'Unknown is not a denial');
+  const precision={size:()=>1,resolve(key,target){return key==='dolbyPrecisionDetail'&&target.dimension.pictureMode&&!target.app_id?description(key,target,['off','on']):index.resolve(key,target);}};
+  const pictures=list=>list.filter(p=>p.bank.target.dimension.pictureMode&&!p.bank.target.app_id);
+  assert(pictures(native.plan({...doc,banks:[]},precision,['hdmi3'],true)).every(p=>p.keys.includes('dolbyPrecisionDetail')),'Listed when the model allows it');
+  const skipped=pictures(native.plan({...doc,banks:[]},precision,['hdmi3'],true,['dolbyPrecisionDetail']));
+  assert(skipped.length&&skipped.every(p=>!p.keys.includes('dolbyPrecisionDetail')&&p.keys.includes('backlight')),'Skipped when the model disables it');
+  for(const [capabilities,expected] of [[async()=>({dolbyPrecisionDetail:false}),{dolbyPrecisionDetail:reason}],[async()=>({}),{}],[async()=>{throw new Error('Config Service down');},{}]]) {
+    const g=fixture(doc,{nativeDescriptions:precision,capabilities}),m=g.create();m.setPower('on');await m.idle();
+    assert.deepEqual(m.status().unsupported_settings,{},'Nothing is claimed before the model is read');
+    await m.command({action:'initialize',document:doc,enabled:true,migration_id:'precision-test'});
+    await m.command({action:'upgrade_profiles',revision:m.status().revision});await m.idle();
+    const got=await m.command({action:'get'});
+    assert.deepEqual(got.status.unsupported_settings,expected);
+    const listed=got.catalog.filter(b=>Object.hasOwn(b.settings,'dolbyPrecisionDetail')).length;
+    assert(expected.dolbyPrecisionDetail?listed===0:listed>0,'Catalog lists Precision Detail '+listed+' times');
+    m.stop();
+  }
 };

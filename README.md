@@ -2,6 +2,8 @@
 
 LG Picture Bridge connects a **rooted 2026 LG G6 (webOS 11)** to Home Assistant. It reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision through MQTT discovery, and applies picture profiles without notification dialogs.
 
+Version **0.25.0**, with Home Assistant companion **0.16.0**, stops listing settings this TV model never uses. On the G6 that is Dolby Precision Detail, which LG switches off for the whole model, so the editor no longer shows it as **n/a** everywhere. Values already stored for it are kept. A scan of every catalog group found no other setting that is never editable. See [Settings this TV model never uses](docs/setting-availability.md#settings-this-tv-model-never-uses-0250).
+
 Version **0.24.0**, with Home Assistant companion **0.15.0**, refines the editor:
 
 - **Locked presets.** A preset an input never selects is locked. It still shows its faded value, but you can't select it, and edits across a whole row leave it out. To edit one, change the input's Preset selection first. See [Presets an input never selects](docs/setting-availability.md#presets-an-input-never-selects-0240).

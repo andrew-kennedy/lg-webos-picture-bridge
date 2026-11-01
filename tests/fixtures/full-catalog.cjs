@@ -111,11 +111,14 @@ function install(data) {
       else controls[key]={component:'select',options:choices[key]||[String(settings[key])]};
     }
     if(controls.enable144HzBooster)controls.enable144HzBooster.label='165 Hz boost';
-    return {id,settings:structuredClone(settings),controls,availability};
+    // data.capabilities: the model switches an older bridge reports per bank.
+    return {id,settings:structuredClone(settings),controls,availability,...(data.capabilities?{capabilities:data.capabilities}:{})};
   }
   window.requestProfile=async command=>{
     if(command.action==='get') {
       const result=await original(command);result.status.editor_api=window.editorApi;
+      // data.unsupported: the bridge's model-unsupported settings (0.25.0).
+      if(data.unsupported)result.status.unsupported_settings=data.unsupported;
       result.catalog=data.catalog.map(b=>({...b,devices:(managed(b.id)||b).devices||[],settings:{...b.settings,...Object.fromEntries(Object.keys((managed(b.id)||{settings:{}}).settings).map(k=>[k,null]))}}));
       return result;
     }

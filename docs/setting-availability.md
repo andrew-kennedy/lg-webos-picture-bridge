@@ -150,6 +150,14 @@ Contrast covers every preset. From 0.24.0 that is spelled out:
 The replaced ordinary control is no longer listed as a skipped value, because the Game rows
 already edit the value LG uses there.
 
+## Settings this TV model never uses (0.25.0)
+
+Some settings LG stores for every preset are switched off for the whole TV model. On the G6 that is Dolby Precision Detail: Config Service reports `tv.model.dolbyVisionPrecisionDetail: false` (see [the verification below](#dolby-vision-precision-detail-verification)). Before 0.25.0 the editor listed it anyway and showed **n/a** for every target.
+
+Since 0.25.0 the bridge reports these settings in the editor status as `unsupported_settings`, each with its reason, and the native catalog no longer lists them. The editor leaves them out of the settings list and grid. When the editor talks to an older bridge, it hides Dolby Precision Detail as soon as an inspected bank reports the model switch. Values a profile already stores (two HDMI 3 Dolby Vision banks hold `off`) are kept. Only an explicit `false` hides a setting: if Config Service doesn't answer, nothing is hidden.
+
+A read-only scan of all 576 catalog groups on 2026-10-31 found no other setting that is never editable. Gamma, Expression Enhancer, TruMotion de-judder and de-blur, and Filmmaker ambient light compensation are each editable for only a few targets, but they depend on the signal or preset, so they stay listed. The motion twin `motionProOLED` and the unaudited `motionEyeCare`, `aiHdrRemastering` and `ambientLightCompensation` were already left out of the catalog.
+
 ## Editing and recovery
 
 Both single-bank and combined edits validate applicability before committing standards. Combined edits validate the completed candidate and every target before the first persistent write. A failed later target cannot partially commit earlier edits. Shared brightness preferences validate their full affected set. Keeping temporary adjustments also checks applicability before promoting them.

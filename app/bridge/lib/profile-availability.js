@@ -45,6 +45,12 @@ function loadCapabilities(service) {
   capabilityRequests.set(service,pending);
   return pending;
 }
+// Settings this TV model never uses, for any input or preset, with the reason.
+// Only an explicit false from Config Service counts; unknown is not a denial.
+const modelReasons={dolbyPrecisionDetail:'LG disables Dolby Precision Detail in this TV model configuration, for every preset.'};
+function unsupported(capabilities) {
+  return Object.fromEntries(Object.entries(modelReasons).filter(([key])=>capabilities&&capabilities[key]===false));
+}
 function reviewedPlatform() {
   if (platform !== undefined) return platform;
   try {
@@ -131,8 +137,8 @@ function describe(key, bank, info, options) {
     if(!supported.some(v=>v.value===bank.target.dimension.gameGenre&&v.visible===true&&v.active===true))
       return unavailable('LG does not offer this Game Optimizer genre on this port.');
   }
-  if (key === 'dolbyPrecisionDetail' && options.capabilities && options.capabilities.dolbyPrecisionDetail === false)
-    return unavailable('LG disables Dolby Precision Detail in this TV model configuration, for every preset.');
+  const disabled = unsupported(options.capabilities)[key];
+  if (disabled) return unavailable(disabled);
   const restriction = reviewed && restrictions(key,bank,options);
   if (restriction) return restriction;
   const active = matchesActive(bank.target,options.context,info.current);
@@ -215,4 +221,4 @@ function assertEditable(key, value, bank, inspection, options) {
   return controls.encode(result.control,value);
 }
 
-module.exports = {describe,assertEditable,restrictions,matchesActive,reviewedPlatform,loadCapabilities,format};
+module.exports = {describe,assertEditable,restrictions,matchesActive,reviewedPlatform,loadCapabilities,unsupported,format};

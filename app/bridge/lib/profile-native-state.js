@@ -18,7 +18,8 @@ function create(options) {
   async function load(refresh=false) {
     if(refresh)definitions=null;
     if(!definitions) {
-      if(!loading)loading=catalog.discover(options.document(),{index:options.index}).then(v=>{definitions=v;}).finally(()=>{loading=null;});
+      if(!loading)loading=Promise.resolve(options.unsupported?options.unsupported():[])
+        .then(unsupported=>catalog.discover(options.document(),{index:options.index,unsupported})).then(v=>{definitions=v;}).finally(()=>{loading=null;});
       await loading;
     }
     return metadata();
