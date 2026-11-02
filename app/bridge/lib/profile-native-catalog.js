@@ -42,7 +42,7 @@ function plan(document,index,inputs,all=false,unsupported=[]) {
     const port=input.replace(/_pc$/,''),modes=new Set(),apps=input==='default',label=apps?'TV apps':input;
     for(const dynamicRange of banks.RANGES) {
       const target={category:'picture',dimension:{input,dynamicRange}};
-      const offered=choices(index.resolve('pictureMode',target)).filter(v=>view.presetsFor(dynamicRange).includes(v));
+      const offered=choices(index.resolve('pictureMode',target)).filter(v=>view.presetsFor(dynamicRange).includes(v)&&view.listed(v));
       if(!offered.length)continue;
       offered.forEach(v=>modes.add(v));
       add(target,['pictureMode'],label+' '+dynamicRange+' preset selection');

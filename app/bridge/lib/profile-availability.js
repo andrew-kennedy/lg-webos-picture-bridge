@@ -187,7 +187,7 @@ function describe(key, bank, info, options) {
   description = clone(description);
   if (key === 'pictureMode' && description.values && description.values.arrayExt) {
     const allowed = view.presetsFor(format(bank.target.dimension));
-    description.values.arrayExt = description.values.arrayExt.filter(v=>allowed.includes(v.value));
+    description.values.arrayExt = description.values.arrayExt.filter(v=>allowed.includes(v.value)&&view.listed(v.value));
   }
   if (key === 'hdrDynamicToneMapping' && !game(bank.target.dimension.pictureMode) && description.values && description.values.arrayExt)
     description.values.arrayExt = description.values.arrayExt.filter(v => v.value !== 'HGIG');

@@ -7,7 +7,8 @@
 // enough to exercise exclusions; they are not a substitute for the audits.
 const catalog=require('../../app/bridge/lib/profile-catalog');
 const banks=require('../../app/bridge/lib/profile-banks');
-const presets={sdr:['personalized','vivid','normal','eco','cinema','game','filmMaker','expert1','expert2'],hdr:['hdrPersonalized','hdrVivid','hdrStandard','hdrEco','hdrCinemaBright','hdrGame','hdrFilmMaker'],dolbyHdr:['dolbyHdrPersonalized','dolbyHdrVivid','dolbyHdrStandard','dolbyHdrCinemaBright','dolbyHdrCinema','dolbyHdrGame']};
+// The bridge doesn't list Eco or Photo (profile-view.js `listed`).
+const presets={sdr:['personalized','vivid','normal','cinema','game','filmMaker','expert1','expert2'],hdr:['hdrPersonalized','hdrVivid','hdrStandard','hdrCinemaBright','hdrGame','hdrFilmMaker'],dolbyHdr:['dolbyHdrPersonalized','dolbyHdrVivid','dolbyHdrStandard','dolbyHdrCinemaBright','dolbyHdrCinema','dolbyHdrGame']};
 // The bridge lists only the Standard genre (see profile-native-catalog.js).
 const genres=['Standard'];
 // The G6 enables on/off OLED Motion (motionPro); its leveled twin is not listed.
@@ -82,7 +83,7 @@ function install(data) {
     dynamicContrast:['off','low','medium','high'],dynamicColor:['off','low','medium','high'],superResolution:['off','low','medium','high'],noiseReduction:['off','low','medium','high','auto'],mpegNoiseReduction:['off','low','medium','high','auto'],
     smoothGradation:['off','low','medium','high'],realCinema:['off','on'],truMotionMode:['off','cinemaClear','natural','smooth','user'],motionPro:['on','off'],filmmakerAmbientLight:['off','on'],dolbyPrecisionDetail:['off','on'],blackLevel:['auto','high','low'],
     gameGenre:['Standard','FPS','RPG','RTS','Sports','USER'],aigamesound:['on','off'],inputOptimization:['auto','on'],gameOptimization:['off','on'],enableALLM:['off','on'],enableQFT:['off','on'],enable144HzBooster:['off','on'],uhdDeepColor:['off','on'],freesync:['off','on']};
-  const mapping={sdr:['personalized','vivid','normal','eco','cinema','game','filmMaker','expert1','expert2'],hdr:['hdrPersonalized','hdrVivid','hdrStandard','hdrEco','hdrCinemaBright','hdrGame','hdrFilmMaker'],dolbyHdr:['dolbyHdrPersonalized','dolbyHdrVivid','dolbyHdrStandard','dolbyHdrCinemaBright','dolbyHdrCinema','dolbyHdrGame']};
+  const mapping={sdr:['personalized','vivid','normal','cinema','game','filmMaker','expert1','expert2'],hdr:['hdrPersonalized','hdrVivid','hdrStandard','hdrCinemaBright','hdrGame','hdrFilmMaker'],dolbyHdr:['dolbyHdrPersonalized','dolbyHdrVivid','dolbyHdrStandard','dolbyHdrCinemaBright','dolbyHdrCinema','dolbyHdrGame']};
   window.native=data.native;window.editorApi=9;if(data.lastContext)window.lastContext=data.lastContext;
   const managed=id=>window.fixture.document.banks.find(b=>b.id===id);
   const values=id=>({...window.native[id].settings,...(managed(id)||{settings:{}}).settings});

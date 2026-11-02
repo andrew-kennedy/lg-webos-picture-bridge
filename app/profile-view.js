@@ -14,6 +14,11 @@
   const families={game:'Gaming',movie:'Cinema / Filmmaker',expert:'Expert / ISF',general:'Standard / Vivid',personalized:'Personalized',eco:'Eco'};
   const presetFormat=mode=>mode.startsWith('dolbyHdr')?'dolbyHdr':mode.startsWith('hdr')?'hdr':'sdr';
   const presetsFor=range=>Object.keys(modes).filter(mode=>presetFormat(mode)===range.replace(/ALLM$/,''));
+  // Presets the catalog and Preset selection don't offer. Eco has no picture
+  // processing of its own (LG's energy-rating preset, with Standard's menu) and
+  // Photo is a partial preset. Saved values naming them stay valid.
+  const unlisted=new Set(['eco','hdrEco','photo']);
+  const listed=mode=>!unlisted.has(mode);
   const presetFamily=mode=>/game$/i.test(mode||'')?'game':/cinema|filmmaker/i.test(mode||'')?'movie':/^expert/.test(mode||'')?'expert':/personalized/i.test(mode||'')?'personalized':/eco/i.test(mode||'')?'eco':'general';
   const gameKeys = {gameColorDepth:'color',gameSharpness:'sharpness',gameAdjustContrast:'contrast',gameBlackLevel:'brightness'};
   const physical = input => String(input||'').replace(/_pc$/,'');
@@ -308,6 +313,6 @@
     inputAudioFormatHDMI3:'HDMI 3 input audio format',inputAudioFormatHDMI4:'HDMI 4 input audio format'};
   const title=key=>titles[key] || key.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase());
   const rowFormat=(kind,row)=>kind==='preset'?presetFormat(row):kind==='range'?rangeFormat(row):null;
-  return {values,brightness,profileOptions,preferenceValue,isInherited,control,same,inputName,brightnessRole,setBrightnessLink,scopeSelection,modes,families,presetsFor,presetFamily,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition,
+  return {values,brightness,profileOptions,preferenceValue,isInherited,control,same,inputName,brightnessRole,setBrightnessLink,scopeSelection,modes,families,presetsFor,listed,presetFamily,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition,
     ranges,coordinates,inColumn,targeted,rangesFor,presetUsage,shortPreset,rowLabel,rowFormat,physical,titles,title};
 });

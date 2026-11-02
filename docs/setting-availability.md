@@ -193,6 +193,17 @@ Two related settings are left out:
 - **Sound Mode** (`soundMode`), whose choices include AI Sound Pro (`aiSoundPlus`), is stored per audio input and sound output. LG greys it out while sound goes over eARC, as it does on this TV (`soundOutput: external_arc`, Digital Sound Output pass-through).
 - **AI Sound** (`aiSound`) is a single TV-wide switch. LG's Settings app shows it only on models with Adaptive Sound Control, so the G6 doesn't.
 
+## Picture presets (0.28.0)
+
+Unlike game genres, most picture presets carry processing that no setting exposes. A read-only comparison on 2026-11-02 (OLED77G6WUA, firmware 43.21.69) looked at four layers:
+
+- **Stored settings.** Every preset stores the same 104 settings in `/etc/palm/defaultSettings.json` (Photo is a partial record with 28). Of the 19 whose factory values differ between SDR presets, 16 are editor settings. The other three are `localDimming` (an LCD control), the white-balance base temperature (Game `medium`, the rest `warm2`) and the list of settings copied to other inputs. The 72 hidden settings (white balance, color management, HDR tone-mapping fine controls, position) are identical across presets.
+- **Menu rules** (`/etc/palm/override.json`). Standard, Cinema and Eco have the same menu. Vivid locks Color Gamut and Peak Brightness, Sports locks Peak Brightness, Personalized locks the settings the Picture Wizard sets (Dynamic Contrast, Gamma, Near Black Detail, Sharpness), Filmmaker alone enables Ambient Light, and Game disables Real Cinema and TruMotion adjustments.
+- **Settings app** (`com.palm.app.settings`). Eco is paired with Energy Saving Auto for the US EPA energy rating. Personalized is wired to the Picture Wizard (`com.webos.app.picturewizard`).
+- **Picture-quality libraries.** `libpqdb.so` lists tuning entries per preset, model and panel size, such as `SDR vivid_G6_77`, `SDR expert_G6_77`, `SDR default_G6_77`, `HDR standard_G6_77`, `HDR cinema_G6_77`, `HDR vivid_G6_77` and `HDR game_G6_77`, plus G6 entries for SDR Cinema, Sports, Game, Filmmaker and Expert 1/2 and HDR Cinema Home and Filmmaker. `pqcontroller` has a Vivid brightness boost (`bBoostOnForVivid`, tied to Peak Brightness and the OLED brightness-limiting tables), separate HDR global boost gains for HDR Standard, Vivid, Cinema and Game, and separate default brightness for Standard and Vivid/Sports (`tv.model.standardBacklight`, `tv.model.vividSportsBacklight`). What the tuning entries contain wasn't decoded.
+
+No tuning entry exists for Eco, Personalized or Photo. Since 0.28.0 the native catalog and Preset selection leave out Eco (`eco`, `hdrEco`) and Photo (`photo`): Eco is Standard's menu without its own tuning, and Photo is a partial preset. Personalized stays for its Picture Wizard. A saved value or TV setting naming Eco or Photo stays valid; on 2026-11-02 no input selected either.
+
 ## Editing and recovery
 
 Both single-bank and combined edits validate applicability before committing standards. Combined edits validate the completed candidate and every target before the first persistent write. A failed later target cannot partially commit earlier edits. Shared brightness preferences validate their full affected set. Keeping temporary adjustments also checks applicability before promoting them.
