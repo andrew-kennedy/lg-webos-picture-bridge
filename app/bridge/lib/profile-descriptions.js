@@ -60,8 +60,8 @@ function create(environment, allowed) {
     if (!allowed.has(key)) return;
     if (record.country && record.country !== 'none') return;
     if (record.app_id && record.app_id !== 'default') return;
-    if (isOverride && !/@(?:picture|other)\$(?:hdmi[1-4](?:_pc)?|default)\./.test(record.key)) return;
-    if (!isOverride && !['picture','other'].includes(record.category)) return;
+    if (isOverride && !/@(?:(?:picture|other)\$(?:hdmi[1-4](?:_pc)?|default)|sound\$hdmi[1-4]_game)\./.test(record.key)) return;
+    if (!isOverride && !['picture','other','sound'].includes(record.category)) return;
     const conditions=Object.entries(record.condition || {});
     if (conditions.some(([k,v])=>environment[k] !== v)) return;
     const map=isOverride?overrides:base, id=isOverride?record.key:record.category+'/'+key, score=conditions.length;
@@ -71,7 +71,8 @@ function create(environment, allowed) {
   }
   function resolve(key, target) {
     const found=base.get(target.category+'/'+key);if (!found) return null;
-    const d=target.dimension,layout=target.category==='picture'?['input','pictureMode','dynamicRange']:['gameInput','gameGenre','dynamicRange','uhdDeepColor'];
+    // Category layouts from LG's /etc/palm/dimensionFormat.json.
+    const d=target.dimension,layout={picture:['input','pictureMode','dynamicRange'],sound:['audioInput','soundMode','soundOutput','audioOutput']}[target.category]||['gameInput','gameGenre','dynamicRange','uhdDeepColor'];
     const name=key+'@'+target.category+'$'+layout.map(k=>d[k] || 'x').join('.');
     const override=overrides.get(name), result=override?merge(found.description,override.description):clone(found.description);
     result.key=key;

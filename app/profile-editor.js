@@ -45,6 +45,7 @@
     lowLevelAdjustment:'Fine-tunes dark game areas when variable refresh rate is enabled. It adjusts shadow visibility separately from the normal black-level control.',
     blackStabilizer:'Adjusts visibility in dark game scenes, helping objects stand out in shadows. Changes can also alter the intended contrast.',
     whiteStabilizer:'Adjusts visibility in bright game scenes, helping objects stand out in highlights. It is separate from the panel’s Peak brightness setting.',
+    aigamesound:'Game Optimizer’s AI Sound Pro: LG’s AI analyses the game’s sound for effects, clearer voices and surround. Each HDMI port keeps its own setting, used only in Game presets. Outside them, LG’s AI Sound Pro is a Sound Mode choice, which isn’t edited here.',
     inputOptimization:'Selects LG’s input-lag treatment: auto means Standard; on means Boost. Boost applies when using the Game Optimizer picture mode.',
     gameOptimization:'Enables variable refresh rate, including NVIDIA G-Sync compatibility, to reduce tearing and stutter from a supported source.',
     freesync:'Enables AMD FreeSync variable refresh rate for compatible sources, reducing tearing and stutter. It is separate from the VRR & G-Sync switch.',
@@ -133,7 +134,7 @@
   const order = {
     picture:['backlight','contrast','brightness','color','tint','sharpness','colorTemperature','gamma','gammaLevel','peakBrightness','hdrDynamicToneMapping','expressionEnhancer','dynamicContrast','dynamicColor','colorGamut','superResolution','noiseReduction','mpegNoiseReduction','smoothGradation','nearBlackDetail','dolbyPrecisionDetail','blackLevel'],
     motion:['realCinema','truMotionMode','truMotionJudder','truMotionBlur','motionProOLED','motionPro'],
-    game:['inputOptimization','lowLevelAdjustment','blackStabilizer','whiteStabilizer'],
+    game:['inputOptimization','lowLevelAdjustment','blackStabilizer','whiteStabilizer','aigamesound'],
     port:['enableALLM','gameOptimization','freesync','enableQFT','enable144HzBooster','uhdDeepColor'],
     selection:['pictureMode']};
   const sections = {picture:'Picture',motion:'Motion',game:'Game Optimizer',port:'HDMI connection',selection:'Preset selection'};
@@ -1220,7 +1221,7 @@
       const stale=this.draftsStale(),order=model.profileOptions(this.state.document).map(p=>p[0]),destinations=[...new Set(entries.map(e=>e.variant))].sort((x,y)=>order.indexOf(x)-order.indexOf(y)).map(v=>this.profileName(v));
       this.counts.textContent=entries.length?entries.length+' staged '+(entries.length===1?'change':'changes')+' → '+destinations.join(' + '):'No staged changes';
       this.footer.classList.toggle('dirty',!!entries.length);
-      this.reviewButton.textContent=stale?'Review against latest':entries.length?'Review '+entries.length+' changes':'Review changes';this.reviewButton.disabled=!this.writable()||!entries.length||!!this.review;
+      this.reviewButton.textContent=stale?'Review against latest':entries.length?'Review '+entries.length+(entries.length===1?' change':' changes'):'Review changes';this.reviewButton.disabled=!this.writable()||!entries.length||!!this.review;
       this.discardButton.disabled=!entries.length||!!this.review;
       this.shadowRoot.querySelectorAll('[data-profile-action]').forEach(b=>b.disabled=!this.writable()||!!entries.length||!!this.review);
       this.shadowRoot.querySelectorAll('[data-link-action]').forEach(b=>b.disabled=!this.writable()||this.status.editor_api<5||!!entries.length||!!this.review);

@@ -28,7 +28,7 @@ The settings list is grouped into sections:
 | --- | --- |
 | **Picture** | Color, sharpness, contrast, black level and other picture controls. Equivalent Game Optimizer controls join the same row. |
 | **Motion** | Real Cinema, TruMotion and other configured motion controls. Real Cinema remains stored in LG's ordinary picture bank. |
-| **Game Optimizer** | Distinct Game Optimizer controls, such as stabilizers and fine tune dark areas. |
+| **Game Optimizer** | Distinct Game Optimizer controls, such as stabilizers, fine tune dark areas and AI Sound Pro. |
 | **HDMI connection** | Port-wide options such as ALLM, VRR, QFT and refresh-rate boost. All connected devices and formats share them. |
 | **Preset selection** | Which picture preset LG selects for each input and signal range, including ALLM and dormant mappings. |
 

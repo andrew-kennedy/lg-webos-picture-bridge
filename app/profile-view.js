@@ -17,7 +17,8 @@
   const presetFamily=mode=>/game$/i.test(mode||'')?'game':/cinema|filmmaker/i.test(mode||'')?'movie':/^expert/.test(mode||'')?'expert':/personalized/i.test(mode||'')?'personalized':/eco/i.test(mode||'')?'eco':'general';
   const gameKeys = {gameColorDepth:'color',gameSharpness:'sharpness',gameAdjustContrast:'contrast',gameBlackLevel:'brightness'};
   const physical = input => String(input||'').replace(/_pc$/,'');
-  const input = bank => bank.target.dimension.input||bank.target.dimension.gameInput;
+  // Game Optimizer sound banks use the port's Game Optimizer audio input (hdmiN_game).
+  const input = bank => bank.target.dimension.input||bank.target.dimension.gameInput||String(bank.target.dimension.audioInput||'').replace(/_game$/,'')||undefined;
   const isGame = mode => /game$/i.test(mode||'');
   function format(bank) {
     const d=bank.target.dimension;
@@ -124,12 +125,12 @@
       const deviceIds=!family?[...new Set(doc.banks.filter(b=>physical(input(b))===port).flatMap(b=>b.devices||[]))]:bank.devices||[];
       for(const key of Object.keys(bank.settings)) {
         const category=motionKeys.has(key)?'motion':bank.target.category==='picture'?(d.dynamicRange?'selection':'picture'):
-          gameKeys[key]?'picture':d.gameGenre||['gameGenre','inputOptimization'].includes(key)?'game':'port';
+          gameKeys[key]?'picture':d.gameGenre||bank.target.category==='sound'||['gameGenre','inputOptimization'].includes(key)?'game':'port';
         const preference=key==='backlight'&&bank.brightness_role?(doc.schema===2?variant+'/'+bank.brightness_role:bank.brightness_role==='game_sdr'?'game_sdr':variant==='standard'?null:'movie_'+variant):null;
         result.push({id:bank.id+':'+key,bank,key,alias:gameKeys[key]||key,category,port,format:family,preset,
           managed:!bank.managed_keys||bank.managed_keys.includes(key),
           input_type:d.input&&d.input!=='default'?(/_pc$/.test(d.input)?'pc':'video'):null,
-          family:d.gameGenre?'game':preset?presetFamily(preset):d.dynamicRange?presetFamily(values(bank,state,variant).pictureMode):null,
+          family:d.gameGenre||bank.target.category==='sound'?'game':preset?presetFamily(preset):d.dynamicRange?presetFamily(values(bank,state,variant).pictureMode):null,
           genre:d.gameGenre||null,signals:signals.length?signals:['off','on'],devices:deviceIds,
           preference,brightnessRole:key==='backlight'?bank.brightness_role:null,
           locked:doc.schema!==2&&key==='backlight'&&bank.brightness_role==='movie_sdr'&&variant==='standard',
@@ -188,7 +189,7 @@
   function storedScope(record) {
     const bank=record.bank,d=bank.target.dimension;
     const detail=d.pictureMode?(modes[d.pictureMode]||d.pictureMode)+' · '+(bank.target.app_id?'Motion':'Picture'):
-      d.dynamicRange?(formats[record.format]||record.format)+(d.dynamicRange.endsWith('ALLM')?' + ALLM':' without ALLM')+' · '+(d.gameGenre?'Game Optimizer':'Preset selection'):'Shared port settings';
+      d.dynamicRange?(formats[record.format]||record.format)+(d.dynamicRange.endsWith('ALLM')?' + ALLM':' without ALLM')+' · '+(d.gameGenre?'Game Optimizer':'Preset selection'):d.audioInput?'Game Optimizer sound':'Shared port settings';
     return inputName(input(bank))+' · '+detail;
   }
   function combinedControl(cell,live) {
@@ -296,7 +297,7 @@
     dolbyPrecisionDetail:'Dolby Precision Detail',aiPicture:'AI picture',aiHdrRemastering:'AI HDR remastering',filmmakerAmbientLight:'FILMMAKER MODE ambient light',
     skinColor:'Skin color',grassColor:'Grass color',skyColor:'Sky color',aspectRatio:'Aspect ratio',justScan:'Just scan',logoLuminanceAdjust:'Adjust logo brightness',
     gameColorDepth:'Game color depth',gameSharpness:'Game sharpness',gameAdjustContrast:'Game contrast',gameBlackLevel:'Game black level',
-    lowLevelAdjustment:'Fine tune dark areas',blackStabilizer:'Black stabilizer',whiteStabilizer:'White stabilizer',gameGenre:'Game genre',darkMode:'Dark mode',
+    lowLevelAdjustment:'Fine tune dark areas',blackStabilizer:'Black stabilizer',whiteStabilizer:'White stabilizer',gameGenre:'Game genre',aigamesound:'AI Sound Pro',darkMode:'Dark mode',
     enableALLM:'Auto low latency mode',enableQFT:'Quick frame transport',enable144HzBooster:'Refresh rate boost',enableMotionBooster:'Motion booster',
     gameOptimization:'VRR & G-Sync',freesync:'AMD FreeSync',qmsVrr:'Quick Media Switching',inputOptimization:'Prevent input delay',uhdDeepColor:'HDMI Deep Color',
     enableDolbyVisionPC:'Dolby Vision for PC',crosshair:'Crosshair',fpsCounter:'FPS counter',gameUIColor:'Game dashboard color',

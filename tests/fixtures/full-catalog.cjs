@@ -49,6 +49,8 @@ function build() {
     if(input.endsWith('_pc'))continue;
     const {gameGenre,...connection}=portValues;
     add({category:'other',dimension:{gameInput:port}},connection,port+' connection');
+    // Game Optimizer's AI Sound Pro, on the port's Game Optimizer audio input.
+    add({category:'sound',dimension:{audioInput:port+'_game'}},{aigamesound:port==='hdmi1'?'on':'off'},port+' Game Optimizer sound');
     for(const range of banks.RANGES)for(const genre of genres)add({category:'other',dimension:{gameInput:port,dynamicRange:range,gameGenre:genre}},Object.fromEntries(banks.GAME.map(k=>[k,gameValue(k,range,genre)])),port+' '+range+' '+genre);
   }
   return {state,catalog:list,native};
@@ -79,7 +81,7 @@ function install(data) {
   const choices={colorGamut:['auto','extended','wide'],gamma:['high2','mediumHavingLevel','bt1886'],peakBrightness:['off','low','medium','high'],hdrDynamicToneMapping:['on','HGIG','off'],expressionEnhancer:['off','detail','highlight'],
     dynamicContrast:['off','low','medium','high'],dynamicColor:['off','low','medium','high'],superResolution:['off','low','medium','high'],noiseReduction:['off','low','medium','high','auto'],mpegNoiseReduction:['off','low','medium','high','auto'],
     smoothGradation:['off','low','medium','high'],realCinema:['off','on'],truMotionMode:['off','cinemaClear','natural','smooth','user'],motionPro:['on','off'],filmmakerAmbientLight:['off','on'],dolbyPrecisionDetail:['off','on'],blackLevel:['auto','high','low'],
-    gameGenre:['Standard','FPS','RPG','RTS','Sports','USER'],inputOptimization:['auto','on'],gameOptimization:['off','on'],enableALLM:['off','on'],enableQFT:['off','on'],enable144HzBooster:['off','on'],uhdDeepColor:['off','on'],freesync:['off','on']};
+    gameGenre:['Standard','FPS','RPG','RTS','Sports','USER'],aigamesound:['on','off'],inputOptimization:['auto','on'],gameOptimization:['off','on'],enableALLM:['off','on'],enableQFT:['off','on'],enable144HzBooster:['off','on'],uhdDeepColor:['off','on'],freesync:['off','on']};
   const mapping={sdr:['personalized','vivid','normal','eco','cinema','game','filmMaker','expert1','expert2'],hdr:['hdrPersonalized','hdrVivid','hdrStandard','hdrEco','hdrCinemaBright','hdrGame','hdrFilmMaker'],dolbyHdr:['dolbyHdrPersonalized','dolbyHdrVivid','dolbyHdrStandard','dolbyHdrCinemaBright','dolbyHdrCinema','dolbyHdrGame']};
   window.native=data.native;window.editorApi=9;if(data.lastContext)window.lastContext=data.lastContext;
   const managed=id=>window.fixture.document.banks.find(b=>b.id===id);

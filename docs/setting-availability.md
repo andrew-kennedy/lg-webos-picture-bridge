@@ -178,6 +178,21 @@ LG's Game Optimizer app (`com.webos.app.gameoptimizer`) names them Standard, FPS
 
 Profiles already choose these values per device and room, so genres only add six places for a value to hide. Since 0.26.0 the editor works in Standard only. The native catalog lists the Standard genre and leaves the genre selector out of the port settings. The editor ignores other genres' banks, even from an older bridge's catalog or an older profile, and never reads or edits them. It has no **Game genre** setting, genre chips or genre wording, and its Game rows edit Standard. The saved port settings for HDMI 1 (PC), HDMI 3 (Switch 2) and HDMI 4 (PS5) hold Standard, so the bridge keeps those ports there. A genre picked from the TV's menu counts as a temporary change and ends at standby. HDMI 2 has no saved genre; it was on Standard on 2026-10-31.
 
+## AI Sound Pro in Game Optimizer (0.27.0)
+
+Game Optimizer's sound section has an **AI Sound Pro** switch. LG's Game Optimizer app (`com.webos.app.gameoptimizer`) labels the `aigamesound` setting that way on 2026 models (earlier models call it AI Game Sound). It offers the switch only in the Game, HDR Game and Dolby Vision Game presets, and its help says the game-genre sound doesn't work while it's on.
+
+LG stores `aigamesound` in the `sound` category per audio input (`dimension: ["audioInput"]`). Each HDMI port has two audio inputs: `hdmiN` and `hdmiN_game`, the second used while the port is in Game Optimizer (read live on 2026-11-02: HDMI 4 in SDR Game reported `audioInput: hdmi4_game`, and the PC on HDMI 1, input `hdmi1_pc` in SDR + ALLM Game, reported `hdmi1_game`). The factory default is On for every input.
+
+AI Sound Pro and Sound Mode are separate values. Switching `aigamesound` on and off, by explicit audio input or in the current context as LG's app does, left `soundMode` unchanged. On 2026-11-02 the editor's write path (an explicit `hdmi1_game` write) turned HDMI 1's AI Sound Pro off; it had read On.
+
+Since 0.27.0 the editor lists **AI Sound Pro** with the Game Optimizer settings, one On/Off value per HDMI port, saved to the port's `hdmiN_game` audio input. Like the other port settings it stays editable whatever is on screen. The bridge tracks a change made on the TV while that port is in a Game preset, like any other managed value.
+
+Two related settings are left out:
+
+- **Sound Mode** (`soundMode`), whose choices include AI Sound Pro (`aiSoundPlus`), is stored per audio input and sound output. LG greys it out while sound goes over eARC, as it does on this TV (`soundOutput: external_arc`, Digital Sound Output pass-through).
+- **AI Sound** (`aiSound`) is a single TV-wide switch. LG's Settings app shows it only on models with Adaptive Sound Control, so the G6 doesn't.
+
 ## Editing and recovery
 
 Both single-bank and combined edits validate applicability before committing standards. Combined edits validate the completed candidate and every target before the first persistent write. A failed later target cannot partially commit earlier edits. Shared brightness preferences validate their full affected set. Keeping temporary adjustments also checks applicability before promoting them.

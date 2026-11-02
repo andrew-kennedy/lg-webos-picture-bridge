@@ -16,6 +16,7 @@ const omitted=new Set(['motionEyeCare','aiHdrRemastering','ambientLightCompensat
 // TV's factory table enables, so the editor never shows a permanently hidden twin.
 const variants=new Set(['motionPro','motionProOLED']);
 const offered=(index,key,target)=>!variants.has(key)||visible(index.resolve(key,target));
+const portOf=target=>{const d=target.dimension||{};return String(d.input||d.gameInput||String(d.audioInput||'').replace(/_game$/,'')).replace(/_pc$/,'');};
 
 // unsupported: keys this TV model never uses (see availability.unsupported).
 function plan(document,index,inputs,all=false,unsupported=[]) {
@@ -29,10 +30,10 @@ function plan(document,index,inputs,all=false,unsupported=[]) {
     const existing=document.banks.find(b=>canonical(b.target)===identity);
     const missing=keys.filter(k=>all||!existing||!Object.hasOwn(existing.settings,k)).filter(k=>index.resolve(k,target));
     if(!missing.length)return;
-    const port=(target.dimension.input||target.dimension.gameInput).replace(/_pc$/,'');
-    const peers=document.banks.filter(b=>(b.target.dimension.input||b.target.dimension.gameInput||'').replace(/_pc$/,'')===port);
-    const family=target.dimension.gameGenre?'game':target.dimension.pictureMode?view.presetFamily(target.dimension.pictureMode):null;
-    const matching=family?peers.filter(b=>b.target.dimension.gameGenre?family==='game':b.target.dimension.pictureMode&&view.presetFamily(b.target.dimension.pictureMode)===family):peers;
+    const port=portOf(target),gameOnly=t=>!!t.dimension.gameGenre||t.category==='sound';
+    const peers=document.banks.filter(b=>portOf(b.target)===port);
+    const family=gameOnly(target)?'game':target.dimension.pictureMode?view.presetFamily(target.dimension.pictureMode):null;
+    const matching=family?peers.filter(b=>gameOnly(b.target)?family==='game':b.target.dimension.pictureMode&&view.presetFamily(b.target.dimension.pictureMode)===family):peers;
     const devices=[...new Set(matching.flatMap(b=>b.devices||[]))];
     const bank=existing||{id:'native_'+crypto.createHash('sha256').update(identity).digest('hex').slice(0,24),name,devices,target,settings:{}};
     result.push({bank,keys:missing,existing:!!existing});
@@ -53,6 +54,8 @@ function plan(document,index,inputs,all=false,unsupported=[]) {
       if(!apps)add({...target,app_id:'com.webos.app.'+port},['truMotionMode'],input+' '+view.modes[pictureMode]+' motion');
     }
     if(apps)continue;
+    // Game Optimizer's AI Sound Pro, on the port's Game Optimizer audio input.
+    add({category:'sound',dimension:{audioInput:port+'_game'}},banks.SOUND,port+' Game Optimizer sound');
     const target={category:'other',dimension:{gameInput:port}};
     // LG's game genres (Standard, FPS, RPG, RTS, Sports, User) are six saved
     // copies of the same seven Game Optimizer values; only their factory

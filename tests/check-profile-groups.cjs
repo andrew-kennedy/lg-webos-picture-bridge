@@ -12,7 +12,7 @@ const fixture=require('./fixtures/profile-formats.cjs');
     await mount(page,initial);
     const a=actions(page),{q,button}=a,control=(role,name)=>page.getByRole(role,{name,exact:true});
     const save=async()=>{
-      await page.getByRole('button',{name:/^Review (\d+ changes|against latest)$/}).click();
+      await page.getByRole('button',{name:/^Review (\d+ changes?|against latest)$/}).click();
       await button('Save standards').click();await a.saved();
     };
     const reviewed=()=>page.evaluate(()=>document.querySelector('lg-profile-editor').review.entries.map(e=>e.bank_id));
@@ -82,7 +82,7 @@ const fixture=require('./fixtures/profile-formats.cjs');
     assert.equal(await a.number('color').inputValue(),'53');
     // Linked SDR gaming brightness previews every linked preset, even from one input.
     await a.open('backlight');await a.number('backlight').fill('75');
-    await button('Review 1 changes').click();
+    await button('Review 1 change').click();
     const targets=await q('.sheet .targets li').allTextContents();
     assert.equal(targets.length,3);assert(targets.some(t=>t.includes('HDMI 4')));assert(targets.some(t=>t.includes('HDMI 3')),'Shared brightness preview expands beyond the selected HDMI 1');
     await button('Save standards').click();await a.saved();

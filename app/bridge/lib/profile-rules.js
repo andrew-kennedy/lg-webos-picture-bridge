@@ -25,6 +25,11 @@ function resolve(key,target) {
     if(key==='gameGenre')return select(['Standard','FPS','RPG','RTS','Sports','USER'],'Used when Game Optimizer is active.');
     return null;
   }
+  // Game Optimizer's AI Sound Pro, saved per port like the settings above.
+  if(target.category==='sound' && dimensions==='audioInput' && !target.app_id && /^hdmi[1-4]_game$/.test(d.audioInput)) {
+    if(key==='aigamesound')return select(['on','off'],'Used when this port is in a Game preset.');
+    return null;
+  }
   if(target.category!=='picture' || dimensions!=='input,pictureMode')return null;
   const identity=d.input+'/'+d.pictureMode,isGame=games.has(identity),isMovie=movies.has(identity);
   if(identity==='default/filmMaker'&&!target.app_id&&homeScreen.has(key))

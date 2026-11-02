@@ -28,7 +28,7 @@ const catalog=require('../app/bridge/lib/profile-catalog');
     assert.equal((await a.calls('edit_many')).length,0,'Filtering is read-only');
     await button('Remove override for Color depth').focus();await page.keyboard.press('Enter');
     assert.equal(await page.evaluate(()=>Object.values(document.querySelector('lg-profile-editor').draft)[0].inherit),true);
-    await button('Review 1 changes').click();assert(await page.getByText('50 → Base: 50',{exact:true}).isVisible());
+    await button('Review 1 change').click();assert(await page.getByText('50 → Base: 50',{exact:true}).isVisible());
     await refresh(()=>{window.failNextBatch='before';});await button('Save Dark room overrides').click();
     await page.getByText(/Unsaved drafts remain/).waitFor();
     assert.equal(await drafts(),1,'Equal-value reset is not mistaken for a successful save');
@@ -65,7 +65,7 @@ const catalog=require('../app/bridge/lib/profile-catalog');
     await button('Save Dark room overrides').click();await a.saved();await a.ready();assert.equal(await a.number('color').inputValue(),'53');
     // Resetting linked gaming brightness from one input previews every linked preset.
     await refresh(async()=>{window.fixture.document.profiles.find(p=>p.id==='dark').brightness.game_sdr=70;window.fixture.revision++;const e=document.querySelector('lg-profile-editor');e.target={inputs:['hdmi1_pc'],presets:['game'],ranges:null,genres:null,allm:null};e.onlyOverrides=true;await e.refresh(true);});
-    await a.open('backlight');await button('Remove override for OLED pixel brightness').click();await button('Review 1 changes').click();
+    await a.open('backlight');await button('Remove override for OLED pixel brightness').click();await button('Review 1 change').click();
     assert.equal(await page.evaluate(()=>document.querySelector('lg-profile-editor').review.entries[0].targets.length),3);
     await button('Save Dark room overrides').click();await a.saved();
     assert.equal(await page.evaluate(()=>window.fixture.document.profiles.find(p=>p.id==='dark').brightness.game_sdr),undefined);
@@ -73,7 +73,7 @@ const catalog=require('../app/bridge/lib/profile-catalog');
     await refresh(async()=>{window.fixture.document.banks.find(b=>b.id==='movie_hdrFilmMaker').variants={dark:{color:59}};window.unavailable={movie_hdrFilmMaker:{color:'Unavailable in this signal'}};window.fixture.revision++;const e=document.querySelector('lg-profile-editor');e.target={inputs:['hdmi3'],presets:['hdrFilmMaker'],ranges:null,genres:null,allm:null};e.setting='color';await e.refresh(true);});
     await a.ready();assert.equal(await a.number('color').count(),0,'No value control for an excluded target');
     await a.focusKey('excluded-settings').click();assert(await page.getByText(/Saved override: 59 · Base: 48/).isVisible());
-    await button('Remove override for Color depth').click();await button('Review 1 changes').click();await button('Save Dark room overrides').click();await a.saved();
+    await button('Remove override for Color depth').click();await button('Review 1 change').click();await button('Save Dark room overrides').click();await a.saved();
     assert.deepEqual(await q('.list .item').evaluateAll(n=>n.map(i=>i.dataset.focus)),['setting:pictureMode'],'Only the Dolby Vision preset mapping override remains');
     // Read-only and older bridge views cannot submit an unsupported reset.
     await refresh(async()=>{window.editorApi=6;window.unavailable={};window.fixture.document.banks.find(b=>b.id==='movie_hdrFilmMaker').variants={dark:{color:59}};window.fixture.revision++;await document.querySelector('lg-profile-editor').refresh(true);});

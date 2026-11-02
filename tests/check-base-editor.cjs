@@ -23,7 +23,7 @@ const catalog=require('../app/bridge/lib/profile-catalog');
     assert.equal(await a.number('color').inputValue(),'50');
     assert.match(await a.cell('hdmi3','filmMaker').getAttribute('aria-label'),/overridden in Dark room/,'Base cells show where a profile keeps its own value');
     assert(await q('.valuebox').getByText('Overridden in Dark room — those profiles keep their own value.').isVisible());
-    await a.number('color').fill('51');await button('Review 1 changes').click();
+    await a.number('color').fill('51');await button('Review 1 change').click();
     assert(await page.getByRole('heading',{name:'Review Base changes',exact:true}).isVisible());
     assert(await page.getByText('Profiles following this Base value: Bright room.',{exact:true}).isVisible());
     assert(await page.getByText('Existing overrides stay in: Dark room.',{exact:true}).isVisible());
@@ -59,13 +59,13 @@ const catalog=require('../app/bridge/lib/profile-catalog');
     // Follow Base removes the override only; it never writes a new Base.
     await a.focusKey('edit:dark').click();await a.ready();await button('Remove override for Color depth').click();
     assert(await q('.valuebox').getByText('Draft: follow Base').first().isVisible());
-    await button('Review 1 changes').click();await button('Save Dark room overrides').click();await a.saved();
+    await button('Review 1 change').click();await button('Save Dark room overrides').click();await a.saved();
     saved=await bank();assert.equal(saved.settings.color,52);assert.equal(saved.variants?.dark?.color,undefined);
     assert.equal(await a.number('color').inputValue(),'52');
     // Linked movie brightness has explicit room overrides; the review says why
     // saving Base will not replace them.
     await a.focusKey('edit:standard').click();await a.open('backlight');
-    await a.number('backlight').fill('10');await button('Review 1 changes').click();
+    await a.number('backlight').fill('10');await button('Review 1 change').click();
     assert(await page.getByText('Existing overrides stay in: Bright room, Dark room.',{exact:true}).isVisible());
     await button('Save Base').click();await a.saved();
     assert.equal(await page.evaluate(()=>window.fixture.document.brightness.movie_sdr),10);

@@ -17,7 +17,10 @@ var GAME = ['gameAdjustContrast', 'gameBlackLevel', 'gameColorDepth', 'gameSharp
   'blackStabilizer', 'whiteStabilizer', 'lowLevelAdjustment'];
 var PORT = ['gameGenre', 'inputOptimization', 'gameOptimization', 'enableALLM', 'enableQFT',
   'enable144HzBooster', 'uhdDeepColor', 'freesync'];
-var descriptionKeys = PICTURE.concat(GAME,PORT,['pictureMode','truMotionMode']);
+// Game Optimizer's AI Sound Pro (LG's aigamesound). LG stores it per audio
+// input, and each HDMI port has a separate Game Optimizer input (hdmiN_game).
+var SOUND = ['aigamesound'];
+var descriptionKeys = PICTURE.concat(GAME,PORT,SOUND,['pictureMode','truMotionMode']);
 function fail(message, code) { var e = new Error(message); e.code = code || 'invalid_profile_bank'; return e; }
 function plain(value) { return value && typeof value === 'object' && !Array.isArray(value); }
 function same(a, b) {
@@ -38,6 +41,8 @@ function target(source) {
       allowed = source.app_id ? ['truMotionMode'] : PICTURE;
       if (source.app_id && source.app_id !== 'com.webos.app.' + d.input.replace(/_pc$/, '')) throw fail('Wrong app binding');
     } else if (names === 'dynamicRange,input' && RANGES.includes(d.dynamicRange) && !source.app_id) allowed = ['pictureMode'];
+  } else if (source.category === 'sound' && names === 'audioInput' && /^hdmi[1-4]_game$/.test(d.audioInput || '') && !source.app_id) {
+    allowed = SOUND;
   } else if (source.category === 'other' && /^hdmi[1-4]$/.test(d.gameInput || '') && !source.app_id) {
     if (names === 'gameInput') allowed = PORT;
     else if (names === 'dynamicRange,gameGenre,gameInput' && RANGES.includes(d.dynamicRange) &&
@@ -169,13 +174,14 @@ async function run(service, command, guard, context) {
 // Reuse the existing category subscriptions for managed values that need no
 // individual HA control (for example structured HDMI RGB range).
 var observationKeys = {picture:PICTURE.concat(['pictureMode','truMotionMode','truMotionJudder','truMotionBlur']),
-  other:GAME.concat(PORT)};
+  other:GAME.concat(PORT), sound:SOUND};
 function observation(category, key, description, record, context) {
   if (!description || !record || !context || !context.ready ||
       !/^hdmi[1-4](_pc)?$/.test(context.input || '') || !Array.isArray(description.dimension) ||
       !Number.isFinite(record.observed_at)) return null;
   var dimensions = {}, physical = context.input.replace(/_pc$/, '');
-  var expected = {input:context.input, pictureMode:context.mode, dynamicRange:context.range, gameInput:physical};
+  var expected = {input:context.input, pictureMode:context.mode, dynamicRange:context.range, gameInput:physical,
+    audioInput:physical + (/game$/i.test(context.mode || '') ? '_game' : '')};
   for (var name of description.dimension) {
     var value = (record.dimension || {})[name];
     if (typeof value !== 'string' || (expected[name] && expected[name] !== value)) return null;
@@ -191,7 +197,7 @@ function observation(category, key, description, record, context) {
   return {target:scope, key:key, value:record.value, observed_at:new Date(record.observed_at).toISOString()};
 }
 module.exports = {normalize:normalize, target:target, run:run, same:same, encodingDescription,
-  descriptionKeys, PICTURE, GAME, PORT, RANGES,
+  descriptionKeys, PICTURE, GAME, PORT, SOUND, RANGES,
   observationKeys:observationKeys, observation:observation, request:request, encode:encode,
   async inspect(service, bank, guard, context, editor) {
     const prepared=editor&&editor.readCache&&editor.readCache.get('native:'+bank.id);

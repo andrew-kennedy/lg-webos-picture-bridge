@@ -84,6 +84,7 @@ function active(bank, context) {
   const d = bank.target.dimension;
   return !!context.ready && (!d.input || d.input === context.input) &&
     (!d.gameInput || d.gameInput === String(context.input || '').replace(/_pc$/, '')) &&
+    (!d.audioInput || /game$/i.test(context.mode||'') && d.audioInput === String(context.input || '').replace(/_pc$/, '') + '_game') &&
     (!d.pictureMode || d.pictureMode === context.mode) && (!d.dynamicRange || d.dynamicRange === context.range) &&
     (!d.gameGenre || /game$/i.test(context.mode||'')&&d.gameGenre === (context.gameGenre || 'Standard'));
 }

@@ -22,7 +22,7 @@ const {actions}=require('./fixtures/editor-actions.cjs');
     await a.cell('default','filmMaker').click();await a.ready();
     assert(await q('.valuebox').getByText('TV apps · SDR Filmmaker',{exact:true}).first().isVisible());
     assert.equal(await a.number('sharpness').inputValue(),'10');
-    await a.number('sharpness').fill('0');await a.button('Review 1 changes').click();
+    await a.number('sharpness').fill('0');await a.button('Review 1 change').click();
     await a.focusKey('review-confirm').click();await a.saved();await a.ready();
     assert.deepEqual((await a.calls('edit_many')).at(-1).edits,[{bank_id:'native_tv_apps_filmMaker',variant:'standard',settings:{sharpness:0},expected:{sharpness:10}}]);
     assert.equal(await a.number('sharpness').inputValue(),'0');

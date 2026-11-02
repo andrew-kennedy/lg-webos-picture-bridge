@@ -31,7 +31,7 @@ const catalog=require('../app/bridge/lib/profile-catalog');
     await a.focusKey('view-back').click();
     await a.open('backlight');
     assert.equal(await a.number('backlight').inputValue(),'3','New profile inherits base movie brightness');
-    await a.number('backlight').fill('17');await button('Review 1 changes').click();
+    await a.number('backlight').fill('17');await button('Review 1 change').click();
     await button('Save Evening overrides').click();await a.saved();
     assert.equal((await page.evaluate(()=>window.fixture.document.profiles.at(-1))).brightness.movie_sdr,17);
     await a.focusKey('open-tv').click();

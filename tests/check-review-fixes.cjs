@@ -60,7 +60,7 @@ const describe=(page,fix)=>page.evaluate(async source=>{
       const {page,a,button}=await fresh();
       await describe(page,b=>{if(b.id==='movie_filmMaker'){b.availability.color={state:'unverified',editable:false,reason:'Not verified on this input'};delete b.controls.color;}return b;});
       await a.focusKey('edit:dark').click();await a.ready();await a.open('color');await a.cell('hdmi3','filmMaker').click();await a.ready();
-      await button('Remove override for Color depth').click();await button('Review 1 changes').click();
+      await button('Remove override for Color depth').click();await button('Review 1 change').click();
       assert(await page.getByText('47 → Base: 50',{exact:true}).isVisible());
       assert(await page.getByText(/^Clean-up only: Not verified on this input\. Removing this unused override writes no value to the TV\.$/).isVisible());
       await page.close();

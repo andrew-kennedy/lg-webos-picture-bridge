@@ -65,8 +65,8 @@ function reviewedPlatform() {
 function matchesActive(target, context, current) {
   if (!context || !context.ready || !current || !current.dimension) return false;
   const d = target.dimension;
-  if(d.gameGenre&&!game(context.mode))return false;
-  if (physical(d.input || d.gameInput) !== physical(context.input)) return false;
+  if((d.gameGenre||/_game$/.test(d.audioInput||''))&&!game(context.mode))return false;
+  if (physical(d.input || d.gameInput || String(d.audioInput || '').replace(/_game$/,'')) !== physical(context.input)) return false;
   if (d.input && d.input !== context.input) return false;
   if (d.pictureMode && d.pictureMode !== context.mode) return false;
   if (d.dynamicRange && d.dynamicRange !== context.range) return false;
