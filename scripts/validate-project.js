@@ -30,6 +30,8 @@ var required = [
   'app/bridge/lib/cec-patch.js',
   'app/bridge/lib/cec-policy.js',
   'app/bridge/lib/cec-inventory.js',
+  'app/bridge/lib/cec-devices.js',
+  'app/bridge/lib/mqtt-cec-devices.js',
   'app/bridge/lib/mqtt-cec.js',
   'app/bridge/cec-guard-cli.js',
   'app/bridge/lib/mqtt-client.js',

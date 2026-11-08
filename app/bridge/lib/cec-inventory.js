@@ -1,5 +1,14 @@
 'use strict';
 
+var URI = 'luna://com.webos.service.eim/getAllInputStatus';
+// LG's CEC stack reports each device's <Report Power Status>: On, Off (standby),
+// transitionToOn while it wakes, Unknown before it answers.
+function power(value) {
+  if (value === 'On') return 'on';
+  if (value === 'Off' || value === 'Standby') return 'standby';
+  if (typeof value === 'string' && /^transitionTo/i.test(value)) return /On$/i.test(value) ? 'turning_on' : 'turning_off';
+  return 'unknown';
+}
 // EIM reports cached discovery, NOT the selected route of an external HDMI switch.
 function extract(payload) {
   if (!payload || payload.returnValue !== true || !Array.isArray(payload.devices)) throw new Error('Invalid CEC inventory response');
@@ -16,7 +25,7 @@ function extract(payload) {
       result.push({input: 'hdmi' + match[1], vendor_id: number(device.vendorId, 16777215),
         osd_name: typeof device.osdName === 'string' ? device.osdName.replace(/[\x00-\x1f\x7f]/g, '').slice(0, 64) : null,
         device_type: number(device.cecpDevType, 7), physical_address: number(device.physicalAddress, 65535),
-        logical_address: number(device.uniqueId, 15)});
+        logical_address: number(device.uniqueId, 15), power: power(device.cecPower)});
     });
   });
   // EIM order is not meaningful and can change between identical observations.
@@ -33,6 +42,49 @@ function create(service, changed, deps) {
   var stopped = false, timer = null, pending = false, request = null, timeout = null, generation = 0;
   var state = {devices: [], state: 'starting', changed_at: null,
     interpretation: 'cached_cec_discovery_not_hdmi_switch_route', last_error: null};
+  function report(error, payload) {
+    if (!error) { try { state.devices = extract(payload); } catch (e) { error = e; } }
+    state.state = error ? 'unavailable' : 'observed';
+    state.last_error = error ? String(error.message).slice(0, 256) : null;
+    if (error) state.devices = [];
+    var next = JSON.stringify([state.devices, state.state, state.last_error]);
+    if (next !== previous) {
+      previous = next;
+      state.changed_at = new Date(clock()).toISOString();
+      changed(JSON.parse(JSON.stringify(state)));
+    }
+  }
+  // EIM pushes the input list whenever LG's CEC stack adds, drops or re-polls a
+  // device, so a subscription replaces the 30-second poll. A lost subscription
+  // reports unavailable and resubscribes after 30 seconds.
+  var subscription = null, retry = null;
+  function unsubscribe() {
+    if (subscription && subscription.cancel) { try { subscription.cancel(); } catch (ignored) {} }
+    subscription = null;
+  }
+  function subscribe() {
+    if (stopped) return;
+    var epoch = ++generation, answered = false;
+    function lost(error) {
+      if (stopped || epoch !== generation) return;
+      generation++; cancelLater(timeout); timeout = null; unsubscribe();
+      report(error || new Error('CEC inventory subscription lost'));
+      retry = later(subscribe, 30000);
+    }
+    timeout = later(function () { lost(new Error('CEC inventory request timed out')); }, 5000);
+    try {
+      subscription = service.subscribe(URI, {subscribe: true});
+      subscription.on('response', function (message) {
+        if (stopped || epoch !== generation) return;
+        var payload = message.payload || message;
+        if (payload.returnValue === false || payload.subscribed === false) { lost(new Error(payload.errorText || 'CEC inventory subscription refused')); return; }
+        if (!answered) { answered = true; cancelLater(timeout); timeout = null; }
+        report(null, payload);
+      });
+      subscription.on('error', function (error) { lost(error instanceof Error ? error : null); });
+      subscription.on('cancel', function () { lost(); });
+    } catch (error) { lost(error); }
+  }
   function poll() {
     if (stopped || pending) return;
     pending = true;
@@ -40,29 +92,23 @@ function create(service, changed, deps) {
     function finish(error, payload) {
       if (stopped || epoch !== generation) return;
       generation++; pending = false; cancelLater(timeout); timeout = null;
-      if (!error) { try { state.devices = extract(payload); } catch (e) { error = e; } }
-      state.state = error ? 'unavailable' : 'observed';
-      state.last_error = error ? String(error.message).slice(0, 256) : null;
-      if (error) state.devices = [];
-      var next = JSON.stringify([state.devices, state.state, state.last_error]);
-      if (next !== previous) {
-        previous = next;
-        state.changed_at = new Date(clock()).toISOString();
-        changed(JSON.parse(JSON.stringify(state)));
-      }
+      report(error, payload);
     }
     timeout = later(function () {
       if (request && request.cancel) { try { request.cancel(); } catch (ignored) {} }
       finish(new Error('CEC inventory request timed out'));
     }, 5000);
     try {
-      request = service.call('luna://com.webos.service.eim/getAllInputStatus', {}, function (message) {
+      request = service.call(URI, {}, function (message) {
         finish(null, message.payload || message);
       });
     } catch (error) { finish(error); }
   }
-  return {start: function () { poll(); timer = schedule(poll, 30000); },
-    stop: function () { stopped = true; generation++; cancel(timer); cancelLater(timeout);
+  return {start: function () {
+      if (typeof service.subscribe === 'function') subscribe();
+      else { poll(); timer = schedule(poll, 30000); }
+    },
+    stop: function () { stopped = true; generation++; cancel(timer); cancelLater(timeout); cancelLater(retry); unsubscribe();
       if (request && request.cancel) { try { request.cancel(); } catch (ignored) {} } }};
 }
-module.exports = {extract: extract, create: create};
+module.exports = {extract: extract, create: create, power: power};

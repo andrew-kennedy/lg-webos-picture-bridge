@@ -4,6 +4,8 @@ var crypto = require('crypto');
 var mqtt = require('./mqtt-client');
 var mqttCommands = require('./mqtt-commands');
 var mqttCec = require('./mqtt-cec');
+var mqttCecDevices = require('./mqtt-cec-devices');
+var cecInventory = require('./cec-inventory');
 var mqttSettings = require('./mqtt-settings');
 var mqttProfiles = require('./mqtt-profiles');
 var appInfo = require('../../appinfo.json');
@@ -106,11 +108,21 @@ function create(config, onHealth, dependencies) {
     }
   }) : null;
   var cec = settings.cec_commands_enabled && deps.cecGuard ? mqttCec.create({
-    topic: base + '/cec/command', guard: deps.cecGuard, service: deps.service,
+    topic: base + '/cec/command', guard: deps.cecGuard,
     publish: function (status) {
       return online && !stopped ? client.publish(base + '/cec/state', JSON.stringify(status), false) : false;
     }
   }) : null;
+  // CEC source power (0.29.0): LG's CEC device list, one subscription shared with
+  // the CEC filter status.
+  var cecDevices = deps.service ? mqttCecDevices.create({config: config, id: id, base: base,
+    store: deps.cecDeviceStore, now: deps.now,
+    publish: function (topic, payload, retain) { return online && !stopped && client.publish(topic, payload, retain); }
+  }) : null;
+  var inventoryWatcher = deps.service ? (deps.cecInventory || cecInventory).create(deps.service, function (value) {
+    if (cec) cec.inventory(value);
+    cecDevices.observe(value);
+  }, deps.inventoryDependencies) : null;
   // One HA entity per TV setting is opt-in (0.22.3): the TV editor and the LG Picture
   // Profiles panel cover editing, and the entities only filled the recorder. When off,
   // announce() publishes their tombstones so HA removes them.
@@ -159,6 +171,7 @@ function create(config, onHealth, dependencies) {
     }
     if (commands && commands.status().ready && !commands.publish()) submitted = false;
     if (cec && !cec.publish()) submitted = false;
+    if (cecDevices && !cecDevices.publish()) submitted = false;
     if (controls && !controls.publish()) submitted = false;
     if (profiles && !profiles.publish()) submitted = false;
     return submitted;
@@ -178,6 +191,7 @@ function create(config, onHealth, dependencies) {
         if (!client.publish(settings.discovery_prefix + '/' + kind + '/' + id + '_cec_filter/config', '', true)) submitted = false;
       });
     }
+    if (cecDevices && !cecDevices.announce()) submitted = false;
     if (!commands) {
       // Remove the opt-in entity when commands are subsequently disabled.
       if (!client.publish(settings.discovery_prefix + '/sensor/' + id + '_picture_command/config', '', true)) {
@@ -237,7 +251,10 @@ function create(config, onHealth, dependencies) {
     if (profiles && profiles.message) profiles.message(topic,message,metadata || {});
   });
   return {
-    start: function () { client.start(); if (cec) cec.start(); if (controls) controls.start(); refreshTimer = schedule(publish, 30000); },
+    start: function () {
+      client.start(); if (cec) cec.start(); if (inventoryWatcher) inventoryWatcher.start();
+      if (controls) controls.start(); refreshTimer = schedule(publish, 30000);
+    },
     picture: function (value) { picture = value; observed(value); observeContext(); update(); },
     signal: function (value) {
       signal = value;
@@ -251,6 +268,7 @@ function create(config, onHealth, dependencies) {
     stop: function (callback) {
       stopped = true; if (commands) commands.disconnect();
       if (cec) cec.stop();
+      if (inventoryWatcher) inventoryWatcher.stop();
       if (controls) controls.stop();
       if (profiles) { if (profiles.stop) profiles.stop(); else profiles.disconnect(); }
       cancelLater(timer); cancel(refreshTimer); client.stop(callback);

@@ -2,7 +2,6 @@
 
 var commands = require('./mqtt-commands');
 var policy = require('./cec-policy');
-var inventory = require('./cec-inventory');
 
 function discovery(config, id, session) {
   var base = config.mqtt.topic_prefix + '/' + id;
@@ -51,11 +50,10 @@ function create(options) {
     },
     summarizeResult: function (value) { return {policy_hash: value.policy_hash, enabled: value.enabled,
       filter_state: value.filter_state, rule_count: value.policy.rules.length}; }});
-  var watcher = options.service ? inventory.create(options.service, function (value) {
-    devices = value; publish();
-  }, options.inventoryDependencies) : null;
+  // mqtt-discovery owns the one EIM inventory subscription and passes each change here.
   return {connect: channel.connect, subscribed: channel.subscribed, disconnect: channel.disconnect,
     receive: channel.receive, status: snapshot, publish: publish,
-    start: function () { if (watcher) watcher.start(); }, stop: function () { channel.disconnect(); if (watcher) watcher.stop(); }};
+    inventory: function (value) { devices = value; publish(); },
+    start: function () {}, stop: function () { channel.disconnect(); }};
 }
 module.exports = {create: create, discovery: discovery};

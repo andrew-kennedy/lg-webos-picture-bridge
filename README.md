@@ -2,6 +2,8 @@
 
 LG Picture Bridge connects a **rooted 2026 LG G6 (webOS 11)** to Home Assistant. It reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision through MQTT discovery, and applies picture profiles without notification dialogs.
 
+Version **0.29.0** adds a power entity for each HDMI-CEC source, read from the TV's own CEC device list: for example `binary_sensor.lg_tv_cec_switch_2`, `binary_sensor.lg_tv_cec_apple_tv` and `binary_sensor.lg_tv_cec_shield`. The TV pushes changes, so nothing polls, and it works while the TV is in standby. A Nintendo Switch 2 reads On within about a second of waking, and Off when the TV drops it (about 15–35 seconds after it sleeps). A broken HDMI link doesn't make it Off, because the Switch keeps answering. See [CEC source power](#cec-source-power).
+
 Version **0.28.1**, with Home Assistant companion **0.20.0**, fixes scrolling in the Home Assistant mobile app. On a narrow screen the editor now scrolls as one page inside its own box, with the review row pinned below it: a setting opens at its top, Back returns to the same place in the list, and reaching the end of a scroll no longer moves Home Assistant's page (which pulled to refresh). Wider layouts and the TV app are unchanged.
 
 Version **0.28.0**, with Home Assistant companion **0.19.0**, stops offering the Eco and Photo picture presets. A firmware comparison found that most presets carry their own picture tuning for this model and panel size (Vivid also has its own brightness boost), so they stay. Eco has none (it's Standard's menu plus LG's energy-rating link) and Photo is a partial preset. Personalized stays for its Picture Wizard. See [Picture presets](docs/setting-availability.md#picture-presets-0280).
@@ -116,6 +118,7 @@ Discovered entities use these default IDs:
 | `sensor.lg_tv_screensaver_type` | LG screensaver reason |
 | `sensor.lg_tv_picture_command` | Correlated command results; enabled with picture commands |
 | `sensor.lg_tv_cec_filter` / `switch.lg_tv_cec_filter` | CEC policy status and master toggle |
+| `binary_sensor.lg_tv_cec_<source>` | Power of each HDMI-CEC source the TV has seen (see [CEC source power](#cec-source-power)) |
 | `number.lg_tv_picture_*` / `select.lg_tv_picture_*` | Active picture settings, with live TV ranges and options |
 | `select.lg_tv_sound_*` | Audio settings available with the current sound output |
 | `number.lg_tv_other_*` / `select.lg_tv_other_*` | Gaming and HDMI settings |
@@ -168,6 +171,18 @@ An icon command is separate:
 ```
 
 MQTT commands require protocol 1, the current session ID from the command sensor, a unique request ID, and an expiry within 60 seconds. Retained requests are ignored; identical retries do not repeat writes. The Home Assistant script handles the envelope, retries, and correlated result. Broker authentication/ACLs protect this interface. Optional bearer-token HTTP commands and webhooks are still available through the example YAML files.
+
+## CEC source power
+
+The bridge subscribes to the TV's input list (EIM `getAllInputStatus`), which LG's CEC stack keeps current: a source that wakes announces itself and reports *transitionToOn*, then *On*; a source in standby reports *Off*; a source that stops answering LG's polls is dropped. Each source the TV has named gets a `binary_sensor.lg_tv_cec_<name>` (device class power):
+
+- **On**: the source reports On or is waking.
+- **Off**: it reports standby, or the TV dropped it. Sources are remembered by name in the state directory (`cec-devices.json`), so a source that leaves the list while asleep, like a Nintendo Switch 2, keeps its entity across restarts.
+- **Unknown**: the TV's list is unavailable, or a listed source hasn't reported a state yet.
+
+A source that briefly reappears without a name while waking is matched by its logical and physical address. Attributes give the raw state (`on`, `turning_on`, `standby`, `turning_off`, `unknown`, `absent`), the HDMI input, addresses and vendor ID. It is read-only: the bridge sends no CEC.
+
+Observed on the G6 (2026-11-08): a Switch 2 behind an HDMI switch reads On about a second after waking and Off 15–35 seconds after it sleeps. During a failing HDMI 2.1 link it stayed On, since it kept answering. Sources behind one HDMI switch can share a physical address (the switch can hand every input the selected port's address), so identity uses the name first.
 
 ## CEC automatic-selection filter
 
