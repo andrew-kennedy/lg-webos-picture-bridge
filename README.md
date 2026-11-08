@@ -2,6 +2,8 @@
 
 LG Picture Bridge connects a **rooted 2026 LG G6 (webOS 11)** to Home Assistant. It reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision through MQTT discovery, and applies picture profiles without notification dialogs.
 
+Version **0.28.1**, with Home Assistant companion **0.20.0**, fixes scrolling in the Home Assistant mobile app. On a narrow screen the editor now scrolls as one page inside its own box, with the review row pinned below it: a setting opens at its top, Back returns to the same place in the list, and reaching the end of a scroll no longer moves Home Assistant's page (which pulled to refresh). Wider layouts and the TV app are unchanged.
+
 Version **0.28.0**, with Home Assistant companion **0.19.0**, stops offering the Eco and Photo picture presets. A firmware comparison found that most presets carry their own picture tuning for this model and panel size (Vivid also has its own brightness boost), so they stay. Eco has none (it's Standard's menu plus LG's energy-rating link) and Photo is a partial preset. Personalized stays for its Picture Wizard. See [Picture presets](docs/setting-availability.md#picture-presets-0280).
 
 Version **0.27.0**, with Home Assistant companion **0.18.0**, adds Game Optimizer's **AI Sound Pro** to the editor: one On/Off value per HDMI port, listed with the Game Optimizer settings and used only in Game presets. Sound Mode (whose choices include AI Sound Pro outside Game Optimizer) stays out, since LG greys it out while sound goes over eARC. See [AI Sound Pro in Game Optimizer](docs/setting-availability.md#ai-sound-pro-in-game-optimizer-0270).

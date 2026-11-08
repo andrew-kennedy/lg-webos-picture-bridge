@@ -179,8 +179,10 @@
       const closed=n.closest('details:not([open])');
       return n.getClientRects().length&&(!closed||closed.firstElementChild===n);
     }); }
-    scrolls() {const result={};for(const k of ['list','detail','sheet']){const n=this.shadowRoot.querySelector('.'+k);if(n)result[k]=n.scrollTop;}return result;}
-    restoreScroll(saved) {if(saved)for(const [k,v] of Object.entries(saved)){const n=this.shadowRoot.querySelector('.'+k);if(n)n.scrollTop=v;}}
+    // Narrow screens scroll one .page per view; its position is kept per view (page:edit, page:review…).
+    scrolls() {const result={};for(const k of ['list','detail','sheet']){const n=this.shadowRoot.querySelector('.'+k);if(n)result[k]=n.scrollTop;}const page=this.shadowRoot.querySelector('.page');if(page)result['page:'+page.dataset.mode]=page.scrollTop;return result;}
+    restoreScroll(saved) {if(saved)for(const [k,v] of Object.entries(saved)){const n=this.shadowRoot.querySelector(k.startsWith('page:')?'.page[data-mode="'+k.slice(5)+'"]':'.'+k);if(n)n.scrollTop=v;}}
+    paged() {return !!this.page&&this.page.isConnected&&this.page.getClientRects().length>0;}
     captureFocus() {
       const active=this.shadowRoot.activeElement,controls=this.controls(),index=controls.indexOf(active);
       return index>=0 ? {key:active.dataset.focus,neighbors:controls.slice(index+1).concat(controls.slice(0,index).reverse()).map(n=>n.dataset.focus),kept:true} : null;
@@ -691,9 +693,16 @@
     // ---- Rendering ---------------------------------------------------------
     narrow() {return !!this.listHost&&!!this.detailHost&&!(this.listHost.getClientRects().length&&this.detailHost.getClientRects().length);}
     showPane(pane) {
-      this.pane=pane;const body=this.shadowRoot.querySelector('.body');if(body)body.dataset.pane=pane;
+      const body=this.shadowRoot.querySelector('.body'),from=body&&body.dataset.pane,page=this.paged()&&this.page;
+      if(page&&from==='list'&&pane==='detail')this.listScroll=page.scrollTop;
+      this.pane=pane;if(body)body.dataset.pane=pane;
+      // One page scrolls on narrow screens: a setting opens at its top, and
+      // Back returns to the same place in the list.
+      if(page&&body&&pane==='detail')page.scrollTop=Math.min(page.scrollTop,page.scrollTop+body.getBoundingClientRect().top-page.getBoundingClientRect().top);
+      else if(page&&from==='detail'&&this.listScroll!=null)page.scrollTop=this.listScroll;
       const host=pane==='list'?this.listHost:this.detailHost,focus=host&&[...host.querySelectorAll('[data-focus]:not(:disabled)')].find(n=>n.getClientRects().length&&(pane==='detail'||n.getAttribute('aria-current')==='true'))||host&&host.querySelector('[data-focus]:not(:disabled)');
-      if(focus&&!this.busy)focus.focus();
+      // The page is already placed; a plain focus() would re-centre the Back button.
+      if(focus&&!this.busy){if(!page)focus.focus();else{focus.focus({preventScroll:true});if(pane==='list')focus.scrollIntoView({block:'nearest'});}}
     }
     openSetting(alias) {
       const changed=alias!==this.setting;this.setting=alias;this.pane='detail';this.review=null;
@@ -708,6 +717,9 @@
       if('list' in previous)this.editScroll=previous;
       root.innerHTML=`<style>${styles}</style>`;
       const frame=el('div',undefined,'frame');this.frame=frame;
+      // Narrow screens scroll the header, context and panes as one page with
+      // the review row pinned below it; wider layouts scroll the panes.
+      const page=el('div',undefined,'page');page.dataset.mode=!(this.state&&this.state.document)?'empty':this.review?'review':this.view;frame.append(page);this.page=page;
       if(this.state&&this.state.document&&this.variant!=='standard')frame.classList.add('profile');
       const top=el('header',undefined,'top');top.append(el('h2','Picture settings'));
       const actions=el('div',undefined,'actions');
@@ -717,11 +729,11 @@
       if(this.state.document)actions.append(this.button('Reviewer settings',()=>this.openView('reviews'),'ghost small','open-reviews'));
       actions.append(this.button('Refresh',()=>this.refresh(true),'small'));
       if(!this.state.document&&this.adapter.fileTransfer!==false)actions.append(...this.backupButtons());
-      top.append(actions);frame.append(top);
-      if(!this.state.document){this.listHost=this.detailHost=null;frame.append(el('p','Import a profile collection using LG Picture Profiles in Home Assistant.','empty'),el('p',this.status.error||'No collection yet.','message'));root.append(frame);this.lockControls();this.restoreFocus(focus);return;}
+      top.append(actions);page.append(top);
+      if(!this.state.document){this.listHost=this.detailHost=null;page.append(el('p','Import a profile collection using LG Picture Profiles in Home Assistant.','empty'),el('p',this.status.error||'No collection yet.','message'));root.append(frame);this.lockControls();this.restoreFocus(focus);return;}
       const context=el('div',undefined,'context');context.append(this.editCard());
-      if(this.adapter.tvApp)context.classList.add('solo');else context.append(this.tvCard());frame.append(context);
-      const body=el('main',undefined,'body');body.setAttribute('aria-label','Settings editor');frame.append(body);
+      if(this.adapter.tvApp)context.classList.add('solo');else context.append(this.tvCard());page.append(context);
+      const body=el('main',undefined,'body');body.setAttribute('aria-label','Settings editor');page.append(body);
       this.listHost=this.detailHost=this.gridHost=null;
       if(this.review||this.view!=='edit') {
         body.classList.add('single');const sheet=el('section',undefined,'sheet');body.append(sheet);
@@ -1355,7 +1367,8 @@
   .dot{display:inline-block;width:.6em;height:.6em;border-radius:50%;background:var(--live);flex:none}.dot.last{background:transparent;border:2px solid var(--live);box-sizing:border-box}
   .body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(14em,30%) minmax(0,1fr);gap:.55em}
   .body.single{grid-template-columns:minmax(0,1fr)}
-  .list,.detail,.sheet{min-height:0;overflow:auto;border:1px solid var(--line);border-radius:.75em;background:var(--surface);scroll-padding:3.5em .5em .5em}
+  .page{display:contents}
+  .list,.detail,.sheet{min-height:0;overflow:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:.75em;background:var(--surface);scroll-padding:3.5em .5em .5em}
   .list{padding-bottom:.5em}
   .list-head{position:sticky;top:0;z-index:1;background:var(--surface);padding:.55em .8em;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:.3em;align-items:flex-start}
   .list-for{font-weight:600;font-size:.92em}
@@ -1453,6 +1466,11 @@
     .body[data-pane=list] .detail{display:none}.body[data-pane=detail] .list{display:none}
     .pane-back{display:inline-block}
     .tv-card .using{flex-basis:100%}.tv-card button{margin-left:0}
+    /* One scroller, so a phone shows more than a sliver of a setting. The
+       review row and status stay pinned below it. contain stops a scroll that
+       reaches the end from moving Home Assistant's page (pull to refresh). */
+    .page{display:flex;flex-direction:column;gap:inherit;flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scroll-padding:3.5em 0 .5em}
+    .body{flex:1 0 auto;min-height:100%}.list,.detail,.sheet{overflow:visible;min-height:auto}
   }
   @container frame (max-width:480px){
     .top h2{font-size:1.15em}.card{padding:.45em .6em}.edit-card{padding-left:.9em}
