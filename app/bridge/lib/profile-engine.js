@@ -45,7 +45,7 @@ function create(options) {
       if (journal.power === 'off' || (boot && journal.boot_id && boot !== journal.boot_id)) mergeScopes(journal.restore,journal.dirty);
       room = journal.room || (journal.environment && journal.environment.room) || 'dark';
       if(!['bright','dark'].includes(room))throw new Error('Invalid saved room');
-      if(saved.document.schema===1||selection()!=='automatic'&&!catalog.valid(saved.document,selection()))journal.selection='automatic';
+      if(saved.document.schema===1||selection()!=='automatic'&&(!catalog.valid(saved.document,selection())||catalog.addon(saved.document,selection())))journal.selection='automatic';
     }
   } catch (error) { loadError = 'Profile recovery required: ' + error.message; }
 
@@ -56,7 +56,11 @@ function create(options) {
     if(!candidate||candidate.document.schema!==2)return room;
     return selection()!=='automatic'&&catalog.valid(candidate.document,selection())?selection():candidate.document.automatic[room];
   }
-  function resolved(bank,variant=activeProfile(),candidate=saved,adjustments) {
+  // Valid add-on selections ({group: profile_id}) for a collection.
+  function addonSelection(candidate=saved) { return candidate&&candidate.document.schema===2?catalog.addons(candidate.document,journal.addons):{}; }
+  // What the TV applies: the main profile, then each selected add-on.
+  function layers(candidate=saved) { return candidate&&candidate.document.schema===2?catalog.layers(candidate.document,activeProfile(candidate),journal.addons):activeProfile(candidate); }
+  function resolved(bank,variant=layers(),candidate=saved,adjustments) {
     return candidate.document.schema===2?Object.assign(view.values(bank,candidate,variant),adjustments||{}):model.desired(bank,variant,preferences(candidate),adjustments);
   }
   function allKeys() { return Object.fromEntries(document().banks.map(b => [b.id,Object.keys(b.settings)])); }
@@ -71,7 +75,11 @@ function create(options) {
   function mergeScopes(target, source) {
     for (const [id,keys] of Object.entries(source)) target[id] = [...new Set((target[id] || []).concat(keys))];
   }
-  function environment() { return document().schema===2?{profile:activeProfile(),brightness:view.brightness(document(),activeProfile())}:{room,preferences:model.clone(preferences())}; }
+  function environment() {
+    if(document().schema!==2)return {room,preferences:model.clone(preferences())};
+    const addons=addonSelection();
+    return {profile:activeProfile(),brightness:view.brightness(document(),activeProfile()),...(Object.keys(addons).length?{addons}:{})};
+  }
   function writeJournal() {
     if (!saved) return;
     journal.boot_id = boot; journal.revision = saved.revision; journal.room=room;
@@ -90,13 +98,13 @@ function create(options) {
   function snapshot(complete = false) {
     return {schema:1,owner_id:saved && saved.owner_id,instance_id:instance,sequence,revision:saved ? saved.revision : 0,
       document:model.clone(document()),preferences:model.clone(preferences()),enabled:!!(saved && saved.enabled),
-      room,selection:selection(),active_profile:activeProfile(),environment:model.clone(journal.environment),overrides:model.clone(overrides),
+      room,selection:selection(),active_profile:activeProfile(),addons:addonSelection(),environment:model.clone(journal.environment),overrides:model.clone(overrides),
       recovery:{dirty:model.clone(journal.dirty),restore:model.clone(journal.restore),boot_id:boot,power,reconstructing:recovery},
       migration_id:saved && saved.migration_id || null,context:model.clone(context),created_at:new Date(clock()).toISOString(),
       ...(complete?{native_snapshot:browser.backup()}:{}),storage_mode:'native'};
   }
   function status() {
-    return {configured:!!saved,editor_api:9,profile_schema:document()&&document().schema,selection:selection(),active_profile:activeProfile(),owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
+    return {configured:!!saved,editor_api:10,profile_schema:document()&&document().schema,selection:selection(),active_profile:activeProfile(),addons:addonSelection(),owner_id:saved && saved.owner_id,instance_id:instance,revision:saved ? saved.revision : 0,
       enabled:!!(saved && saved.enabled),room,power,context,last_context:lastContext,temporary_count:Object.values(overrides).reduce((n,v) => n + Object.keys(v).length,0),
       pending_restore:Object.keys(journal.restore).length > 0||!!(journal.native&&journal.native.length),applying,changed_count:changedCount,native_backup_error:nativeError,native_backup_complete:!!browser.captured(),
       error:loadError || lastError,backup_sequence:latestBackup ? sequence : null,backup_acknowledged:acknowledged,
@@ -198,7 +206,7 @@ function create(options) {
       let standard = model.same(item.value,resolved(bank)[k]);
       const env = journal.environment;
       if (env && model.environmentKeys(bank).includes(k)) {
-        const previous=env.profile?{...bank.settings,...(bank.variants||{})[env.profile]}:model.desired(bank,env.room,env.preferences);
+        const previous=env.profile?Object.assign({...bank.settings},...[env.profile,...Object.values(env.addons||{})].map(v=>(bank.variants||{})[v]||{})):model.desired(bank,env.room,env.preferences);
         if(env.profile&&bank.brightness_role)previous.backlight=env.brightness[bank.brightness_role];
         standard=standard||model.same(item.value,previous[k]);
       }
@@ -241,7 +249,7 @@ function create(options) {
   async function applyBank(bank, keys, force) {
     if (!keys.length) return 0;
     const id = bank.id, before = (await native({action:'read',banks:[{id,target:bank.target,keys}]})).banks[0].settings;
-    const values = resolved(bank,activeProfile(),saved,force ? {} : overrides[id]), patch = {}, expected = {}, marks = {};
+    const values = resolved(bank,layers(),saved,force ? {} : overrides[id]), patch = {}, expected = {}, marks = {};
     for (const k of keys) {
       const identity = id + '/' + k;
       marks[k] = versions[identity] || 0;
@@ -317,12 +325,13 @@ function create(options) {
     const affected={};
     for(const bank of candidate.document.banks) {
       const old=document().banks.find(b=>b.id===bank.id);
-      const before=old?resolved(old):{},after=resolved(bank,activeProfile(candidate),candidate);
+      const before=old?resolved(old):{},after=resolved(bank,layers(candidate),candidate);
       const keys=Object.keys(after).filter(k=>!model.same(before[k],after[k]));
       if(keys.length)affected[bank.id]=keys;
     }
     saved=candidate;
-    if(selection()!=='automatic'&&!catalog.valid(document(),selection()))journal.selection='automatic';
+    if(selection()!=='automatic'&&(!catalog.valid(document(),selection())||catalog.addon(document(),selection())))journal.selection='automatic';
+    if(journal.addons)journal.addons=addonSelection();
     for(const [id,keys] of Object.entries(affected))for(const key of keys)if(overrides[id])delete overrides[id][key];
     mergeScopes(journal.restore,affected);journal.dirty=dirtyScopes();persistStandards();
     queueSync();return status();
@@ -474,7 +483,7 @@ function create(options) {
         saved = {schema:1,owner_id:saved ? saved.owner_id : crypto.randomBytes(16).toString('hex'),
           revision:(saved ? saved.revision : 0),document:doc,preferences:model.preferences(backup.preferences),enabled:backup.enabled === true};
         overrides = {}; recovery = false; loadError = null;
-        journal.selection=backup.selection||'automatic';journal.native=nativeRestore;
+        journal.selection=backup.selection||'automatic';journal.addons=model.clone(backup.addons||{});journal.native=nativeRestore;
         journal.dirty = {}; journal.restore = allKeys(); journal.environment = null;
         persistStandards(); await reconcile(); return status();
       }
@@ -500,7 +509,11 @@ function create(options) {
           const source=input.copy_from||'standard';if(!catalog.valid(doc,source))throw new Error('Unknown source profile');
           created='p_'+crypto.randomBytes(8).toString('hex');
           const copied=source==='standard'?{}:catalog.profile(doc,source);
-          doc.profiles.push({id:created,name:input.name,brightness:model.clone(copied.brightness||{})});
+          // An add-on keeps its source's group unless the command names one;
+          // null or an empty group makes a main profile.
+          let group=input.group===undefined?copied.group:input.group;
+          if(group===null||group==='')group=undefined;else if(group!==undefined)catalog.groupName(group);
+          doc.profiles.push({id:created,name:input.name,brightness:group?{}:model.clone(copied.brightness||{}),...(group?{group}:{})});
           for(const bank of doc.banks)if((bank.variants||{})[source])bank.variants[created]=model.clone(bank.variants[source]);
         } else if(input.action==='set_automatic')doc.automatic=model.clone(input.profiles);
         else {
@@ -522,10 +535,34 @@ function create(options) {
       if(input.action==='apply_profile') {
         if(document().schema!==2)throw new Error('Upgrade the profile collection first');
         if(input.profile_id!=='automatic'&&!catalog.valid(document(),input.profile_id))throw new Error('Unknown profile');
+        if(catalog.addon(document(),input.profile_id))throw new Error('That is an add-on profile; select it with apply_addon');
         if(input.clear_adjustments!==undefined&&typeof input.clear_adjustments!=='boolean')throw new Error('Expected clear_adjustments boolean');
         if(input.revision!==undefined)checkRevision(input);
         journal.selection=input.profile_id;
         if(input.clear_adjustments!==false)mergeScopes(journal.restore,allKeys());
+        writeJournal();changed(true);return reconcile();
+      }
+      if(input.action==='apply_addon') {
+        // Choose one add-on (or none) for a group. Like a profile selection,
+        // this is session state: it creates no standards revision.
+        const doc=document();
+        if(doc.schema!==2)throw new Error('Upgrade the profile collection first');
+        if(typeof input.group!=='string'||!catalog.groups(doc).includes(input.group))throw new Error('Unknown add-on group');
+        const id=input.profile_id===undefined||input.profile_id===null||input.profile_id==='none'?null:input.profile_id;
+        if(id!==null&&(typeof id!=='string'||!catalog.addon(doc,id)||catalog.profile(doc,id).group!==input.group))throw new Error('Choose an add-on from this group');
+        if(input.clear_adjustments!==undefined&&typeof input.clear_adjustments!=='boolean')throw new Error('Expected clear_adjustments boolean');
+        if(input.revision!==undefined)checkRevision(input);
+        const current=addonSelection(),previous=current[input.group]||null;
+        if(id)current[input.group]=id;else delete current[input.group];
+        journal.addons=current;
+        if(input.clear_adjustments!==false) {
+          // Restore every key the old or new add-on owns, discarding
+          // temporary adjustments there, so the result is exactly the add-on.
+          for(const bank of doc.banks)for(const variant of [previous,id].filter(Boolean)) {
+            const keys=Object.keys((bank.variants||{})[variant]||{});
+            if(keys.length)mergeScopes(journal.restore,{[bank.id]:keys});
+          }
+        }
         writeJournal();changed(true);return reconcile();
       }
       if (input.action === 'inspect'||input.action==='inspect_many') {
@@ -635,8 +672,8 @@ function create(options) {
       if (input.action === 'restore_scope') {
         guard(); checkRevision(input);
         if(input.scope!==undefined&&!['all','active'].includes(input.scope))throw new Error('Unknown scope');
-        const requested=view.scopeSelection(snapshot(),input.filters,input.categories), selection={},excluded=[], epoch=powerEpoch, currentRoom=activeProfile(), currentContext=model.canonical(context);
-        const check=()=>{externalGuard();guard();checkRevision(input);if(powerEpoch!==epoch||activeProfile()!==currentRoom||model.canonical(context)!==currentContext)throw new Error('TV session, signal or room changed');};
+        const requested=view.scopeSelection(snapshot(),input.filters,input.categories), selection={},excluded=[], epoch=powerEpoch, currentRoom=layers(), currentLayers=model.canonical(currentRoom), currentContext=model.canonical(context);
+        const check=()=>{externalGuard();guard();checkRevision(input);if(powerEpoch!==epoch||model.canonical(layers())!==currentLayers||model.canonical(context)!==currentContext)throw new Error('TV session, signal or room changed');};
         // check() rejects any revision, room or context change, so one view serves every key.
         const current=sharedEditorOptions();
         for(const [id,keys] of Object.entries(requested)) {
@@ -664,7 +701,8 @@ function create(options) {
         }
         const oldPreferences=preferences();
         saved.document = doc; if(doc.schema===1)saved.preferences=oldPreferences;
-        if(selection()!=='automatic'&&!catalog.valid(doc,selection()))journal.selection='automatic';
+        if(selection()!=='automatic'&&(!catalog.valid(doc,selection())||catalog.addon(doc,selection())))journal.selection='automatic';
+        if(journal.addons)journal.addons=addonSelection();
         overrides = {}; journal.dirty = {}; journal.restore = allKeys();
         persistStandards(); await reconcile(); return status();
       }
@@ -841,6 +879,11 @@ function create(options) {
         if (epoch !== powerEpoch) throw new Error('TV power session changed');
         if (input.selection && (input.room !== room || document().schema===2&&input.profile_id!==activeProfile())) throw new Error('Room changed or active profile changed; review the selected settings again');
         const selection = selectedKeys(input,'active'), candidate = model.clone(saved), prefValues = {}, promoted = model.clone(overrides);
+        // Keep saves into the topmost selected add-on that already overrides
+        // that bank (so a game's add-on remembers its own tweaks), otherwise
+        // into the main profile in use. Linked brightness stays with the main profile.
+        const chosenAddons=Object.values(addonSelection()).reverse();
+        const keepIn=(bank,k)=>k==='backlight'&&bank.brightness_role?activeProfile():chosenAddons.find(v=>(bank.variants||{})[v])||activeProfile();
         for (const [id,keys] of Object.entries(selection)) {
           const bank = candidate.document.banks.find(b => b.id === id);
           for (const [k,v] of Object.entries(promoted[bank.id] || {})) {
@@ -852,7 +895,7 @@ function create(options) {
                 if(Object.hasOwn(prefValues,shared)&&!model.same(prefValues[shared],v))throw new Error('Conflicting temporary values for shared brightness');
                 prefValues[shared]=v;
               }
-              catalog.edit(candidate.document,bank,activeProfile(),k,v);
+              catalog.edit(candidate.document,bank,keepIn(bank,k),k,v);
             } else if (k === 'backlight' && bank.brightness_role) {
               const role=bank.brightness_role === 'movie_sdr' ? 'movie_' + room : 'game_sdr';
               if (Object.hasOwn(prefValues,role) && !model.same(prefValues[role],v)) throw new Error('Conflicting temporary values for shared brightness');

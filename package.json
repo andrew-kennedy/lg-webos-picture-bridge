@@ -1,6 +1,6 @@
 {
   "name": "lg-webos-picture-bridge",
-  "version": "0.29.1",
+  "version": "0.30.0",
   "private": true,
   "description": "A rooted LG webOS bridge that reports SDR, HDR, HLG, and Dolby Vision changes to Home Assistant",
   "license": "MIT",
@@ -13,7 +13,7 @@
     "manifest": "node scripts/generate-manifest.js",
     "site": "node scripts/generate-site.js",
     "test": "node tests/run.js",
-    "test:layout": "node tests/check-ui-layout.cjs && node tests/check-profile-editor.cjs && node tests/check-profile-remote.cjs && node tests/check-profile-groups.cjs && node tests/check-profile-granularity.cjs && node tests/check-base-editor.cjs && node tests/check-named-profiles.cjs && node tests/check-profile-inheritance.cjs && node tests/check-native-catalog.cjs && node tests/check-native-storage.cjs && node tests/check-target-grid.cjs && node tests/check-review-fixes.cjs && node tests/check-last-watched.cjs && node tests/check-grid-fit.cjs && node tests/check-grid-na.cjs && node tests/check-tv-apps.cjs && node tests/check-tv-app.cjs && node tests/check-reviewer-notes.cjs && node tests/check-locked-presets.cjs && node tests/check-game-genres.cjs && node tests/check-game-sound.cjs && node tests/check-phone-page.cjs",
+    "test:layout": "node tests/check-ui-layout.cjs && node tests/check-profile-editor.cjs && node tests/check-profile-remote.cjs && node tests/check-profile-groups.cjs && node tests/check-profile-granularity.cjs && node tests/check-base-editor.cjs && node tests/check-named-profiles.cjs && node tests/check-addon-profiles.cjs && node tests/check-profile-inheritance.cjs && node tests/check-native-catalog.cjs && node tests/check-native-storage.cjs && node tests/check-target-grid.cjs && node tests/check-review-fixes.cjs && node tests/check-last-watched.cjs && node tests/check-grid-fit.cjs && node tests/check-grid-na.cjs && node tests/check-tv-apps.cjs && node tests/check-tv-app.cjs && node tests/check-reviewer-notes.cjs && node tests/check-locked-presets.cjs && node tests/check-game-genres.cjs && node tests/check-game-sound.cjs && node tests/check-phone-page.cjs",
     "validate": "node scripts/validate-project.js"
   },
   "devDependencies": {

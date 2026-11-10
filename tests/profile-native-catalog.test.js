@@ -27,7 +27,7 @@ module.exports=async()=>{
   });
   const before=e.snapshot(),op=f.operations.length,writes=f.writes.length;
   const result=await e.command({action:'include_native_catalog',revision:e.status().revision});
-  assert(result.catalog.length>100);assert.equal(result.editor_api,9);
+  assert(result.catalog.length>100);assert.equal(result.editor_api,10);
   assert.equal(f.writes.length,writes,'Discovery never writes bridge storage');assert.equal(f.operations.length,op,'Discovery reads metadata, not values');
   assert.deepEqual(e.snapshot().document,before.document,'Browsing never enrolls standards');
   const virtual={...e.snapshot(),document:{...e.snapshot().document,banks:result.catalog}};

@@ -632,7 +632,7 @@
       const usable=new Set(this.records().filter(r=>r.key==='backlight'&&this.lgStatus(r).editable).map(r=>r.bank.id));
       if(banks.some(b=>!usable.has(b.id))){this.error('LG doesn’t use OLED pixel brightness for every selected preset. Select them again.');return;}
       const changed=banks.filter(b=>!!b.brightness_role!==linked);if(!changed.length){this.error('The selected profiles already have this link state.');return;}
-      const describe=bank=>(bank.brightness_role?'Linked':'Independent')+' · '+(this.schema2()?model.profileOptions(this.state.document).map(([id,label])=>label+' '+model.values(bank,this.state,id).backlight).join(' / '):'Bright '+model.values(bank,this.state,'bright').backlight+' / Dark '+model.values(bank,this.state,'dark').backlight);
+      const describe=bank=>(bank.brightness_role?'Linked':'Independent')+' · '+(this.schema2()?model.profileOptions(this.state.document,'main').map(([id,label])=>label+' '+model.values(bank,this.state,id).backlight).join(' / '):'Bright '+model.values(bank,this.state,'bright').backlight+' / Dark '+model.values(bank,this.state,'dark').backlight);
       const entries=changed.map(bank=>{const after=JSON.parse(JSON.stringify(bank));model.setBrightnessLink(after,linked,this.state.preferences,this.state.room,this.state.document);return {label:'SDR brightness link',variant:'All profiles',before:describe(bank),value:describe(after),targets:[{scope:model.inputName(bank)+' · '+model.modes[bank.target.dimension.pictureMode]}]};});
       this.review={action:'set_brightness_links',revision:this.state.revision,links:changed.map(bank=>({bank_id:bank.id,linked})),entries,returnFocus};this.render({key:'review-back',neighbors:[]},false);
     }
@@ -788,7 +788,7 @@
       if(schema2||this.status.editor_api>=6)tabs.append(this.button(this.adapter.fileTransfer!==false?'Profiles & backup':schema2?'Manage profiles':'Named profiles',()=>this.openView('profiles'),'ghost','open-profiles'));
       else if(this.adapter.fileTransfer!==false)tabs.append(this.button('Backup',()=>this.openView('profiles'),'ghost','open-profiles'));
       card.append(tabs);
-      const base=this.variant==='standard',note=el('p',schema2?(base?'Starting values. Profiles follow Base unless they override a setting.':'Changes save as '+this.profileName(this.variant)+' overrides. The rest follows Base.'):
+      const base=this.variant==='standard',addon=schema2&&!base&&(this.state.document.profiles.find(p=>p.id===this.variant)||{}).group,note=el('p',schema2?(base?'Starting values. Profiles follow Base unless they override a setting.':addon?'Changes save as '+this.profileName(this.variant)+' overrides. When this add-on is selected, its overrides apply on top of the profile in use; nothing else changes.':'Changes save as '+this.profileName(this.variant)+' overrides. The rest follows Base.'):
         (base?'Base standard values.':this.profileName(this.variant)+' values for this room.'),'edit-note');
       note.id='edit-context';card.append(note);return card;
     }
@@ -803,10 +803,15 @@
       const second=el('div',undefined,'tv-line');second.append(el('span',this.usingText(),'using'),this.button('TV profile & automation',()=>this.openView('tv'),'ghost small','open-tv'));card.append(second);
       return card;
     }
+    // Selected add-ons, e.g. " + Switch 2 HDR · DTM fix".
+    addonText() {
+      const layers=[].concat(model.activeLayers(this.state)).slice(1);
+      return layers.map(id=>' + '+this.profileName(id)).join('');
+    }
     // The profile the TV is using, how it was chosen, and its state.
     usingText() {
       const temporary=Object.values(this.state.overrides||{}).reduce((n,v)=>n+Object.keys(v).length,0);
-      const using=this.schema2()?'Using '+this.profileName(this.state.active_profile)+' · '+(this.state.selection==='automatic'?'Automatic':'Manual'):'Room: '+this.state.room;
+      const using=this.schema2()?'Using '+this.profileName(this.state.active_profile)+' · '+(this.state.selection==='automatic'?'Automatic':'Manual')+this.addonText():'Room: '+this.state.room;
       return using+(this.state.enabled?'':' · paused')+(temporary?' · '+temporary+' temporary':'');
     }
     aliasGroups() {
@@ -1171,15 +1176,17 @@
         const doc=this.state.document,list=el('ul',undefined,'targets');
         for(const p of doc.profiles) {
           const count=doc.banks.reduce((n,b)=>n+Object.keys((b.variants||{})[p.id]||{}).length,0)+Object.keys(p.brightness||{}).length;
-          list.append(el('li',p.name+' · '+(count?count+' '+(count===1?'override':'overrides'):'follows Base everywhere')+' · ID '+p.id+(p.id===this.state.active_profile?' · on TV now':'')));
+          list.append(el('li',(p.group?p.group+' add-on · ':'')+p.name+' · '+(count?count+' '+(count===1?'override':'overrides'):'follows Base everywhere')+' · ID '+p.id+(p.id===this.state.active_profile?' · on TV now':'')));
         }
         const fields=el('div',undefined,'section');fields.append(el('h4','Profiles'),list);
         const nameLabel=el('label',undefined,'field'),name=el('input');name.type='text';name.maxLength=64;name.placeholder='e.g. Evening';name.value=this.profileNameDraft||'';name.dataset.focus='profile-name';name.setAttribute('aria-label','Profile name');name.oninput=()=>{this.profileNameDraft=name.value;};nameLabel.append(el('span','Profile name'),name);
-        const actions=el('div',undefined,'row-actions'),make=copy=>this.profileCommand({action:'create_profile',name:name.value.trim(),copy_from:copy});
-        actions.append(this.button('New from Base',()=>make('standard')));
+        const groupLabel=el('label',undefined,'field'),group=el('input');group.type='text';group.maxLength=40;group.placeholder='e.g. Switch 2 HDR';group.value=this.profileGroupDraft||'';group.dataset.focus='profile-group';group.setAttribute('aria-label','Add-on group');group.oninput=()=>{this.profileGroupDraft=group.value;};
+        const known=[...new Set(doc.profiles.filter(v=>v.group).map(v=>v.group))];groupLabel.append(el('span','Add-on group'+(known.length?' (existing: '+known.join(', ')+')':'')),group);
+        const actions=el('div',undefined,'row-actions'),make=(copy,extra={})=>this.profileCommand({action:'create_profile',name:name.value.trim(),copy_from:copy,...extra});
+        actions.append(this.button('New from Base',()=>make('standard',{group:null})),this.button('New add-on from Base',()=>{if(!group.value.trim()){this.error('Name the add-on group first, e.g. Switch 2 HDR.');return;}make('standard',{group:group.value.trim()});}));
         const selected=this.variant!=='standard'?this.profileName(this.variant):null;
         if(selected)actions.append(this.button('Duplicate '+selected,()=>make(this.variant)),this.button('Rename '+selected,()=>this.profileCommand({action:'rename_profile',profile_id:this.variant,name:name.value.trim()})),this.button('Reset '+selected+' to Base',()=>this.reviewProfile('reset_profile')),this.button('Delete '+selected,()=>this.reviewProfile('delete_profile')));
-        const create=el('div',undefined,'section');create.append(el('h4',selected?'New profile or change '+selected:'New profile'),nameLabel,actions,
+        const create=el('div',undefined,'section');create.append(el('h4',selected?'New profile or change '+selected:'New profile'),nameLabel,groupLabel,actions,el('p','An add-on belongs to a group, such as Switch 2 HDR, and is chosen per group in TV profile & automation. It layers over Automatic or a manual profile, so give it overrides only where it should apply (for example HDMI 3’s HDR Game preset).','note'),
           el('p',selected?'Actions apply to '+selected+', the profile you are editing. Pick another tab to change a different profile. Duplicating copies only its overrides; Reset removes all of them.':'Pick a profile tab to rename, duplicate, reset or delete it.','note'));
         if(selected)create.append(el('p','Automation profile ID: '+this.variant+'. Renaming keeps this ID.','note'));
         sheet.append(fields,create);
@@ -1193,7 +1200,7 @@
       if(backup)sheet.append(backup);
     }
     renderTv(sheet) {
-      const p=this.status.offline?null:this.picture(),choices=model.profileOptions(this.state.document);
+      const p=this.status.offline?null:this.picture(),choices=model.profileOptions(this.state.document,'main');
       this.sheetHead(sheet,'TV profile & automation','Choosing what the TV uses is separate from editing. Editing Base or a profile never changes this selection.');
       const now=el('div',undefined,'section');now.append(el('h4',p&&!p.live?'Last watched':'On screen'),el('p',this.status.offline?'TV offline · showing saved backup':p?this.pictureText(p,true)+(p.live?'':this.adapter&&this.adapter.tvApp?' · the TV returns here when you close this app':' · no HDMI picture on screen now'):'No HDMI picture since the bridge started.'));
       sheet.append(now);
@@ -1207,6 +1214,22 @@
         for(const [key,label] of [['bright','Automatic bright room'],['dark','Automatic dark room']])grid.append(this.select(label,choices.map(([id,l])=>[id,id==='standard'?'Base':l]),automatic[key],id=>{this.automaticDraft={...automatic,[key]:id};automatic[key]=id;}));
         bindings.append(el('h4','Automatic bindings'),grid,this.button('Save automatic bindings',()=>this.profileCommand({action:'set_automatic',profiles:this.automaticDraft||this.state.document.automatic})));
         sheet.append(use,bindings);
+        const addons=this.state.document.profiles.filter(v=>v.group),groups=[...new Set(addons.map(v=>v.group))];
+        if(groups.length) {
+          // One selector per group. The choice persists on the TV and layers
+          // over whichever main profile is in use.
+          const section=el('div',undefined,'section'),current=this.state.addons||{};this.addonChoice=this.addonChoice||{};
+          section.append(el('h4','Add-ons'));
+          for(const group of groups) {
+            const options=[['none','Off · use the profile in use'],...addons.filter(v=>v.group===group).map(v=>[v.id,v.name])];
+            const pick=()=>Object.hasOwn(this.addonChoice,group)?this.addonChoice[group]:current[group]||'none',fields=el('div',undefined,'fields');
+            fields.append(this.select(group,options,pick(),id=>{this.addonChoice[group]=id;}));
+            section.append(el('p',group+' now: '+(current[group]?(addons.find(v=>v.id===current[group])||{}).name:'Off'),'note'),fields,
+              this.button('Apply '+group,()=>this.profileCommand({action:'apply_addon',group,profile_id:pick()}),'tv-primary','addon-apply:'+group));
+          }
+          section.append(el('p','An add-on only changes the settings it overrides, such as one source’s HDR game preset, on top of Automatic or a manual profile. Its choice stays until you change it, across power cycles. Applying clears temporary adjustments in the settings it owns.','note'));
+          sheet.insertBefore(section,bindings);
+        }
       }
       const manage=el('div',undefined,'section'),management=this.button(this.state.enabled?'Profile management: On':'Profile management: Off',()=>this.mutate({action:'set_enabled',enabled:!this.state.enabled}),undefined,'management');management.setAttribute('aria-pressed',String(this.state.enabled));
       manage.append(el('h4','Profile management'),management,el('p','Profile management applies saved profiles and resets temporary adjustments to their saved values after a power cycle.','note'));sheet.append(manage);
@@ -1215,7 +1238,7 @@
       const temporary=this.records().filter(r=>r.managed&&Object.hasOwn((this.state.overrides||{})[r.bank.id]||{},r.key)),active=this.state.active_profile||this.state.room;
       const temp=el('div',undefined,'section');temp.append(el('h4','Temporary adjustments · '+temporary.length));
       if(temporary.length) {
-        const list=el('ul',undefined,'targets');for(const r of temporary)list.append(el('li',pretty(r.alias)+' · '+model.storedScope(r)+': '+display(this.state.overrides[r.bank.id][r.key])+' (saved in '+this.profileName(active)+': '+display(model.values(r.bank,this.state,active)[r.key])+')'));temp.append(list);
+        const list=el('ul',undefined,'targets');for(const r of temporary)list.append(el('li',pretty(r.alias)+' · '+model.storedScope(r)+': '+display(this.state.overrides[r.bank.id][r.key])+' (saved in '+this.profileName(active)+this.addonText()+': '+display(model.values(r.bank,this.state,model.activeLayers(this.state))[r.key])+')'));temp.append(list);
         const actions=el('div',undefined,'row-actions'),restore=this.button('Restore all to saved values',()=>this.openActionReview('restore',temporary,'restore'),undefined,'restore'),keep=this.button('Keep all adjustments',()=>this.openActionReview('save',temporary,'promote'),undefined,'promote');
         restore.dataset.tempAction=keep.dataset.tempAction=temporary.some(r=>!this.statusOf(r).editable)?'blocked':'';actions.append(restore,keep);temp.append(actions);
       } else temp.append(el('p','Nothing on the TV differs from its saved values.','note'));
@@ -1287,7 +1310,7 @@
     renderReview(sheet) {
       const r=this.review,variants=[...new Set(r.entries.map(e=>e.variant))];
       const editTitle=this.schema2()&&variants.length===1?(variants[0]==='standard'?'Review Base changes':'Review '+this.profileName(variants[0])+' overrides'):'Review settings changes';
-      const head=el('div',undefined,'sheet-head');head.append(el('h3',r.action==='delete_profile'?'Delete profile':r.action==='reset_profile'?'Reset profile to base':r.action==='set_brightness_links'?'Review brightness links':r.action==='edit_many'?editTitle:r.action==='restore'?'Restore '+this.profileName(this.state.active_profile||this.state.room)+' standards':'Keep adjustments in '+this.profileName(this.state.active_profile||this.state.room)));sheet.append(head);
+      const head=el('div',undefined,'sheet-head');head.append(el('h3',r.action==='delete_profile'?'Delete profile':r.action==='reset_profile'?'Reset profile to base':r.action==='set_brightness_links'?'Review brightness links':r.action==='edit_many'?editTitle:r.action==='restore'?'Restore '+this.profileName(this.state.active_profile||this.state.room)+this.addonText()+' standards':'Keep adjustments in '+this.profileName(this.state.active_profile||this.state.room)+this.addonText()));sheet.append(head);
       if(r.action==='edit_many')sheet.append(el('p','Nothing is written until you save. Each change lists the exact TV storage it replaces.','note'));
       for(const entry of r.entries) {
         const row=el('div',undefined,'diff'+(entry.variant==='standard'?' to-base':entry.variant==='All profiles'?'':' to-profile')),label=el('div');label.append(el('strong',entry.label),el('p','Save to: '+this.profileName(entry.variant)+(entry.preference?' · Shared brightness':''),'destination'));
@@ -1329,6 +1352,8 @@
         if(command.action==='create_profile'&&reply.profile_id){this.variant=reply.profile_id;this.profileNameDraft='';}
         if(command.action==='set_automatic')this.automaticDraft=null;
         if(command.action==='apply_profile')this.applyChoice=null;
+        if(command.action==='apply_addon'&&this.addonChoice)delete this.addonChoice[command.group];
+        if(command.action==='create_profile')this.profileGroupDraft='';
         if(command.action==='delete_profile'&&this.view==='profiles')this.variant='standard';
         if(['edit_many','initialize','import','restore_backup'].includes(command.action))this.draft={};this.review=null;this.resetLive();
         if(!await this.refresh())throw new Error('Command accepted, but the saved state could not be refreshed');

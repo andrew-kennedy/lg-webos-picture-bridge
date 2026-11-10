@@ -118,6 +118,7 @@ function decodeBackup(envelope) {
     validate(state.native_snapshot.document);
     if(state.native_snapshot.document.banks.some(b=>b.variants||b.brightness_role))fail('Native snapshot must contain values, not profile policy');
   }
+  if(state.addons!==undefined&&(!plain(state.addons)||Object.keys(state.addons).length>32||Object.values(state.addons).some(v=>typeof v!=='string')))fail('Invalid add-on selection');
   if(state.document.schema===2&&state.selection!==undefined&&state.selection!=='automatic'&&!catalog.valid(state.document,state.selection))fail('Invalid selected profile');
   return state;
 }

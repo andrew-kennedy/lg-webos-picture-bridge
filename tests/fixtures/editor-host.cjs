@@ -60,13 +60,15 @@ function setup(initial) {
     }
     if(command.action==='create_profile') {
       const id='p_'+window.fixture.revision,source=window.fixture.document.profiles.find(p=>p.id===command.copy_from);
-      window.fixture.document.profiles.push({id,name:command.name,brightness:structuredClone(source&&source.brightness||{})});
+      const group=command.group===undefined?source&&source.group:command.group;
+      window.fixture.document.profiles.push({id,name:command.name,brightness:group?{}:structuredClone(source&&source.brightness||{}),...(group?{group}:{})});
       for(const bank of window.fixture.document.banks)if((bank.variants||{})[command.copy_from])bank.variants[id]=structuredClone(bank.variants[command.copy_from]);
       window.fixture.revision++;return {revision:window.fixture.revision,profile_id:id};
     }
     if(command.action==='rename_profile'){window.fixture.document.profiles.find(p=>p.id===command.profile_id).name=command.name;window.fixture.revision++;}
     if(command.action==='set_automatic'){window.fixture.document.automatic=command.profiles;window.fixture.revision++;}
     if(command.action==='apply_profile'){window.fixture.selection=command.profile_id;window.fixture.active_profile=command.profile_id==='automatic'?window.fixture.document.automatic[window.fixture.room]:command.profile_id;window.fixture.overrides={};}
+    if(command.action==='apply_addon'){window.fixture.addons={...(window.fixture.addons||{})};if(command.profile_id==='none')delete window.fixture.addons[command.group];else window.fixture.addons[command.group]=command.profile_id;}
     if(command.action==='reset_profile') {
       window.fixture.document.profiles.find(p=>p.id===command.profile_id).brightness={};
       for(const bank of window.fixture.document.banks)if(bank.variants)delete bank.variants[command.profile_id];window.fixture.revision++;

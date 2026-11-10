@@ -31,9 +31,12 @@
     if(d.pictureMode)return d.pictureMode.startsWith('dolbyHdr')?'dolbyHdr':d.pictureMode.startsWith('hdr')?'hdr':'sdr';
     return null;
   }
+  // variant is a profile ID, or an array of layers: the main profile, then
+  // selected add-ons, each overriding the one before it.
   function values(bank,state,variant) {
     if(state.document.schema===2) {
-      const result={...bank.settings,...(bank.variants||{})[variant]||{}};
+      const result={...bank.settings};
+      for(const layer of [].concat(variant))Object.assign(result,(bank.variants||{})[layer]||{});
       if(bank.brightness_role)result.backlight=brightness(state.document,variant)[bank.brightness_role];
       return result;
     }
@@ -42,12 +45,25 @@
     if(bank.brightness_role)result.backlight=state.preferences[bank.brightness_role==='game_sdr'?'game_sdr':'movie_'+room];
     return result;
   }
-  function profileOptions(document) {
-    return [['standard','Base standard'],...(document.schema===2?document.profiles.map(p=>[p.id,p.name]):[['bright','Bright room'],['dark','Dark room']])];
+  // Add-on profiles are labelled with their group, e.g. "Switch 2 HDR · DTM".
+  function profileOptions(document,kind) {
+    const all=document.schema===2?document.profiles.filter(p=>kind==='main'?!p.group:kind==='addon'?!!p.group:true).map(p=>[p.id,p.group?p.group+' · '+p.name:p.name]):[['bright','Bright room'],['dark','Dark room']];
+    return kind==='addon'?all:[['standard','Base standard'],...all];
+  }
+  // The layers the TV applies now: the main profile, then each selected add-on.
+  function activeLayers(state) {
+    const main=state.active_profile||state.room,doc=state.document,selected=state.addons||{};
+    if(!doc||doc.schema!==2)return main;
+    const chosen=[...new Set(doc.profiles.filter(p=>p.group).map(p=>p.group))].filter(g=>doc.profiles.some(p=>p.id===selected[g]&&p.group===g)).map(g=>selected[g]);
+    return chosen.length?[main,...chosen]:main;
   }
   function brightness(document,variant) {
-    const profile=(document.profiles||[]).find(p=>p.id===variant);
-    return {...document.brightness,...profile&&profile.brightness||{}};
+    const result={...document.brightness};
+    for(const layer of [].concat(variant)) {
+      const profile=(document.profiles||[]).find(p=>p.id===layer);
+      Object.assign(result,profile&&profile.brightness||{});
+    }
+    return result;
   }
   function preferenceValue(state,key) {
     if(state.document.schema!==2)return state.preferences[key];
@@ -313,6 +329,6 @@
     inputAudioFormatHDMI3:'HDMI 3 input audio format',inputAudioFormatHDMI4:'HDMI 4 input audio format'};
   const title=key=>titles[key] || key.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase());
   const rowFormat=(kind,row)=>kind==='preset'?presetFormat(row):kind==='range'?rangeFormat(row):null;
-  return {values,brightness,profileOptions,preferenceValue,isInherited,control,same,inputName,brightnessRole,setBrightnessLink,scopeSelection,modes,families,presetsFor,listed,presetFamily,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition,
+  return {values,brightness,profileOptions,activeLayers,preferenceValue,isInherited,control,same,inputName,brightnessRole,setBrightnessLink,scopeSelection,modes,families,presetsFor,listed,presetFamily,categories,formats,records,options,matches,factor,scopeRows,storedScope,combinedControl,applicability,partition,
     ranges,coordinates,inColumn,targeted,rangesFor,presetUsage,shortPreset,rowLabel,rowFormat,physical,titles,title};
 });

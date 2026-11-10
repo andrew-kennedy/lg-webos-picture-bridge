@@ -2,12 +2,38 @@
 
 // Named profiles are partial overlays on the same native bank identities.
 // Selection belongs to the session journal, never to the standard revision.
+// An add-on profile names a group (for example "Switch 2 HDR"). At most one
+// add-on per group is selected, and it layers over the main profile in use,
+// so it only changes the banks it overrides.
 const view = require('../../profile-view');
 const clone = value => JSON.parse(JSON.stringify(value));
 const plain = value => value && typeof value === 'object' && !Array.isArray(value);
 const roles = ['game_sdr','movie_sdr'];
 function ids(doc) { return doc.schema===2 ? doc.profiles.map(p=>p.id) : ['bright','dark']; }
-function valid(doc,id) { return id==='standard'||ids(doc).includes(id); }
+// A layered variant is an array: the main profile, then selected add-ons.
+function valid(doc,id) { return Array.isArray(id)?id.length>0&&id.every(v=>valid(doc,v)):id==='standard'||ids(doc).includes(id); }
+function addon(doc,id) { const p=doc.schema===2&&doc.profiles.find(v=>v.id===id);return !!(p&&p.group); }
+function groups(doc) { return doc.schema===2?[...new Set(doc.profiles.filter(p=>p.group).map(p=>p.group))]:[]; }
+function groupName(value) {
+  if(typeof value!=='string'||!value.trim()||value!==value.trim()||value.length>40||/[\x00-\x1f\x7f]/.test(value))throw new Error('Choose an add-on group name (1–40 characters)');
+  return value;
+}
+// Valid add-on selections only, in group order. Unknown groups or profiles
+// (deleted, renamed group, older backups) fall back to no add-on.
+function addons(doc,selected) {
+  const result={};
+  if(!doc||doc.schema!==2||!plain(selected))return result;
+  for(const group of groups(doc)) {
+    const id=Object.hasOwn(selected,group)?selected[group]:null;
+    const p=id&&doc.profiles.find(v=>v.id===id);
+    if(p&&p.group===group)result[group]=id;
+  }
+  return result;
+}
+function layers(doc,main,selected) {
+  const chosen=Object.values(addons(doc,selected));
+  return chosen.length?[main,...chosen]:main;
+}
 function profile(doc,id) {
   if(id==='standard')return doc;
   const found=doc.profiles.find(p=>p.id===id);
@@ -23,12 +49,17 @@ function validate(doc) {
   if(!Array.isArray(doc.profiles)||doc.profiles.length>32)throw new Error('Expected up to 32 named profiles');
   const seen=new Set(),names=new Set(['automatic','base standard']);
   for(const p of doc.profiles) {
-    if(!plain(p)||Object.keys(p).some(k=>!['id','name','brightness'].includes(k))||
+    if(!plain(p)||Object.keys(p).some(k=>!['id','name','brightness','group'].includes(k))||
       !/^[a-z][a-z0-9_-]{0,63}$/.test(p.id||'')||['constructor','prototype','__proto__','standard','automatic'].includes(p.id)||seen.has(p.id))throw new Error('Profile IDs must be unique');
     if(typeof p.name!=='string'||!p.name.trim()||p.name!==p.name.trim()||p.name.length>64||/[\x00-\x1f\x7f]/.test(p.name)||names.has(p.name.toLowerCase()))throw new Error('Choose a unique profile name (1–64 characters)');
     brightness(p.brightness||{});seen.add(p.id);names.add(p.name.toLowerCase());
+    if(Object.hasOwn(p,'group')) {
+      groupName(p.group);
+      if(Object.keys(p.brightness||{}).length)throw new Error('Add-on profiles cannot change linked SDR brightness');
+    }
   }
   if(!plain(doc.automatic)||Object.keys(doc.automatic).length!==2||['bright','dark'].some(k=>!valid(doc,doc.automatic[k])))throw new Error('Choose profiles for both automatic room conditions');
+  if(['bright','dark'].some(k=>addon(doc,doc.automatic[k])))throw new Error('Automatic room conditions need main profiles, not add-ons');
 }
 function upgrade(document,preferences) {
   if(document.schema===2)return clone(document);
@@ -59,6 +90,7 @@ function edit(doc,bank,id,key,value,reset=false) {
   if(!valid(doc,id))throw new Error('Unknown profile');
   if(reset&&id==='standard')throw new Error('Base standards cannot inherit from themselves');
   if(key==='backlight'&&bank.brightness_role) {
+    if(addon(doc,id)&&!reset)throw new Error('Add-on profiles cannot change linked SDR brightness; unlink it first');
     if(reset&&!Object.hasOwn(profile(doc,id).brightness||{},bank.brightness_role))return;
     const p=profile(doc,id);p.brightness=p.brightness||{};
     if(reset)delete p.brightness[bank.brightness_role];else setBrightness(doc,id,bank.brightness_role,value);
@@ -71,4 +103,4 @@ function edit(doc,bank,id,key,value,reset=false) {
     if(!Object.keys(bank.variants).length)delete bank.variants;
   }
 }
-module.exports={ids,valid,profile,validate,upgrade,preferences,legacyPatch,edit,setBrightness};
+module.exports={ids,valid,addon,groups,groupName,addons,layers,profile,validate,upgrade,preferences,legacyPatch,edit,setBrightness};

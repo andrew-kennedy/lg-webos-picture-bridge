@@ -12,7 +12,7 @@ function create(options) {
       if (command && ['read','apply'].includes(command.action)) return banks.normalize(command);
       if (!engine || !command || !['get','backup','initialize','restore_backup','inspect','set_environment','set_enabled',
         'set_brightness','set_brightness_links','include_motion_controls','include_native_catalog','capture_native','compact_management','inspect_many','restore_scope','import','edit','edit_many','restore','save','reconcile',
-        'upgrade_profiles','create_profile','rename_profile','delete_profile','reset_profile','set_automatic','apply_profile'].includes(command.action)) throw new Error('Unknown profile command');
+        'upgrade_profiles','create_profile','rename_profile','delete_profile','reset_profile','set_automatic','apply_profile','apply_addon'].includes(command.action)) throw new Error('Unknown profile command');
       return command;
     }, summarizeResult:function (value) { return value; },
     publish:publish,
