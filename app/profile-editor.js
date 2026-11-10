@@ -145,8 +145,13 @@
   const model = window.LGProfileView;
   const presetRank = mode => ['sdr','hdr','dolbyHdr'].indexOf(model.rowFormat('preset',mode))*100+Object.keys(model.modes).indexOf(mode);
   const inputRank = id => {const m=/^hdmi(\d)(_pc)?$/.exec(id);return m?Number(m[1])*2+(m[2]?1:0):id==='default'?20:99;};
-  const optionText = (key,value) => key==='pictureMode'?(model.modes[value]||value):key==='truMotionMode'&&value==='user'?'User Selection':display(value);
-  const cellText = (key,value) => key==='pictureMode'&&model.modes[value]?model.shortPreset(value):key==='truMotionMode'&&value==='user'?'User':display(value);
+  // Friendly names for raw native values that are cryptic on their own. The
+  // Gamma control stores LG's keys; show what they actually are. profile-view
+  // titles the control "Gamma", so these read as Gamma 2.2 / Gamma BT.1886.
+  const valueLabels = {gamma:{high2:'BT.1886',mediumHavingLevel:'2.2'}};
+  const valueLabel = (key,value) => (valueLabels[key]&&valueLabels[key][value])||display(value);
+  const optionText = (key,value) => key==='pictureMode'?(model.modes[value]||value):key==='truMotionMode'&&value==='user'?'User Selection':valueLabel(key,value);
+  const cellText = (key,value) => key==='pictureMode'&&model.modes[value]?model.shortPreset(value):key==='truMotionMode'&&value==='user'?'User':valueLabel(key,value);
   // One label for a set of values: the value, a numeric span, or Mixed.
   function summarize(key,values) {
     const unique=[...new Set(values.map(display))];
@@ -966,7 +971,7 @@
       const drafts=records.map(r=>this.draft[this.entryId(r)]).filter(Boolean);
       if(!drafts.length)return '';
       const ids=new Set(drafts.map(d=>d.id));
-      return (drafts.some(d=>d.inherit)?'Draft: follow Base':'Draft: '+[...new Set(drafts.map(d=>display(d.value)))].join(' / '))+' for '+[...ids].length+' '+(ids.size===1?'entry':'entries')+' → '+this.profileName(this.variant)+' (not saved yet)';
+      return (drafts.some(d=>d.inherit)?'Draft: follow Base':'Draft: '+[...new Set(drafts.map(d=>valueLabel(d.key,d.value)))].join(' / '))+' for '+[...ids].length+' '+(ids.size===1?'entry':'entries')+' → '+this.profileName(this.variant)+' (not saved yet)';
     }
     renderGrid() {
       const host=this.gridHost;if(!host)return;host.replaceChildren();
@@ -1294,7 +1299,7 @@
           if(entry.baseImpact.overridden.length)label.append(el('p','Existing overrides stay in: '+entry.baseImpact.overridden.join(', ')+'.','note'));
         }
         if(entry.nativeOnly&&entry.variant==='standard')label.append(el('p','Saved directly on the TV. Future adjustments to this value persist until you change them again.','note'));
-        row.append(label,el('span',display(entry.before)+' → '+(entry.inherit?'Base: ':'')+display(entry.value),'value'));sheet.append(row);
+        row.append(label,el('span',valueLabel(entry.key,entry.before)+' → '+(entry.inherit?'Base: ':'')+valueLabel(entry.key,entry.value),'value'));sheet.append(row);
       }
       const excluded=[...new Map(r.entries.flatMap(e=>e.excluded||[]).map(e=>[e.id,e])).values()];
       if(excluded.length) {

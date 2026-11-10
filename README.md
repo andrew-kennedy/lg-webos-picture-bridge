@@ -2,6 +2,8 @@
 
 LG Picture Bridge connects a **rooted 2026 LG G6 (webOS 11)** to Home Assistant. It reports HDMI signal presence, input, picture mode, and SDR/HDR10/HLG/Dolby Vision through MQTT discovery, and applies picture profiles without notification dialogs.
 
+Version **0.29.1** labels the two SDR Gamma choices for what they are — **2.2** and **BT.1886** — instead of LG's internal `mediumHavingLevel` and `high2`. The dropdown, the setting grid and the review screen all show the new names; the value written to the TV is unchanged.
+
 Version **0.29.0** adds a power entity for each HDMI-CEC source, read from the TV's own CEC device list: for example `binary_sensor.lg_tv_cec_switch_2`, `binary_sensor.lg_tv_cec_apple_tv` and `binary_sensor.lg_tv_cec_shield`. The TV pushes changes, so nothing polls, and it works while the TV is in standby. A Nintendo Switch 2 reads On within about a second of waking, and Off when the TV drops it (about 15–35 seconds after it sleeps). A broken HDMI link doesn't make it Off, because the Switch keeps answering. See [CEC source power](#cec-source-power).
 
 Version **0.28.1**, with Home Assistant companion **0.20.0**, fixes scrolling in the Home Assistant mobile app. On a narrow screen the editor now scrolls as one page inside its own box, with the review row pinned below it: a setting opens at its top, Back returns to the same place in the list, and reaching the end of a scroll no longer moves Home Assistant's page (which pulled to refresh). Wider layouts and the TV app are unchanged.
